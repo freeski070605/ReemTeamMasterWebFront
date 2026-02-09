@@ -121,7 +121,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   linkFacebook: async (accessToken: string) => {
     try {
-      const response = await client.post('/users/facebook/link', { accessToken });
+      await client.post('/users/facebook/link', { accessToken });
       // TODO: update user state with facebook info
       toast.success('Facebook account linked successfully!');
     } catch (error: any) {

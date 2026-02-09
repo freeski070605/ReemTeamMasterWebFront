@@ -12,9 +12,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import TableSelect from './pages/TableSelect';
 import GameTable from './pages/GameTable';
-import Wallet from './pages/Wallet';
 import Admin from './pages/Admin';
-import Profile from './pages/Profile';
 import Account from './pages/Account';
 
 const App: React.FC = () => {
