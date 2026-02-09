@@ -14,6 +14,9 @@ import TableSelect from './pages/TableSelect';
 import GameTable from './pages/GameTable';
 import Admin from './pages/Admin';
 import Account from './pages/Account';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import UserDataDeletion from './pages/UserDataDeletion';
 
 const App: React.FC = () => {
   const { checkAuth } = useAuthStore();
@@ -29,6 +32,9 @@ const App: React.FC = () => {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/data-deletion" element={<UserDataDeletion />} />
           
           <Route element={<ProtectedRoute />}>
             <Route path="/tables" element={<TableSelect />} />

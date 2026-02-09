@@ -143,7 +143,7 @@ const Account: React.FC = () => {
                     <div className="text-xs text-white/60">Not connected</div>
                   </div>
                   <FacebookLogin
-                    appId="YOUR_FACEBOOK_APP_ID"
+                    appId="1437814761308514"
                     autoLoad={false}
                     fields="name,email,picture"
                     callback={(response: any) => linkFacebook(response.accessToken)}

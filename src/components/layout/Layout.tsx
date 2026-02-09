@@ -64,7 +64,14 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </main>
 
       <footer className="layout-footer bg-black/70 border-t border-white/10 py-6 text-center text-white/50 text-sm">
-        &copy; {new Date().getFullYear()} ReemTeam. All rights reserved.
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-wrap justify-center gap-4 text-white/60">
+            <Link to="/privacy" className="hover:text-yellow-200 transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-yellow-200 transition-colors">Terms of Service</Link>
+            <Link to="/data-deletion" className="hover:text-yellow-200 transition-colors">User Data Deletion</Link>
+          </div>
+          <div>&copy; {new Date().getFullYear()} ReemTeam. All rights reserved.</div>
+        </div>
       </footer>
     </div>
   );
