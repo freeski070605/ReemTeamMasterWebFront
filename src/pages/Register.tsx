@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import FacebookLogin from 'react-facebook-login/dist/facebook-login-render-props';
+import { ReactFacebookLoginInfo, ReactFacebookFailureResponse } from 'react-facebook-login';
 import { useAuthStore } from '../store/authStore';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -8,7 +10,8 @@ const Register: React.FC = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { register, isLoading } = useAuthStore();
+  const [errorMessage, setErrorMessage] = useState('');
+  const { register, isLoading, facebookLogin } = useAuthStore();
   const navigate = useNavigate();
   const logoSrc = "/assets/logo.png";
 
@@ -19,6 +22,21 @@ const Register: React.FC = () => {
       navigate('/tables'); // Redirect to tables after registration
     } catch (error) {
       // Error handled in store
+    }
+  };
+
+  const handleFacebookRegister = async (response: ReactFacebookLoginInfo | ReactFacebookFailureResponse) => {
+    if ('accessToken' in response) {
+      try {
+        await facebookLogin(response.accessToken);
+        navigate('/tables');
+      } catch (error) {
+        setErrorMessage('Facebook registration failed. Please try again.');
+        console.error('Facebook registration failed:', error);
+      }
+    } else {
+      setErrorMessage('Could not authenticate with Facebook. Please try again.');
+      console.error('Facebook registration error: No access token received.');
     }
   };
 
@@ -60,7 +78,21 @@ const Register: React.FC = () => {
         <Button type="submit" className="w-full" isLoading={isLoading}>
           Register
         </Button>
+        {errorMessage && <p className="text-red-500 text-sm mt-4 text-center">{errorMessage}</p>}
       </form>
+        <div className="mt-4">
+          <FacebookLogin
+            appId="1437814761308514"
+            autoLoad={false}
+            fields="name,email,picture"
+            callback={handleFacebookRegister}
+            render={(renderProps: { onClick: () => void; }) => (
+              <Button onClick={renderProps.onClick} className="w-full bg-blue-600 hover:bg-blue-700">
+                Register with Facebook
+              </Button>
+            )}
+          />
+        </div>
         <p className="mt-4 text-center text-sm text-white/60">
           Already have an account?{' '}
           <Link to="/login" className="text-yellow-300 hover:text-yellow-200">
