@@ -1,13 +1,148 @@
+@import url('https://fonts.googleapis.com/css2?family=Gabarito:wght@400;500;600;700;800&family=Oswald:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: "Gabarito", "Oswald", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #121212;
+  color: #A0A0A0;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+.layout-shell {
+  min-height: 100dvh;
+}
+
+.game-table-root {
+  min-height: 100dvh;
+}
+
+@media (max-height: 560px) and (orientation: landscape) {
+  .layout-header {
+    height: 48px;
+  }
+
+  .layout-header-inner {
+    height: 48px;
+  }
+
+  .layout-main {
+    padding: 8px;
+  }
+
+  .layout-footer {
+    display: none;
+  }
+
+  .game-table-shell {
+    border-width: 10px;
+    margin-top: 0;
+  }
+
+  .game-table-brand {
+    top: 8px;
+    left: 8px;
+    transform: scale(0.9);
+    transform-origin: top left;
+  }
+
+  .game-table-stats {
+    top: 8px;
+    right: 8px;
+    transform: scale(0.9);
+    transform-origin: top right;
+  }
+
+  .game-table-center {
+    gap: 4px;
+    transform: translate(-50%, -50%) scale(0.85);
+    transform-origin: center;
+  }
+
+  .game-table-pile {
+    width: 72px;
+    height: 108px;
+  }
+
+  .game-table-log {
+    top: auto;
+    bottom: 84px;
+    left: 8px;
+    width: 45vw;
+    max-width: 320px;
+  }
+
+  .game-table-me {
+    bottom: 92px;
+    left: 8px;
+    transform: scale(0.9);
+    transform-origin: bottom left;
+  }
+
+  .game-table-spreads {
+    bottom: 84px;
+    right: 8px;
+    max-height: 40vh;
+  }
+
+  .game-table-hand {
+    bottom: 4px;
+  }
+
+  .game-table-hand-zone {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-bottom: 4px;
+    padding-top: 4px;
+    max-width: 720px;
+  }
+
+  .game-table-hand-shell {
+    padding: 4px;
+    max-height: 128px;
+  }
+
+  .game-table-hand-cards {
+    height: 68px;
+  }
+
+  .game-table-hand-card {
+    width: 42px;
+    height: 64px;
+  }
+
+  .game-table-hand-cards > :not([hidden]) ~ :not([hidden]) {
+    margin-left: -1.1rem;
+  }
+
+  .game-table-spread-card {
+    width: 32px;
+    height: 46px;
+  }
+
+  .game-table-action-card {
+    padding: 4px;
+  }
+
+  .game-table-hand-hint {
+    display: none;
+  }
+
+  .game-table-hand-title {
+    display: none;
+  }
+
+  .game-table-log {
+    width: 38vw;
+    max-width: 260px;
+    bottom: 96px;
+  }
+
+  .game-table-spreads {
+    bottom: 92px;
+    max-height: 32vh;
+  }
 }
