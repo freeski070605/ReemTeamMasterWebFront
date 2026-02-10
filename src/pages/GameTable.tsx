@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGameStore } from "../store/gameStore";
 import { useAuthStore } from "../store/authStore";
@@ -15,6 +15,7 @@ import TurnTimer from "../components/game/TurnTimer";
 import GameActions from "../components/game/GameActions";
 import { Button } from "../components/ui/Button";
 import bgImage from '../assets/bg.png';
+import backCardImage from "../assets/cards/back.png";
 
 const GameTable: React.FC = () => {
   const { tableId } = useParams<{ tableId: string }>();
@@ -40,6 +41,10 @@ const GameTable: React.FC = () => {
   const [selectedCards, setSelectedCards] = useState<CardType[]>([]);
   const [isHitMode, setIsHitMode] = useState(false);
   const [actionLog, setActionLog] = useState<string[]>([]);
+  const prevTurnStateRef = useRef<{ isMyTurn: boolean; hasTakenAction: boolean }>({
+    isMyTurn: false,
+    hasTakenAction: false,
+  });
   const maxPlayers = 4;
   const {
     balance,
@@ -99,6 +104,17 @@ const GameTable: React.FC = () => {
 
   const currentPlayer = gameState.players.find((p) => p.userId === user._id);
   const isMyTurn = gameState.players[gameState.currentPlayerIndex]?.userId === user._id;
+  useEffect(() => {
+    if (!currentPlayer) return;
+    const prev = prevTurnStateRef.current;
+    if (isMyTurn && !currentPlayer.hasTakenActionThisTurn && (!prev.isMyTurn || prev.hasTakenAction)) {
+      toast.info("Your turn: draw from the deck or discard pile.");
+    }
+    prevTurnStateRef.current = {
+      isMyTurn,
+      hasTakenAction: currentPlayer.hasTakenActionThisTurn,
+    };
+  }, [isMyTurn, currentPlayer]);
 
   const toggleCardSelection = (card: CardType) => {
     if (selectedCards.some((c) => c.rank === card.rank && c.suit === card.suit)) {
@@ -221,8 +237,8 @@ const GameTable: React.FC = () => {
     return gameState.players[idx] ?? null;
   };
 
-  const rightPlayer = seatAt(1);
-  const topPlayer = seatAt(2);
+  const topPlayer = seatAt(1);
+  const rightPlayer = seatAt(2);
   const leftPlayer = seatAt(3);
 
   const isReem = gameState.status === 'round-end' && gameState.roundEndedBy === 'REEM';
@@ -262,18 +278,6 @@ const GameTable: React.FC = () => {
   };
 
   const hand = currentPlayer?.hand ?? [];
-  const fanStyle = (index: number, total: number) => {
-    if (total === 0) return {};
-    const center = (total - 1) / 2;
-    const offset = index - center;
-    const angle = offset * 6;
-    const x = offset * 22;
-    const y = Math.abs(offset) * -2;
-    return {
-      left: "50%",
-      transform: `translateX(-50%) translateX(${x}px) translateY(${y}px) rotate(${angle}deg)`,
-    };
-  };
 
   return (
     <div className="relative h-screen overflow-hidden">
@@ -290,43 +294,42 @@ const GameTable: React.FC = () => {
       </div>
 
       <div className="relative z-10 h-full flex flex-col">
-        <div className="navbar h-11 flex-shrink-0 flex items-center justify-between px-3 sm:px-4 border-b border-white/10 bg-black/30 backdrop-blur-sm">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="relative">
-              <div className="absolute -inset-1 rounded-full bg-yellow-400/20 blur-lg" />
-              <img src={logoSrc} alt="ReemTeam logo" className="relative w-7 h-7 object-contain" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-white text-sm font-bold tracking-wide truncate" style={{ fontFamily: displayFont }}>
-                ReemTeam
-              </div>
-              <div className="text-white/60 text-[10px] uppercase tracking-[0.3em]">Tonk Arena</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 bg-black/40 text-white text-[10px] px-2 py-1 rounded-full border border-white/10 backdrop-blur-sm">
-              <span className="uppercase tracking-widest text-[9px] text-white/60">Players</span>
-              <span className="font-bold">{gameState.players.length}/{maxPlayers}</span>
-            </div>
-            <div className="flex items-center gap-2 bg-black/40 text-white text-[10px] px-2 py-1 rounded-full border border-white/10 backdrop-blur-sm">
-              <span className="uppercase tracking-widest text-[9px] text-white/60">Balance</span>
-              <span className="font-bold">
-                {balanceLoading ? "..." : balanceError ? "Error" : formatCurrency(balance)}
-              </span>
-            </div>
-            <Button variant="danger" size="sm" onClick={handleLeaveTable}>Leave</Button>
-          </div>
-        </div>
-
         <div className="game-wrapper flex-1 relative overflow-hidden touch-manipulation">
           <div className="table-area relative w-full h-full flex items-center justify-center">
             <div
               className={`table relative w-[96vw] max-w-[820px] aspect-[16/9] rounded-[28px] border-[12px] shadow-2xl overflow-hidden bg-black/20 ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.06),transparent_60%)]" />
+              <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 bg-black/50 text-white rounded-full border border-white/10 px-2 py-1 backdrop-blur-sm min-w-0">
+                  <div className="relative flex-shrink-0">
+                    <div className="absolute -inset-1 rounded-full bg-yellow-400/20 blur-lg" />
+                    <img src={logoSrc} alt="ReemTeam logo" className="relative w-6 h-6 object-contain" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold tracking-wide truncate" style={{ fontFamily: displayFont }}>
+                      ReemTeam
+                    </div>
+                    <div className="text-[9px] text-white/60 uppercase tracking-[0.3em]">Tonk Arena</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded-full border border-white/10 backdrop-blur-sm">
+                    <span className="uppercase tracking-widest text-[9px] text-white/60">Players</span>
+                    <span className="font-bold">{gameState.players.length}/{maxPlayers}</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded-full border border-white/10 backdrop-blur-sm">
+                    <span className="uppercase tracking-widest text-[9px] text-white/60">Balance</span>
+                    <span className="font-bold">
+                      {balanceLoading ? "..." : balanceError ? "Error" : formatCurrency(balance)}
+                    </span>
+                  </div>
+                  <Button variant="danger" size="sm" onClick={handleLeaveTable}>Leave</Button>
+                </div>
+              </div>
 
               {topPlayer && (
-                <div className="seat absolute w-[34vw] max-w-[240px] h-[110px] flex items-center justify-center pointer-events-none top-[-12%] left-1/2 -translate-x-1/2">
+                <div className="seat absolute w-[34vw] max-w-[240px] h-[110px] flex items-center justify-center pointer-events-none top-1 left-1/2 -translate-x-1/2">
                   <div className="flex flex-col items-center gap-1">
                     <div className={`px-2 py-1 rounded-lg border ${gameState.players[gameState.currentPlayerIndex]?.userId === topPlayer.userId ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/30'}`}>
                       <div className="text-[11px] text-white font-semibold">{topPlayer.username}</div>
@@ -376,15 +379,14 @@ const GameTable: React.FC = () => {
                   <div className="relative w-20 h-28">
                     {gameState.deck.length > 0 && (
                       <div
-                        className={`w-full h-full bg-blue-800 rounded-lg border-2 border-white shadow-xl flex items-center justify-center cursor-pointer relative ${isMyTurn && !currentPlayer?.hasTakenActionThisTurn ? 'hover:scale-105 hover:ring-4 hover:ring-yellow-400 ring-4 ring-yellow-400 animate-pulse' : ''} transition-all`}
+                        className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center cursor-pointer relative transition-transform ${isMyTurn && !currentPlayer?.hasTakenActionThisTurn ? 'hover:scale-105' : ''}`}
+                        style={{
+                          backgroundImage: `url(${backCardImage})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                        }}
                         onClick={handleDeckClick}
                       >
-                        <div className="text-white font-bold text-sm">DECK</div>
-                        {isMyTurn && !currentPlayer?.hasTakenActionThisTurn && (
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-lg pointer-events-none">
-                            <span className="text-yellow-400 font-bold text-sm animate-bounce">DRAW</span>
-                          </div>
-                        )}
                         <div className="absolute -bottom-5 text-white text-[10px] font-bold">{gameState.deck.length}</div>
                       </div>
                     )}
@@ -396,29 +398,10 @@ const GameTable: React.FC = () => {
                           suit={gameState.discardPile[gameState.discardPile.length - 1].suit}
                           rank={gameState.discardPile[gameState.discardPile.length - 1].rank}
                         />
-                        {isMyTurn && !currentPlayer?.hasTakenActionThisTurn && (
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-lg pointer-events-none">
-                            <span className="text-yellow-400 font-bold text-sm animate-bounce">DRAW</span>
-                          </div>
-                        )}
-                        {isMyTurn && currentPlayer?.hasTakenActionThisTurn && (
-                          <div className={`absolute inset-0 flex items-center justify-center rounded-lg pointer-events-none ${selectedCards.length === 1 ? 'bg-green-500/40' : 'bg-black/20'}`}>
-                            <span className="text-white font-bold text-[10px] text-center px-1 drop-shadow-md">
-                              {selectedCards.length === 1 ? "DISCARD HERE" : "SELECT CARD"}
-                            </span>
-                          </div>
-                        )}
                       </div>
                     ) : (
                       <div className={`w-full h-full border-2 border-dashed border-white/30 rounded-lg flex items-center justify-center text-white/30 relative ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'cursor-pointer hover:bg-white/10 ring-4 ring-green-400 animate-pulse' : ''}`}>
                         Discard
-                        {isMyTurn && currentPlayer?.hasTakenActionThisTurn && (
-                          <div className="absolute inset-0 flex items-center justify-center rounded-lg pointer-events-none">
-                            <span className="text-white font-bold text-[10px] text-center px-1 drop-shadow-md">
-                              {selectedCards.length === 1 ? "DISCARD HERE" : "SELECT CARD"}
-                            </span>
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
@@ -472,27 +455,28 @@ const GameTable: React.FC = () => {
                     <div className="text-[10px] text-white/60">Cards: {hand.length}</div>
                   </div>
 
-                  <div className="hand relative h-24 w-full max-w-[320px] pointer-events-auto">
+                  <div className="hand relative h-24 w-full max-w-[520px] pointer-events-auto">
                     <AnimatePresence>
-                      {hand.map((card, index) => (
-                        <motion.div
-                          key={`${card.rank}-${card.suit}`}
-                          className="card absolute bottom-0"
-                          style={fanStyle(index, hand.length)}
-                          initial={{ y: 40, opacity: 0 }}
-                          animate={{ y: 0, opacity: 1 }}
-                          exit={{ y: -20, opacity: 0 }}
-                          transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                        >
-                          <CardComponent
-                            suit={card.suit}
-                            rank={card.rank}
-                            isSelected={selectedCards.some(c => c.rank === card.rank && c.suit === card.suit)}
-                            onClick={() => toggleCardSelection(card)}
-                            className="w-14 h-20 sm:w-16 sm:h-24"
-                          />
-                        </motion.div>
-                      ))}
+                      <div className="flex items-end justify-center gap-2 sm:gap-3">
+                        {hand.map((card) => (
+                          <motion.div
+                            key={`${card.rank}-${card.suit}`}
+                            className="card"
+                            initial={{ y: 30, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: -20, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                          >
+                            <CardComponent
+                              suit={card.suit}
+                              rank={card.rank}
+                              isSelected={selectedCards.some(c => c.rank === card.rank && c.suit === card.suit)}
+                              onClick={() => toggleCardSelection(card)}
+                              className="w-12 h-18 sm:w-14 sm:h-20"
+                            />
+                          </motion.div>
+                        ))}
+                      </div>
                     </AnimatePresence>
                   </div>
 
