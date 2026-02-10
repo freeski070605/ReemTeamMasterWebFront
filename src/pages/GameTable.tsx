@@ -93,17 +93,12 @@ const GameTable: React.FC = () => {
     };
   }, [socket, user?._id]);
 
-  if (!isConnected || !gameState || !user) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-gray-900">
-        <Loader />
-        <p className="mt-4 text-gray-400">Connecting to table...</p>
-      </div>
-    );
-  }
-
-  const currentPlayer = gameState.players.find((p) => p.userId === user._id);
-  const isMyTurn = gameState.players[gameState.currentPlayerIndex]?.userId === user._id;
+  const currentPlayer = gameState?.players.find((p) => p.userId === user?._id);
+  const isMyTurn = !!(
+    gameState &&
+    user &&
+    gameState.players[gameState.currentPlayerIndex]?.userId === user._id
+  );
   useEffect(() => {
     if (!currentPlayer) return;
     const prev = prevTurnStateRef.current;
@@ -115,6 +110,15 @@ const GameTable: React.FC = () => {
       hasTakenAction: currentPlayer.hasTakenActionThisTurn,
     };
   }, [isMyTurn, currentPlayer]);
+
+  if (!isConnected || !gameState || !user) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-900">
+        <Loader />
+        <p className="mt-4 text-gray-400">Connecting to table...</p>
+      </div>
+    );
+  }
 
   const toggleCardSelection = (card: CardType) => {
     if (selectedCards.some((c) => c.rank === card.rank && c.suit === card.suit)) {
