@@ -215,8 +215,6 @@ const GameTable: React.FC = () => {
 
   const localIndex = gameState.players.findIndex((p) => p.userId === user._id);
   const totalPlayers = gameState.players.length;
-  const dealerId = gameState.players[gameState.currentDealerIndex]?.userId;
-
   const seatAt = (offset: number) => {
     if (offset >= totalPlayers) return null;
     const idx = (localIndex + offset) % totalPlayers;
