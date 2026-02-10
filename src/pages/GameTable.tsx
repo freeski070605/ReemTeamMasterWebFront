@@ -12,6 +12,7 @@ import { PlayingCard as CardComponent } from "../components/ui/Card";
 import PlayerAvatar from "../components/game/PlayerAvatar";
 import Pot from "../components/game/Pot";
 import TurnTimer from "../components/game/TurnTimer";
+import GameActions from "../components/game/GameActions";
 import { Button } from "../components/ui/Button";
 import bgImage from '../assets/bg.png';
 import backCardImage from "../assets/cards/back.png";
@@ -31,13 +32,14 @@ const GameTable: React.FC = () => {
     leaveTable,
     drawCard,
     discardCard,
+    spread,
     hit,
+    drop,
     requestLeaveTable,
   } = useGameStore();
 
   const [selectedCards, setSelectedCards] = useState<CardType[]>([]);
   const [isHitMode, setIsHitMode] = useState(false);
-  const [actionLog, setActionLog] = useState<string[]>([]);
   const prevTurnStateRef = useRef<{ isMyTurn: boolean; hasTakenAction: boolean }>({
     isMyTurn: false,
     hasTakenAction: false,
@@ -131,18 +133,10 @@ const GameTable: React.FC = () => {
     }
   };
 
-  const pushLog = (message: string) => {
-    setActionLog((prev) => {
-      const next = [message, ...prev];
-      return next.slice(0, 6);
-    });
-  };
-
   const handleDeckClick = () => {
     if (isMyTurn && !currentPlayer?.hasTakenActionThisTurn) {
       if (tableId && user) {
         drawCard(tableId, user._id, "deck");
-        pushLog("You drew from the deck.");
       }
     }
   };
@@ -157,7 +151,6 @@ const GameTable: React.FC = () => {
       }
       if (tableId && user) {
         drawCard(tableId, user._id, "discard");
-        pushLog("You drew from the discard pile.");
       }
     } else {
       if (selectedCards.length !== 1) {
@@ -167,9 +160,28 @@ const GameTable: React.FC = () => {
       if (tableId && user) {
         discardCard(tableId, user._id, selectedCards[0]);
         setSelectedCards([]);
-        pushLog("You discarded a card.");
       }
     }
+  };
+
+  const handleSpread = () => {
+    if (selectedCards.length < 3) {
+      toast.error("A spread must have at least 3 cards.");
+      return;
+    }
+    if (tableId && user) {
+      spread(tableId, user._id, selectedCards);
+      setSelectedCards([]);
+    }
+  };
+
+  const handleHitClick = () => {
+    if (selectedCards.length !== 1) {
+      toast.error("Select one card to hit with.");
+      return;
+    }
+    setIsHitMode(true);
+    toast.info("Select a spread to hit.");
   };
 
   const executeHit = (targetPlayerId: string, targetSpreadIndex: number) => {
@@ -178,7 +190,12 @@ const GameTable: React.FC = () => {
       hit(tableId, user._id, selectedCards[0], targetPlayerId, targetSpreadIndex);
       setIsHitMode(false);
       setSelectedCards([]);
-      pushLog("You hit a spread.");
+    }
+  };
+
+  const handleDrop = () => {
+    if (tableId && user) {
+      drop(tableId, user._id);
     }
   };
 
@@ -374,19 +391,6 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              <div className="absolute left-3 bottom-3 w-40 bg-black/40 text-white/80 text-[10px] rounded-lg border border-white/10 backdrop-blur-sm p-2 pointer-events-none [@media(orientation:portrait)]:left-2 [@media(orientation:portrait)]:bottom-[34%] [@media(orientation:portrait)]:w-36">
-                <div className="uppercase tracking-widest text-[9px] text-white/60 mb-1">Action Log</div>
-                {actionLog.length === 0 ? (
-                  <div className="text-white/40">No recent actions.</div>
-                ) : (
-                  <div className="space-y-1">
-                    {actionLog.map((item, idx) => (
-                      <div key={idx} className="truncate">{item}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               <div className="absolute left-1/2 bottom-10 -translate-x-1/2 w-[82%] max-w-[560px] bg-black/25 border border-white/10 rounded-xl p-2 [@media(orientation:portrait)]:bottom-[22%] [@media(orientation:portrait)]:w-[90%] [@media(orientation:portrait)]:max-w-[520px]">
                 <div className="text-[10px] uppercase tracking-widest text-white/50 mb-1 text-center">Spreads</div>
                 <div className="space-y-1">
@@ -414,12 +418,25 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              <div className="seat absolute w-[40vw] max-w-[420px] h-[140px] flex items-center justify-center bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto [@media(orientation:portrait)]:bottom-8 [@media(orientation:portrait)]:w-[92vw]">
+              <div className="seat absolute w-[40vw] max-w-[440px] h-[170px] flex items-center justify-center bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto [@media(orientation:portrait)]:bottom-8 [@media(orientation:portrait)]:w-[92vw]">
                 <div className="flex flex-col items-center gap-1 w-full">
                   <div className={`px-2 py-1 rounded-lg border ${isMyTurn ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/30'}`}>
                     <div className="text-[11px] text-white font-semibold">{user.username}</div>
                     <div className="text-[10px] text-white/60">Cards: {hand.length}</div>
                   </div>
+
+                  {isMyTurn && (
+                    <div className="actions flex gap-2 mt-1 pointer-events-auto [&_button]:min-w-[72px] [&_button]:h-9">
+                      <GameActions
+                        canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
+                        canSpread={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length >= 3)}
+                        canHit={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)}
+                        onDrop={handleDrop}
+                        onSpread={handleSpread}
+                        onHit={handleHitClick}
+                      />
+                    </div>
+                  )}
 
                   <div className="hand relative h-28 w-full max-w-[700px] pointer-events-auto [@media(orientation:portrait)]:max-w-[92vw]">
                     <AnimatePresence>
