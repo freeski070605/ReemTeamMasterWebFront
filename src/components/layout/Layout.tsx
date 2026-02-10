@@ -17,9 +17,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   };
 
   return (
-    <div className="layout-shell bg-[#0f0f10] text-gray-100 flex flex-col">
-      <header className="layout-header bg-black/70 border-b border-white/10 sticky top-0 z-50 backdrop-blur">
-        <div className="layout-header-inner max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div className="min-h-screen bg-[#0f0f10] text-gray-100 flex flex-col">
+      <header className="bg-black/70 border-b border-white/10 sticky top-0 z-50 backdrop-blur">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-8">
             <Link to="/" className="flex items-center gap-3">
               <img src={logoSrc} alt="ReemTeam logo" className="w-9 h-9 object-contain" />
@@ -59,11 +59,11 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </div>
       </header>
 
-      <main className="layout-main flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
         {children}
       </main>
 
-      <footer className="layout-footer bg-black/70 border-t border-white/10 py-6 text-center text-white/50 text-sm">
+      <footer className="bg-black/70 border-t border-white/10 py-6 text-center text-white/50 text-sm">
         <div className="flex flex-col items-center gap-3">
           <div className="flex flex-wrap justify-center gap-4 text-white/60">
             <Link to="/privacy" className="hover:text-yellow-200 transition-colors">Privacy Policy</Link>

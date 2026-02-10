@@ -236,13 +236,11 @@ const GameTable: React.FC = () => {
     }).format(amount);
   };
 
-  const isFocusMode = isMyTurn || selectedCards.length > 0;
-
   return (
-    <div className="game-table-root relative">
+    <div className="relative min-h-screen">
       <div className="fixed inset-0 z-0" aria-hidden>
         <div
-          className={`absolute inset-0 transition-all duration-500 ${isFocusMode ? "scale-[1.02] blur-[1px]" : ""}`}
+          className="absolute inset-0"
           style={{
             backgroundImage: `linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.5)), url(${bgImage})`,
             backgroundSize: "cover",
@@ -250,10 +248,9 @@ const GameTable: React.FC = () => {
           }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_20%,rgba(255,199,74,0.22),transparent_55%)]" />
-        <div className={`absolute inset-0 transition-all duration-500 ${isFocusMode ? "bg-black/35 backdrop-blur-sm" : "bg-black/15"}`} />
       </div>
-      <div className={`game-table-shell relative z-10 w-full h-[100dvh] rounded-lg border-[16px] transition-colors duration-500 shadow-2xl overflow-hidden mt-4 ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}>
-        <div className="game-table-brand absolute top-6 left-6 z-50 flex items-center gap-3">
+      <div className={`relative z-10 w-full h-screen rounded-lg border-[16px] transition-colors duration-500 shadow-2xl overflow-hidden mt-4 ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}>
+        <div className="absolute top-6 left-6 z-50 flex items-center gap-3">
           <div className="relative">
             <div className="absolute -inset-2 rounded-full bg-yellow-400/20 blur-xl" />
             <img src={logoSrc} alt="ReemTeam logo" className="relative w-10 h-10 object-contain" />
@@ -263,7 +260,7 @@ const GameTable: React.FC = () => {
             <div className="text-white/60 text-xs uppercase tracking-[0.3em]">Tonk Arena</div>
           </div>
         </div>
-        <div className="game-table-stats absolute top-6 right-6 z-50 flex flex-col items-end gap-2">
+        <div className="absolute top-6 right-6 z-50 flex flex-col items-end gap-2">
           <div className="flex items-center gap-2 bg-black/40 text-white text-xs px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm">
             <span className="uppercase tracking-widest text-[10px] text-white/60">Players</span>
             <span className="font-bold">{gameState.players.length}/{maxPlayers}</span>
@@ -277,10 +274,10 @@ const GameTable: React.FC = () => {
           <Button variant="danger" size="sm" onClick={handleLeaveTable}>Leave Table</Button>
         </div>
 
-        <div className="game-table-center absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-8 pointer-events-none z-20">
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-8 pointer-events-none z-20">
             <Pot amount={gameState.pot} />
             <div className="flex gap-12 pointer-events-auto">
-              <div className="game-table-pile relative w-24 h-36">
+              <div className="relative w-24 h-36">
                  {gameState.deck.length > 0 && (
                     <div
                       className={`w-full h-full bg-blue-800 rounded-lg border-2 border-white shadow-xl flex items-center justify-center cursor-pointer relative ${isMyTurn && !currentPlayer?.hasTakenActionThisTurn ? 'hover:scale-105 hover:ring-4 hover:ring-yellow-400 ring-4 ring-yellow-400 animate-pulse' : ''} transition-all`}
@@ -296,7 +293,7 @@ const GameTable: React.FC = () => {
                     </div>
                  )}
               </div>
-              <div className="game-table-pile relative w-24 h-36" onClick={handleDiscardPileClick}>
+              <div className="relative w-24 h-36" onClick={handleDiscardPileClick}>
                 {gameState.discardPile.length > 0 ? (
                    <div className={`relative ${isMyTurn ? 'cursor-pointer hover:scale-105 transition-all' : ''} ${isMyTurn && ((!currentPlayer?.hasTakenActionThisTurn) || (currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)) ? 'hover:ring-4 hover:ring-yellow-400 rounded-lg' : ''} ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'animate-pulse' : ''}`}>
                      <CardComponent
@@ -432,7 +429,7 @@ const GameTable: React.FC = () => {
                   onClick={() => isHitMode && executeHit(player.userId, sIdx)}
                 >
                   {spread.map((card, cIdx) => (
-                    <CardComponent key={cIdx} suit={card.suit} rank={card.rank} className="game-table-spread-card w-10 h-14 sm:w-12 sm:h-16 text-[10px]" />
+                    <CardComponent key={cIdx} suit={card.suit} rank={card.rank} className="w-10 h-14 sm:w-12 sm:h-16 text-[10px]" />
                   ))}
                 </div>
               ))}
@@ -441,7 +438,7 @@ const GameTable: React.FC = () => {
         );
         })}
 
-        <div className="game-table-log absolute top-20 left-6 z-30 w-64 max-w-[70vw] bg-black/40 text-white/80 text-xs rounded-xl border border-white/10 backdrop-blur-sm p-3">
+        <div className="absolute top-20 left-6 z-30 w-64 max-w-[70vw] bg-black/40 text-white/80 text-xs rounded-xl border border-white/10 backdrop-blur-sm p-3">
           <div className="uppercase tracking-widest text-[10px] text-white/60 mb-2">Action Log</div>
           {actionLog.length === 0 ? (
             <div className="text-white/40">No recent actions.</div>
@@ -454,13 +451,13 @@ const GameTable: React.FC = () => {
           )}
         </div>
 
-        <div className={`game-table-me absolute bottom-32 left-6 z-30 p-2 rounded-xl ${isMyTurn ? 'ring-4 ring-yellow-400/70 shadow-[0_0_24px_rgba(250,204,21,0.45)] bg-yellow-400/10' : 'ring-1 ring-white/10 bg-black/20'}`}>
+        <div className={`absolute bottom-32 left-6 z-30 p-2 rounded-xl ${isMyTurn ? 'ring-4 ring-yellow-400/70 shadow-[0_0_24px_rgba(250,204,21,0.45)] bg-yellow-400/10' : 'ring-1 ring-white/10 bg-black/20'}`}>
           <PlayerAvatar player={{ name: user.username, avatarUrl: user.avatarUrl || '' }} size="sm" />
           <div className="text-white text-xs font-bold mt-2">You</div>
           <div className="text-yellow-400 text-xs">${currentPlayer?.currentBuyIn ?? 0}</div>
         </div>
         
-        <div className="game-table-spreads absolute bottom-32 right-8 flex flex-col items-end gap-2 max-h-[50vh] overflow-y-auto pr-2 pointer-events-auto z-20">
+        <div className="absolute bottom-32 right-8 flex flex-col items-end gap-2 max-h-[50vh] overflow-y-auto pr-2 pointer-events-auto z-20">
              {(currentPlayer?.spreads?.length ?? 0) > 0 && (
                <div className="bg-black/20 p-3 rounded-xl backdrop-blur-sm">
                   <h3 className="text-white/50 text-xs font-bold uppercase mb-2 text-right">My Spreads</h3>
@@ -472,7 +469,7 @@ const GameTable: React.FC = () => {
                           onClick={() => isHitMode && executeHit(user._id, sIdx)}
                         >
                           {spread.map((card, cIdx) => (
-                        <CardComponent key={cIdx} suit={card.suit} rank={card.rank} className="game-table-spread-card w-12 h-16" />
+                            <CardComponent key={cIdx} suit={card.suit} rank={card.rank} className="w-12 h-16" />
                           ))}
                         </div>
                     ))}
@@ -481,15 +478,9 @@ const GameTable: React.FC = () => {
              )}
         </div>
 
-        <div className="game-table-hand absolute bottom-0 left-0 right-0 z-30 pointer-events-none">
-          <div className="game-table-hand-zone mx-auto max-w-5xl w-full px-4 sm:px-6 pb-3 pt-4 pointer-events-auto">
-            <div className="game-table-hand-shell rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md shadow-[0_12px_40px_rgba(0,0,0,0.45)] px-4 py-3">
-              <div className="flex items-center justify-between gap-4 mb-2">
-                <div className="game-table-hand-title text-[11px] uppercase tracking-[0.3em] text-white/60">Your Hand</div>
-                <div className="game-table-hand-hint text-[11px] text-white/40">Tap cards to select</div>
-              </div>
-              <Card className={`p-2 ${isMyTurn ? 'ring-4 ring-yellow-400/60 shadow-[0_0_24px_rgba(250,204,21,0.25)]' : ''}`}>
-                <div className="game-table-hand-cards flex -space-x-10 sm:-space-x-12 items-end h-32 sm:h-40 pb-2 pointer-events-auto">
+        <div className="absolute bottom-2 left-0 right-0 flex flex-col items-center gap-1 z-30 pointer-events-none">
+            <Card className={`p-2 ${isMyTurn ? 'ring-4 ring-yellow-400/70 shadow-[0_0_30px_rgba(250,204,21,0.35)]' : ''}`}>
+              <div className="flex -space-x-10 sm:-space-x-12 items-end h-32 sm:h-40 pb-2 pointer-events-auto">
                 <AnimatePresence>
                   {currentPlayer?.hand.map((card) => (
                     <motion.div
@@ -505,29 +496,27 @@ const GameTable: React.FC = () => {
                         rank={card.rank}
                         isSelected={selectedCards.some(c => c.rank === card.rank && c.suit === card.suit)}
                         onClick={() => toggleCardSelection(card)}
-                        className="game-table-hand-card w-16 h-24 sm:w-20 sm:h-28"
+                        className="w-16 h-24 sm:w-20 sm:h-28"
                       />
                     </motion.div>
                   ))}
                 </AnimatePresence>
-                </div>
-              </Card>
-              <div className="h-14 flex items-center justify-center pointer-events-auto mt-3">
-                {isMyTurn && (
-                  <Card className="game-table-action-card p-2">
-                      <GameActions 
-                          canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
-                          canSpread={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length >= 3)}
-                          canHit={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)}
-                          onDrop={handleDrop}
-                          onSpread={handleSpread}
-                          onHit={handleHitClick}
-                      />
-                  </Card>
-                )}
               </div>
+            </Card>
+            <div className="h-12 flex items-center justify-center pointer-events-auto">
+              {isMyTurn && (
+                <Card className="p-2">
+                    <GameActions 
+                        canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
+                        canSpread={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length >= 3)}
+                        canHit={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)}
+                        onDrop={handleDrop}
+                        onSpread={handleSpread}
+                        onHit={handleHitClick}
+                    />
+                </Card>
+              )}
             </div>
-          </div>
         </div>
     </div>
     </div>
