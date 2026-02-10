@@ -214,18 +214,19 @@ const GameTable: React.FC = () => {
     }
   };
   
-  const otherPlayers = gameState.players.filter(p => p.userId !== user._id);
+  const localIndex = gameState.players.findIndex((p) => p.userId === user._id);
+  const totalPlayers = gameState.players.length;
+  const dealerId = gameState.players[gameState.currentDealerIndex]?.userId;
 
-  const getPositionClass = (index: number, total: number) => {
-    if (total === 1) return 'top-0 left-1/2 -translate-x-1/2 mt-4'; // Top Center
-    if (total === 2) return index === 0 ? 'top-1/2 left-0 -translate-y-1/2 ml-4' : 'top-1/2 right-0 -translate-y-1/2 mr-4'; // Left & Right
-    if (total === 3) {
-      if (index === 0) return 'top-1/2 left-0 -translate-y-1/2 ml-4';
-      if (index === 1) return 'top-0 left-1/2 -translate-x-1/2 mt-4';
-      if (index === 2) return 'top-1/2 right-0 -translate-y-1/2 mr-4';
-    }
-    return '';
+  const seatAt = (offset: number) => {
+    if (offset >= totalPlayers) return null;
+    const idx = (localIndex + offset) % totalPlayers;
+    return gameState.players[idx] ?? null;
   };
+
+  const rightPlayer = seatAt(1);
+  const topPlayer = seatAt(2);
+  const leftPlayer = seatAt(3);
 
   const isReem = gameState.status === 'round-end' && gameState.roundEndedBy === 'REEM';
   const formatCurrency = (amount: number | null) => {
@@ -234,6 +235,33 @@ const GameTable: React.FC = () => {
       style: "currency",
       currency: "USD",
     }).format(amount);
+  };
+
+  const renderOpponentHand = (count: number, size: "sm" | "md" = "sm") => {
+    if (count <= 0) {
+      return <div className="text-xs text-white/40">No cards</div>;
+    }
+    const visible = Math.min(count, 5);
+    const cardClass = size === "md" ? "w-12 h-16" : "w-10 h-14";
+    const overlapClass = size === "md" ? "-space-x-6" : "-space-x-5";
+    return (
+      <div className="relative">
+        <div className={`flex ${overlapClass}`}>
+          {Array.from({ length: visible }).map((_, idx) => (
+            <CardComponent
+              key={`opp-card-${idx}`}
+              suit="Spades"
+              rank="Ace"
+              isHidden
+              className={cardClass}
+            />
+          ))}
+        </div>
+        <div className="absolute -bottom-2 -right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full border border-white/10">
+          {count}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -250,35 +278,93 @@ const GameTable: React.FC = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_20%,rgba(255,199,74,0.22),transparent_55%)]" />
       </div>
       <div className={`relative z-10 w-full h-screen rounded-lg border-[16px] transition-colors duration-500 shadow-2xl overflow-hidden mt-4 ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}>
-        <div className="absolute top-6 left-6 z-50 flex items-center gap-3">
-          <div className="relative">
-            <div className="absolute -inset-2 rounded-full bg-yellow-400/20 blur-xl" />
-            <img src={logoSrc} alt="ReemTeam logo" className="relative w-10 h-10 object-contain" />
+        <div className="flex items-start justify-between px-6 pt-4 pb-2">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="absolute -inset-2 rounded-full bg-yellow-400/20 blur-xl" />
+              <img src={logoSrc} alt="ReemTeam logo" className="relative w-10 h-10 object-contain" />
+            </div>
+            <div>
+              <div className="text-white text-lg font-bold tracking-wide" style={{ fontFamily: displayFont }}>ReemTeam</div>
+              <div className="text-white/60 text-xs uppercase tracking-[0.3em]">Tonk Arena</div>
+            </div>
           </div>
-          <div>
-            <div className="text-white text-lg font-bold tracking-wide" style={{ fontFamily: displayFont }}>ReemTeam</div>
-            <div className="text-white/60 text-xs uppercase tracking-[0.3em]">Tonk Arena</div>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2 bg-black/40 text-white text-xs px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm">
+              <span className="uppercase tracking-widest text-[10px] text-white/60">Players</span>
+              <span className="font-bold">{gameState.players.length}/{maxPlayers}</span>
+            </div>
+            <div className="flex items-center gap-2 bg-black/40 text-white text-xs px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm">
+              <span className="uppercase tracking-widest text-[10px] text-white/60">Balance</span>
+              <span className="font-bold">
+                {balanceLoading ? "..." : balanceError ? "Error" : formatCurrency(balance)}
+              </span>
+            </div>
+            <Button variant="danger" size="sm" onClick={handleLeaveTable}>Leave Table</Button>
           </div>
-        </div>
-        <div className="absolute top-6 right-6 z-50 flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2 bg-black/40 text-white text-xs px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm">
-            <span className="uppercase tracking-widest text-[10px] text-white/60">Players</span>
-            <span className="font-bold">{gameState.players.length}/{maxPlayers}</span>
-          </div>
-          <div className="flex items-center gap-2 bg-black/40 text-white text-xs px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm">
-            <span className="uppercase tracking-widest text-[10px] text-white/60">Balance</span>
-            <span className="font-bold">
-              {balanceLoading ? "..." : balanceError ? "Error" : formatCurrency(balance)}
-            </span>
-          </div>
-          <Button variant="danger" size="sm" onClick={handleLeaveTable}>Leave Table</Button>
         </div>
 
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-8 pointer-events-none z-20">
-            <Pot amount={gameState.pot} />
-            <div className="flex gap-12 pointer-events-auto">
-              <div className="relative w-24 h-36">
-                 {gameState.deck.length > 0 && (
+        <div className="grid grid-cols-[minmax(160px,1fr)_minmax(320px,2fr)_minmax(160px,1fr)] grid-rows-[auto_1fr_auto] gap-4 px-6 pb-6 h-[calc(100%-96px)]">
+          <div className="col-start-2 row-start-1 flex flex-col items-center gap-2">
+            <div className={`px-3 py-2 rounded-xl border ${topPlayer && gameState.players[gameState.currentPlayerIndex]?.userId === topPlayer.userId ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/20'}`}>
+              <div className="text-xs text-white font-semibold">{topPlayer?.username ?? "Waiting..."}</div>
+              <div className="text-[10px] text-white/60">Cards: {topPlayer?.hand.length ?? 0}</div>
+              <div className="text-[10px] text-white/60">Score: {topPlayer ? (gameState.handScores?.[topPlayer.userId] ?? "-") : "-"}</div>
+              <div className="flex items-center gap-2 text-[10px] text-white/60">
+                {topPlayer?.userId === dealerId && <span className="px-1.5 py-0.5 rounded-full bg-yellow-400/20 text-yellow-200">Dealer</span>}
+                {topPlayer && gameState.players[gameState.currentPlayerIndex]?.userId === topPlayer.userId && <span className="px-1.5 py-0.5 rounded-full bg-yellow-400/20 text-yellow-200">Turn</span>}
+              </div>
+            </div>
+            {renderOpponentHand(topPlayer?.hand.length ?? 0, "sm")}
+          </div>
+
+          <div className="col-start-1 row-start-2 flex flex-col items-center gap-3">
+            <div className={`px-3 py-2 rounded-xl border ${leftPlayer && gameState.players[gameState.currentPlayerIndex]?.userId === leftPlayer.userId ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/20'}`}>
+              <div className="text-xs text-white font-semibold">{leftPlayer?.username ?? "Waiting..."}</div>
+              <div className="text-[10px] text-white/60">Cards: {leftPlayer?.hand.length ?? 0}</div>
+              <div className="text-[10px] text-white/60">Score: {leftPlayer ? (gameState.handScores?.[leftPlayer.userId] ?? "-") : "-"}</div>
+              <div className="flex items-center gap-2 text-[10px] text-white/60">
+                {leftPlayer?.userId === dealerId && <span className="px-1.5 py-0.5 rounded-full bg-yellow-400/20 text-yellow-200">Dealer</span>}
+                {leftPlayer && gameState.players[gameState.currentPlayerIndex]?.userId === leftPlayer.userId && <span className="px-1.5 py-0.5 rounded-full bg-yellow-400/20 text-yellow-200">Turn</span>}
+              </div>
+            </div>
+            {renderOpponentHand(leftPlayer?.hand.length ?? 0, "sm")}
+            <div className="w-full max-w-[180px] bg-black/30 border border-white/10 rounded-lg p-2 text-xs text-white/70">
+              <div className="uppercase tracking-widest text-[10px] text-white/60 mb-1">Action Log</div>
+              {actionLog.length === 0 ? (
+                <div className="text-white/40">No recent actions.</div>
+              ) : (
+                <div className="space-y-1">
+                  {actionLog.map((item, idx) => (
+                    <div key={idx} className="truncate">{item}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="col-start-3 row-start-2 flex flex-col items-center gap-3">
+            <div className={`px-3 py-2 rounded-xl border ${rightPlayer && gameState.players[gameState.currentPlayerIndex]?.userId === rightPlayer.userId ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/20'}`}>
+              <div className="text-xs text-white font-semibold">{rightPlayer?.username ?? "Waiting..."}</div>
+              <div className="text-[10px] text-white/60">Cards: {rightPlayer?.hand.length ?? 0}</div>
+              <div className="text-[10px] text-white/60">Score: {rightPlayer ? (gameState.handScores?.[rightPlayer.userId] ?? "-") : "-"}</div>
+              <div className="flex items-center gap-2 text-[10px] text-white/60">
+                {rightPlayer?.userId === dealerId && <span className="px-1.5 py-0.5 rounded-full bg-yellow-400/20 text-yellow-200">Dealer</span>}
+                {rightPlayer && gameState.players[gameState.currentPlayerIndex]?.userId === rightPlayer.userId && <span className="px-1.5 py-0.5 rounded-full bg-yellow-400/20 text-yellow-200">Turn</span>}
+              </div>
+            </div>
+            {renderOpponentHand(rightPlayer?.hand.length ?? 0, "sm")}
+          </div>
+
+          <div className="col-start-2 row-start-2 flex flex-col items-center justify-center gap-6">
+            <div className="flex w-full items-center justify-end gap-6 pr-6">
+              <div className="flex flex-col items-center gap-2">
+                <Pot amount={gameState.pot} />
+                <TurnTimer timeLeft={15} maxTime={30} />
+              </div>
+              <div className="flex items-center gap-6">
+                <div className="relative w-24 h-36">
+                  {gameState.deck.length > 0 && (
                     <div
                       className={`w-full h-full bg-blue-800 rounded-lg border-2 border-white shadow-xl flex items-center justify-center cursor-pointer relative ${isMyTurn && !currentPlayer?.hasTakenActionThisTurn ? 'hover:scale-105 hover:ring-4 hover:ring-yellow-400 ring-4 ring-yellow-400 animate-pulse' : ''} transition-all`}
                       onClick={handleDeckClick}
@@ -291,43 +377,125 @@ const GameTable: React.FC = () => {
                       )}
                       <div className="absolute -bottom-6 text-white text-xs font-bold">{gameState.deck.length}</div>
                     </div>
-                 )}
-              </div>
-              <div className="relative w-24 h-36" onClick={handleDiscardPileClick}>
-                {gameState.discardPile.length > 0 ? (
-                   <div className={`relative ${isMyTurn ? 'cursor-pointer hover:scale-105 transition-all' : ''} ${isMyTurn && ((!currentPlayer?.hasTakenActionThisTurn) || (currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)) ? 'hover:ring-4 hover:ring-yellow-400 rounded-lg' : ''} ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'animate-pulse' : ''}`}>
-                     <CardComponent
-                       suit={gameState.discardPile[gameState.discardPile.length - 1].suit}
-                       rank={gameState.discardPile[gameState.discardPile.length - 1].rank}
-                     />
-                     {isMyTurn && !currentPlayer?.hasTakenActionThisTurn && (
+                  )}
+                </div>
+                <div className="relative w-24 h-36" onClick={handleDiscardPileClick}>
+                  {gameState.discardPile.length > 0 ? (
+                    <div className={`relative ${isMyTurn ? 'cursor-pointer hover:scale-105 transition-all' : ''} ${isMyTurn && ((!currentPlayer?.hasTakenActionThisTurn) || (currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)) ? 'hover:ring-4 hover:ring-yellow-400 rounded-lg' : ''} ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'animate-pulse' : ''}`}>
+                      <CardComponent
+                        suit={gameState.discardPile[gameState.discardPile.length - 1].suit}
+                        rank={gameState.discardPile[gameState.discardPile.length - 1].rank}
+                      />
+                      {isMyTurn && !currentPlayer?.hasTakenActionThisTurn && (
                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-lg pointer-events-none">
-                            <span className="text-yellow-400 font-bold text-xl animate-bounce">DRAW</span>
+                          <span className="text-yellow-400 font-bold text-xl animate-bounce">DRAW</span>
                         </div>
-                     )}
-                     {isMyTurn && currentPlayer?.hasTakenActionThisTurn && (
-                       <div className={`absolute inset-0 flex items-center justify-center rounded-lg pointer-events-none ${selectedCards.length === 1 ? 'bg-green-500/40' : 'bg-black/20'}`}>
-                            <span className="text-white font-bold text-sm text-center px-1 drop-shadow-md">
-                                {selectedCards.length === 1 ? "DISCARD HERE" : "SELECT CARD"}
-                            </span>
-                       </div>
-                     )}
-                   </div>
-                ) : (
-                  <div className={`w-full h-full border-2 border-dashed border-white/30 rounded-lg flex items-center justify-center text-white/30 relative ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'cursor-pointer hover:bg-white/10 ring-4 ring-green-400 animate-pulse' : ''}`}>
-                    Discard
-                    {isMyTurn && currentPlayer?.hasTakenActionThisTurn && (
-                       <div className="absolute inset-0 flex items-center justify-center rounded-lg pointer-events-none">
-                            <span className="text-white font-bold text-sm text-center px-1 drop-shadow-md">
-                                 {selectedCards.length === 1 ? "DISCARD HERE" : "SELECT CARD"}
-                            </span>
-                       </div>
-                    )}
-                  </div>
-                )}
+                      )}
+                      {isMyTurn && currentPlayer?.hasTakenActionThisTurn && (
+                        <div className={`absolute inset-0 flex items-center justify-center rounded-lg pointer-events-none ${selectedCards.length === 1 ? 'bg-green-500/40' : 'bg-black/20'}`}>
+                          <span className="text-white font-bold text-sm text-center px-1 drop-shadow-md">
+                            {selectedCards.length === 1 ? "DISCARD HERE" : "SELECT CARD"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className={`w-full h-full border-2 border-dashed border-white/30 rounded-lg flex items-center justify-center text-white/30 relative ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'cursor-pointer hover:bg-white/10 ring-4 ring-green-400 animate-pulse' : ''}`}>
+                      Discard
+                      {isMyTurn && currentPlayer?.hasTakenActionThisTurn && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-lg pointer-events-none">
+                          <span className="text-white font-bold text-sm text-center px-1 drop-shadow-md">
+                            {selectedCards.length === 1 ? "DISCARD HERE" : "SELECT CARD"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            <TurnTimer timeLeft={15} maxTime={30}/>
+
+            <div className="w-full max-w-2xl bg-black/25 border border-white/10 rounded-xl p-3">
+              <div className="text-xs uppercase tracking-widest text-white/50 mb-2">Spreads</div>
+              <div className="space-y-2">
+                {gameState.players.map((player) => (
+                  <div key={player.userId} className="flex items-center gap-3">
+                    <div className="text-xs text-white/70 w-20 truncate">{player.username}</div>
+                    <div className="flex flex-wrap gap-3">
+                      {player.spreads.length === 0 && (
+                        <div className="text-[10px] text-white/40">No spreads</div>
+                      )}
+                      {player.spreads.map((spread, sIdx) => (
+                        <div
+                          key={`${player.userId}-spread-${sIdx}`}
+                          className={`flex -space-x-6 cursor-pointer ${isHitMode ? 'ring-2 ring-yellow-400 rounded-lg p-1 bg-yellow-400/10' : ''}`}
+                          onClick={() => isHitMode && executeHit(player.userId, sIdx)}
+                        >
+                          {spread.map((card, cIdx) => (
+                            <CardComponent key={cIdx} suit={card.suit} rank={card.rank} className="w-10 h-14 text-[10px]" />
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="col-start-1 row-start-3 flex items-end">
+            {isMyTurn && (
+              <Card className="p-2">
+                <div className="flex flex-col gap-2">
+                  <GameActions 
+                    canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
+                    canSpread={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length >= 3)}
+                    canHit={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)}
+                    onDrop={handleDrop}
+                    onSpread={handleSpread}
+                    onHit={handleHitClick}
+                    orientation="vertical"
+                  />
+                </div>
+              </Card>
+            )}
+          </div>
+
+          <div className="col-start-2 row-start-3 flex flex-col items-center gap-2">
+            <div className={`px-3 py-2 rounded-xl border ${isMyTurn ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/20'}`}>
+              <div className="text-xs text-white font-semibold">{user.username}</div>
+              <div className="text-[10px] text-white/60">Cards: {currentPlayer?.hand.length ?? 0}</div>
+              <div className="text-[10px] text-white/60">Score: {currentPlayer ? (gameState.handScores?.[currentPlayer.userId] ?? "-") : "-"}</div>
+              <div className="flex items-center gap-2 text-[10px] text-white/60">
+                {currentPlayer?.userId === dealerId && <span className="px-1.5 py-0.5 rounded-full bg-yellow-400/20 text-yellow-200">Dealer</span>}
+                {isMyTurn && <span className="px-1.5 py-0.5 rounded-full bg-yellow-400/20 text-yellow-200">Turn</span>}
+              </div>
+            </div>
+            <Card className={`p-2 ${isMyTurn ? 'ring-4 ring-yellow-400/70 shadow-[0_0_30px_rgba(250,204,21,0.35)]' : ''}`}>
+              <div className="flex -space-x-10 sm:-space-x-12 items-end h-32 sm:h-40 pb-2">
+                <AnimatePresence>
+                  {currentPlayer?.hand.map((card) => (
+                    <motion.div
+                      key={`${card.rank}-${card.suit}`}
+                      layout
+                      initial={{ y: 100, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: -50, opacity: 0 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                    >
+                      <CardComponent
+                        suit={card.suit}
+                        rank={card.rank}
+                        isSelected={selectedCards.some(c => c.rank === card.rank && c.suit === card.suit)}
+                        onClick={() => toggleCardSelection(card)}
+                        className="w-16 h-24 sm:w-20 sm:h-28"
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </Card>
+          </div>
         </div>
 
         {gameState.status === 'round-end' && (
@@ -410,33 +578,6 @@ const GameTable: React.FC = () => {
            </div>
         )}
 
-        {otherPlayers.map((player, idx) => {
-          const isCurrentTurnPlayer = gameState.players[gameState.currentPlayerIndex]?.userId === player.userId;
-          return (
-          <div
-            key={player.userId}
-            className={`absolute ${getPositionClass(idx, otherPlayers.length)} transition-all duration-500`}
-          >
-            <div className={`p-2 rounded-xl ${isCurrentTurnPlayer ? 'ring-2 ring-yellow-400/80 bg-yellow-400/10' : 'ring-1 ring-white/10 bg-black/10'}`}>
-              <PlayerAvatar player={{ name: player.username, avatarUrl: '' }} />
-              <div className="text-white font-bold mt-2">${player.currentBuyIn}</div>
-            </div>
-            <div className="bg-black/20 p-2 rounded-xl flex flex-col gap-2">
-              {player.spreads.map((spread, sIdx) => (
-                <div
-                  key={sIdx}
-                  className={`flex -space-x-8 hover:scale-105 transition-transform cursor-pointer ${isHitMode ? 'ring-4 ring-yellow-400 rounded-lg p-1 bg-yellow-400/20' : ''}`}
-                  onClick={() => isHitMode && executeHit(player.userId, sIdx)}
-                >
-                  {spread.map((card, cIdx) => (
-                    <CardComponent key={cIdx} suit={card.suit} rank={card.rank} className="w-10 h-14 sm:w-12 sm:h-16 text-[10px]" />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-        })}
 
         <div className="absolute top-20 left-6 z-30 w-64 max-w-[70vw] bg-black/40 text-white/80 text-xs rounded-xl border border-white/10 backdrop-blur-sm p-3">
           <div className="uppercase tracking-widest text-[10px] text-white/60 mb-2">Action Log</div>
