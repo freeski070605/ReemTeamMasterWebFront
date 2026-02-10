@@ -243,7 +243,7 @@ const GameTable: React.FC = () => {
     if (count <= 0) {
       return <div className="text-xs text-white/40">No cards</div>;
     }
-    const cardClass = size === "md" ? "w-12 h-18" : "w-10 h-16";
+    const cardClass = size === "md" ? "w-10 h-14" : "w-8 h-12";
     return (
       <div className="relative">
         <CardComponent
@@ -358,7 +358,7 @@ const GameTable: React.FC = () => {
                   <TurnTimer timeLeft={15} maxTime={30} />
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="relative w-10 h-16 sm:w-12 sm:h-18">
+                  <div className="relative w-8 h-12 sm:w-10 sm:h-14">
                     {gameState.deck.length > 0 && (
                       <div
                         className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center cursor-pointer relative transition-transform ${isMyTurn && !currentPlayer?.hasTakenActionThisTurn ? 'hover:scale-105' : ''}`}
@@ -373,13 +373,13 @@ const GameTable: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <div className="relative w-10 h-16 sm:w-12 sm:h-18" onClick={handleDiscardPileClick}>
+                  <div className="relative w-8 h-12 sm:w-10 sm:h-14" onClick={handleDiscardPileClick}>
                     {gameState.discardPile.length > 0 ? (
                       <div className={`relative ${isMyTurn ? 'cursor-pointer hover:scale-105 transition-all' : ''} ${isMyTurn && ((!currentPlayer?.hasTakenActionThisTurn) || (currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)) ? 'hover:ring-4 hover:ring-yellow-400 rounded-lg' : ''} ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'animate-pulse' : ''}`}>
                         <CardComponent
                           suit={gameState.discardPile[gameState.discardPile.length - 1].suit}
                           rank={gameState.discardPile[gameState.discardPile.length - 1].rank}
-                          className="w-10 h-16 sm:w-12 sm:h-18"
+                          className="w-8 h-12 sm:w-10 sm:h-14"
                         />
                       </div>
                     ) : (
@@ -408,7 +408,7 @@ const GameTable: React.FC = () => {
                             onClick={() => isHitMode && executeHit(player.userId, sIdx)}
                           >
                             {spread.map((card, cIdx) => (
-                              <CardComponent key={cIdx} suit={card.suit} rank={card.rank} className="w-10 h-16 sm:w-12 sm:h-18 text-[9px]" />
+                              <CardComponent key={cIdx} suit={card.suit} rank={card.rank} className="w-8 h-12 sm:w-10 sm:h-14 text-[9px]" />
                             ))}
                           </div>
                         ))}
@@ -418,25 +418,12 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              <div className="seat absolute w-[40vw] max-w-[440px] h-[170px] flex items-center justify-center bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto [@media(orientation:portrait)]:bottom-8 [@media(orientation:portrait)]:w-[92vw]">
+              <div className="seat absolute w-[40vw] max-w-[440px] h-[170px] flex items-center justify-center bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto [@media(orientation:portrait)]:bottom-6 [@media(orientation:portrait)]:w-[92vw]">
                 <div className="flex flex-col items-center gap-1 w-full">
                   <div className={`px-2 py-1 rounded-lg border ${isMyTurn ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/30'}`}>
                     <div className="text-[11px] text-white font-semibold">{user.username}</div>
                     <div className="text-[10px] text-white/60">Cards: {hand.length}</div>
                   </div>
-
-                  {isMyTurn && (
-                    <div className="actions flex gap-2 mt-1 pointer-events-auto [&_button]:min-w-[72px] [&_button]:h-9">
-                      <GameActions
-                        canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
-                        canSpread={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length >= 3)}
-                        canHit={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)}
-                        onDrop={handleDrop}
-                        onSpread={handleSpread}
-                        onHit={handleHitClick}
-                      />
-                    </div>
-                  )}
 
                   <div className="hand relative h-28 w-full max-w-[700px] pointer-events-auto [@media(orientation:portrait)]:max-w-[92vw]">
                     <AnimatePresence>
@@ -462,6 +449,19 @@ const GameTable: React.FC = () => {
                       </div>
                     </AnimatePresence>
                   </div>
+
+                  {isMyTurn && (
+                    <div className="actions flex gap-2 mt-2 pointer-events-auto [&_button]:min-w-[72px] [&_button]:h-9">
+                      <GameActions
+                        canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
+                        canSpread={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length >= 3)}
+                        canHit={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)}
+                        onDrop={handleDrop}
+                        onSpread={handleSpread}
+                        onHit={handleHitClick}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
