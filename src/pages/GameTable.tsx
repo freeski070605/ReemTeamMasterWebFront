@@ -291,10 +291,10 @@ const GameTable: React.FC = () => {
       </div>
 
       <div className="relative z-10 h-full flex flex-col">
-        <div className="game-wrapper flex-1 relative overflow-hidden touch-manipulation">
+        <div className="game-wrapper flex-1 relative overflow-hidden touch-manipulation pb-24 [@media(orientation:portrait)]:pb-28">
           <div className="table-area relative w-full h-full flex items-center justify-center">
             <div
-              className={`table relative w-[96vw] max-w-[820px] aspect-[16/9] rounded-[28px] border-[12px] shadow-2xl overflow-hidden bg-black/20 [@media(orientation:portrait)]:w-[94vw] [@media(orientation:portrait)]:max-w-[520px] [@media(orientation:portrait)]:aspect-[3/4] [@media(orientation:portrait)]:rounded-[24px] ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
+              className={`table relative w-[98vw] max-w-[920px] aspect-[16/9] rounded-[28px] border-[12px] shadow-2xl overflow-hidden bg-black/20 [@media(orientation:portrait)]:w-[96vw] [@media(orientation:portrait)]:max-w-[560px] [@media(orientation:portrait)]:aspect-[4/5] [@media(orientation:portrait)]:rounded-[24px] ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.06),transparent_60%)]" />
               <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-2 [@media(orientation:portrait)]:flex-col [@media(orientation:portrait)]:items-stretch [@media(orientation:portrait)]:gap-1">
@@ -445,7 +445,7 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              <div className="seat absolute w-[34vw] max-w-[240px] h-[110px] flex items-center justify-center bottom-[-10%] left-1/2 -translate-x-1/2 pointer-events-auto [@media(orientation:portrait)]:bottom-2 [@media(orientation:portrait)]:w-[80vw]">
+              <div className="seat absolute w-[34vw] max-w-[260px] h-[120px] flex items-center justify-center bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto [@media(orientation:portrait)]:bottom-6 [@media(orientation:portrait)]:w-[86vw]">
                 <div className="flex flex-col items-center gap-1 w-full">
                   <div className={`px-2 py-1 rounded-lg border ${isMyTurn ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/30'}`}>
                     <div className="text-[11px] text-white font-semibold">{user.username}</div>
@@ -481,7 +481,7 @@ const GameTable: React.FC = () => {
             </div>
           </div>
           {isMyTurn && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 w-[92%] max-w-[520px]">
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 w-[94%] max-w-[560px]">
               <div className="bg-black/55 border border-white/10 rounded-2xl px-3 py-2 backdrop-blur-sm flex items-center justify-center gap-2">
                 <GameActions
                   canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
