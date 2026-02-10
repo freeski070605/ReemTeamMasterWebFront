@@ -259,8 +259,8 @@ const GameTable: React.FC = () => {
       return <div className="text-xs text-white/40">No cards</div>;
     }
     const visible = Math.min(count, 5);
-    const cardClass = size === "md" ? "w-12 h-16" : "w-10 h-14";
-    const overlapClass = size === "md" ? "-space-x-6" : "-space-x-5";
+    const cardClass = size === "md" ? "w-14 h-20" : "w-12 h-18";
+    const overlapClass = size === "md" ? "-space-x-7" : "-space-x-6";
     return (
       <div className="relative">
         <div className={`flex ${overlapClass}`}>
@@ -380,7 +380,7 @@ const GameTable: React.FC = () => {
                   <TurnTimer timeLeft={15} maxTime={30} />
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="relative w-20 h-28">
+                  <div className="relative w-12 h-18 sm:w-14 sm:h-20">
                     {gameState.deck.length > 0 && (
                       <div
                         className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center cursor-pointer relative transition-transform ${isMyTurn && !currentPlayer?.hasTakenActionThisTurn ? 'hover:scale-105' : ''}`}
@@ -395,7 +395,7 @@ const GameTable: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <div className="relative w-20 h-28" onClick={handleDiscardPileClick}>
+                  <div className="relative w-12 h-18 sm:w-14 sm:h-20" onClick={handleDiscardPileClick}>
                     {gameState.discardPile.length > 0 ? (
                       <div className={`relative ${isMyTurn ? 'cursor-pointer hover:scale-105 transition-all' : ''} ${isMyTurn && ((!currentPlayer?.hasTakenActionThisTurn) || (currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)) ? 'hover:ring-4 hover:ring-yellow-400 rounded-lg' : ''} ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'animate-pulse' : ''}`}>
                         <CardComponent
@@ -476,30 +476,31 @@ const GameTable: React.FC = () => {
                               rank={card.rank}
                               isSelected={selectedCards.some(c => c.rank === card.rank && c.suit === card.suit)}
                               onClick={() => toggleCardSelection(card)}
-                              className="w-12 h-18 sm:w-14 sm:h-20 [@media(orientation:portrait)]:w-10 [@media(orientation:portrait)]:h-16"
+                              className="w-10 h-14 sm:w-12 sm:h-18 [@media(orientation:portrait)]:w-9 [@media(orientation:portrait)]:h-13"
                             />
                           </motion.div>
                         ))}
                       </div>
                     </AnimatePresence>
                   </div>
-
-                  {isMyTurn && (
-                    <div className="actions flex gap-2 mt-1 pointer-events-auto [&_button]:min-w-[72px] [&_button]:h-9 [@media(orientation:portrait)]:mt-2">
-                      <GameActions
-                        canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
-                        canSpread={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length >= 3)}
-                        canHit={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)}
-                        onDrop={handleDrop}
-                        onSpread={handleSpread}
-                        onHit={handleHitClick}
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
           </div>
+          {isMyTurn && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 w-[92%] max-w-[520px]">
+              <div className="bg-black/55 border border-white/10 rounded-2xl px-3 py-2 backdrop-blur-sm flex items-center justify-center gap-2">
+                <GameActions
+                  canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
+                  canSpread={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length >= 3)}
+                  canHit={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)}
+                  onDrop={handleDrop}
+                  onSpread={handleSpread}
+                  onHit={handleHitClick}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {gameState.status === 'round-end' && (
