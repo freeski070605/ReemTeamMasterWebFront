@@ -238,6 +238,9 @@ const GameTable: React.FC = () => {
       currency: "USD",
     }).format(amount);
   };
+  const getPayout = (userId: string) => {
+    return gameState.payouts?.[userId] ?? 0;
+  };
 
   const renderOpponentHand = (count: number, size: "sm" | "md" = "sm") => {
     if (count <= 0) {
@@ -489,7 +492,7 @@ const GameTable: React.FC = () => {
                     {gameState.players.find(p => p.userId === gameState.roundWinnerId)?.username || "Unknown"}
                     {gameState.payouts && gameState.roundWinnerId && (
                       <span className="text-xl text-yellow-400 ml-2">
-                        +${gameState.payouts[gameState.roundWinnerId]}
+                        +${getPayout(gameState.roundWinnerId)}
                       </span>
                     )}
                   </p>
@@ -517,8 +520,8 @@ const GameTable: React.FC = () => {
                             {gameState.handScores?.[player.userId] ?? '-'}
                           </span>
                           {gameState.payouts && (
-                            <span className={`font-mono font-bold ${gameState.payouts[player.userId] > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {gameState.payouts[player.userId] > 0 ? `+$${gameState.payouts[player.userId]}` : `-$${Math.abs(gameState.payouts[player.userId])}`}
+                            <span className={`font-mono font-bold ${getPayout(player.userId) > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {getPayout(player.userId) > 0 ? `+$${getPayout(player.userId)}` : `-$${Math.abs(getPayout(player.userId))}`}
                             </span>
                           )}
                         </div>
