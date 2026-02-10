@@ -10,11 +10,20 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const location = useLocation();
   const logoSrc = "/assets/logo.png";
   const displayFont = '"Oswald", "Gabarito", sans-serif';
+  const isGameRoute = location.pathname.startsWith('/game/');
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  if (isGameRoute) {
+    return (
+      <div className="min-h-screen bg-[#0f0f10] text-gray-100">
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0f0f10] text-gray-100 flex flex-col">

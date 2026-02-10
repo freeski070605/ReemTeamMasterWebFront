@@ -258,22 +258,15 @@ const GameTable: React.FC = () => {
     if (count <= 0) {
       return <div className="text-xs text-white/40">No cards</div>;
     }
-    const visible = Math.min(count, 5);
-    const cardClass = size === "md" ? "w-14 h-20" : "w-12 h-18";
-    const overlapClass = size === "md" ? "-space-x-7" : "-space-x-6";
+    const cardClass = size === "md" ? "w-12 h-18" : "w-10 h-16";
     return (
       <div className="relative">
-        <div className={`flex ${overlapClass}`}>
-          {Array.from({ length: visible }).map((_, idx) => (
-            <CardComponent
-              key={`opp-card-${idx}`}
-              suit="Spades"
-              rank="Ace"
-              isHidden
-              className={cardClass}
-            />
-          ))}
-        </div>
+        <CardComponent
+          suit="Spades"
+          rank="Ace"
+          isHidden
+          className={cardClass}
+        />
         <div className="absolute -bottom-2 -right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full border border-white/10">
           {count}
         </div>
@@ -380,7 +373,7 @@ const GameTable: React.FC = () => {
                   <TurnTimer timeLeft={15} maxTime={30} />
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="relative w-12 h-18 sm:w-14 sm:h-20">
+                  <div className="relative w-10 h-16 sm:w-12 sm:h-18">
                     {gameState.deck.length > 0 && (
                       <div
                         className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center cursor-pointer relative transition-transform ${isMyTurn && !currentPlayer?.hasTakenActionThisTurn ? 'hover:scale-105' : ''}`}
@@ -395,7 +388,7 @@ const GameTable: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <div className="relative w-12 h-18 sm:w-14 sm:h-20" onClick={handleDiscardPileClick}>
+                  <div className="relative w-10 h-16 sm:w-12 sm:h-18" onClick={handleDiscardPileClick}>
                     {gameState.discardPile.length > 0 ? (
                       <div className={`relative ${isMyTurn ? 'cursor-pointer hover:scale-105 transition-all' : ''} ${isMyTurn && ((!currentPlayer?.hasTakenActionThisTurn) || (currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)) ? 'hover:ring-4 hover:ring-yellow-400 rounded-lg' : ''} ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'animate-pulse' : ''}`}>
                         <CardComponent
@@ -476,7 +469,7 @@ const GameTable: React.FC = () => {
                               rank={card.rank}
                               isSelected={selectedCards.some(c => c.rank === card.rank && c.suit === card.suit)}
                               onClick={() => toggleCardSelection(card)}
-                              className="w-10 h-14 sm:w-12 sm:h-18 [@media(orientation:portrait)]:w-9 [@media(orientation:portrait)]:h-13"
+                              className="w-14 h-20 sm:w-16 sm:h-24 [@media(orientation:portrait)]:w-12 [@media(orientation:portrait)]:h-18"
                             />
                           </motion.div>
                         ))}
