@@ -21,7 +21,7 @@ const GameActions: React.FC<GameActionsProps> = ({
   orientation = "horizontal",
 }) => {
   const layoutClass =
-    orientation === "vertical" ? "flex flex-col gap-2" : "flex justify-center space-x-4";
+    orientation === "vertical" ? "flex flex-col gap-2" : "flex flex-wrap justify-center gap-2";
   return (
     <div className={layoutClass}>
       <Button onClick={onDrop} disabled={!canDrop}>Drop</Button>

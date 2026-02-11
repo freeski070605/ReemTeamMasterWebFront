@@ -288,19 +288,19 @@ const GameTable: React.FC = () => {
     if (!player) return null;
 
     return (
-      <div className={`absolute z-10 pointer-events-auto ${className}`}>
-        <div className="bg-black/30 border border-white/10 rounded-xl p-2 backdrop-blur-[1px]">
+      <div className={`absolute z-10 pointer-events-none ${className}`}>
+        <div className="bg-black/30 border border-white/10 rounded-xl p-1.5 backdrop-blur-[1px]">
           <div className="text-[10px] uppercase tracking-widest text-white/50 mb-1 text-center truncate">
             {label}: {player.username}
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-2 min-h-[3.5rem]">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 min-h-[2.8rem]">
             {player.spreads.length === 0 && (
               <div className="text-[9px] text-white/40">No spreads</div>
             )}
             {player.spreads.map((spread, sIdx) => (
               <div
                 key={`${player.userId}-spread-${sIdx}`}
-                className={`flex -space-x-5 cursor-pointer ${isHitMode ? "ring-2 ring-yellow-400 rounded-lg p-1 bg-yellow-400/10" : ""}`}
+                className={`flex -space-x-5 ${isHitMode ? "cursor-pointer pointer-events-auto ring-2 ring-yellow-400 rounded-lg p-1 bg-yellow-400/10" : "pointer-events-none"}`}
                 onClick={() => isHitMode && executeHit(player.userId, sIdx)}
               >
                 {spread.map((card, cIdx) => (
@@ -308,7 +308,7 @@ const GameTable: React.FC = () => {
                     key={cIdx}
                     suit={card.suit}
                     rank={card.rank}
-                    className="w-8 h-12 sm:w-10 sm:h-14 text-[9px]"
+                    className="w-7 h-10 sm:w-8 sm:h-12 text-[9px]"
                   />
                 ))}
               </div>
@@ -421,10 +421,10 @@ const GameTable: React.FC = () => {
                 </div>
               )}
 
-              {renderSpreadZone(topPlayer, "Top Spread", "left-1/2 top-[20%] -translate-x-1/2 w-[42%]")}
-              {renderSpreadZone(leftPlayer, "Left Spread", "left-[4%] top-[44%] -translate-y-1/2 w-[27%]")}
-              {renderSpreadZone(rightPlayer, "Right Spread", "right-[4%] top-[44%] -translate-y-1/2 w-[27%]")}
-              {renderSpreadZone(currentPlayer ?? null, "Your Spread", "left-1/2 bottom-[26%] -translate-x-1/2 w-[42%]")}
+              {renderSpreadZone(topPlayer, "Top Spread", "left-1/2 top-[20%] -translate-x-1/2 w-[30%] max-w-[260px]")}
+              {renderSpreadZone(leftPlayer, "Left Spread", "left-[5%] top-[44%] -translate-y-1/2 w-[19%] max-w-[170px]")}
+              {renderSpreadZone(rightPlayer, "Right Spread", "right-[5%] top-[44%] -translate-y-1/2 w-[19%] max-w-[170px]")}
+              {renderSpreadZone(currentPlayer ?? null, "Your Spread", "left-1/2 bottom-[33%] -translate-x-1/2 w-[30%] max-w-[260px]")}
 
               <div className="center-pile absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
                 <div className="flex items-center gap-4">
@@ -462,16 +462,16 @@ const GameTable: React.FC = () => {
                 <TurnTimer timeLeft={15} maxTime={30} />
               </div>
 
-              <div className="seat absolute w-[40vw] max-w-[440px] h-[170px] flex items-center justify-center bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
+              <div className="seat absolute w-[40vw] max-w-[440px] h-[150px] flex items-center justify-center bottom-3 left-1/2 -translate-x-1/2 pointer-events-auto">
                 <div className="flex flex-col items-center gap-1 w-full">
                   <div className={`px-2 py-1 rounded-lg border ${isMyTurn ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/30'}`}>
                     <div className="text-[11px] text-white font-semibold">{user.username}</div>
                     <div className="text-[10px] text-white/60">Cards: {hand.length}</div>
                   </div>
 
-                  <div className="hand relative h-28 w-full max-w-[700px] pointer-events-auto">
+                  <div className="hand relative h-24 w-full max-w-[700px] pointer-events-auto">
                     <AnimatePresence>
-                      <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-2">
+                      <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
                         {hand.map((card) => (
                           <motion.div
                             key={`${card.rank}-${card.suit}`}
@@ -486,7 +486,7 @@ const GameTable: React.FC = () => {
                               rank={card.rank}
                               isSelected={selectedCards.some(c => c.rank === card.rank && c.suit === card.suit)}
                               onClick={() => toggleCardSelection(card)}
-                              className="w-12 h-18 sm:w-14 sm:h-20"
+                              className="w-10 h-14 sm:w-11 sm:h-16"
                             />
                           </motion.div>
                         ))}
@@ -495,7 +495,7 @@ const GameTable: React.FC = () => {
                   </div>
 
                   {isMyTurn && (
-                    <div className="actions flex gap-2 mt-2 pointer-events-auto [&_button]:min-w-[72px] [&_button]:h-9">
+                    <div className="actions flex gap-1.5 mt-1 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs">
                       <GameActions
                         canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
                         canSpread={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length >= 3)}
