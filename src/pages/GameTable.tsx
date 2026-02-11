@@ -282,38 +282,30 @@ const GameTable: React.FC = () => {
 
   const renderSpreadZone = (
     player: typeof gameState.players[number] | null,
-    label: string,
+    _label: string,
     className: string
   ) => {
-    if (!player) return null;
+    if (!player || player.spreads.length === 0) return null;
 
     return (
       <div className={`absolute z-10 pointer-events-none ${className}`}>
-        <div className="bg-black/30 border border-white/10 rounded-xl p-1.5 backdrop-blur-[1px]">
-          <div className="text-[10px] uppercase tracking-widest text-white/50 mb-1 text-center truncate">
-            {label}: {player.username}
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-1.5 min-h-[2.8rem]">
-            {player.spreads.length === 0 && (
-              <div className="text-[9px] text-white/40">No spreads</div>
-            )}
-            {player.spreads.map((spread, sIdx) => (
-              <div
-                key={`${player.userId}-spread-${sIdx}`}
-                className={`flex -space-x-5 ${isHitMode ? "cursor-pointer pointer-events-auto ring-2 ring-yellow-400 rounded-lg p-1 bg-yellow-400/10" : "pointer-events-none"}`}
-                onClick={() => isHitMode && executeHit(player.userId, sIdx)}
-              >
-                {spread.map((card, cIdx) => (
-                  <CardComponent
-                    key={cIdx}
-                    suit={card.suit}
-                    rank={card.rank}
-                    className="w-7 h-10 sm:w-8 sm:h-12 text-[9px]"
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          {player.spreads.map((spread, sIdx) => (
+            <div
+              key={`${player.userId}-spread-${sIdx}`}
+              className={`flex -space-x-5 ${isHitMode ? "cursor-pointer pointer-events-auto ring-2 ring-yellow-400 rounded-lg p-1 bg-yellow-400/10" : "pointer-events-none"}`}
+              onClick={() => isHitMode && executeHit(player.userId, sIdx)}
+            >
+              {spread.map((card, cIdx) => (
+                <CardComponent
+                  key={cIdx}
+                  suit={card.suit}
+                  rank={card.rank}
+                  className="w-7 h-10 sm:w-8 sm:h-12 text-[9px]"
+                />
+              ))}
+            </div>
+          ))}
         </div>
       </div>
     );
