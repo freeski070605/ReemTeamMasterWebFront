@@ -415,6 +415,11 @@ const GameTable: React.FC = () => {
 
   const handleRequestLeaveTable = () => {
     if (tableId && user) {
+      if (gameState.status === "round-end") {
+        leaveTable(tableId, user._id, user.username);
+        navigate("/tables");
+        return;
+      }
       requestLeaveTable(tableId, user._id);
     }
   };
