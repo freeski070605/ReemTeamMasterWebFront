@@ -11,7 +11,7 @@ interface GameStore {
   isConnected: boolean;
   error: string | null;
 
-  connect: (tableId: string, userId: string, username: string) => void;
+  connect: (tableId: string, userId: string, username: string, avatarUrl?: string) => void;
   disconnect: () => void;
   
   // Actions
@@ -30,7 +30,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isConnected: false,
   error: null,
 
-  connect: (tableId, userId, username) => {
+  connect: (tableId, userId, username, avatarUrl) => {
     const existingSocket = get().socket;
     if (existingSocket) {
         existingSocket.disconnect();
@@ -42,7 +42,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       console.log('Connected to game server');
       set({ isConnected: true, error: null });
       console.log(`Emitting joinTable for ${username} (${userId}) in table ${tableId}`);
-      socket.emit('joinTable', { tableId, userId, username });
+      socket.emit('joinTable', { tableId, userId, username, avatarUrl });
     });
 
     socket.on('initialGameState', (gameState: IGameState) => {
@@ -61,7 +61,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
               toast.success(`${winner?.username} REEMED!`);
           } else if (gameState.roundEndedBy === 'REGULAR') {
               const winner = gameState.players.find(p => p.userId === gameState.roundWinnerId);
-               toast.info(`${winner?.username} Dropped.`);
+               toast.info(`${winner?.username} wins on lowest hand.`);
+          } else if (gameState.roundEndedBy === 'DECK_EMPTY') {
+              const winner = gameState.players.find(p => p.userId === gameState.roundWinnerId);
+              toast.info(`Deck empty. ${winner?.username} wins on lowest hand.`);
           }
       }
     });

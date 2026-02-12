@@ -10,6 +10,7 @@ export interface Card {
 export interface Player {
   userId: string;
   username: string;
+  avatarUrl?: string;
   hand: Card[];
   isAI: boolean;
   isHitLocked: boolean;

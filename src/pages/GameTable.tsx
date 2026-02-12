@@ -41,10 +41,14 @@ const GameTable: React.FC = () => {
   const [selectedCards, setSelectedCards] = useState<CardType[]>([]);
   const [isHitMode, setIsHitMode] = useState(false);
   const [isMobilePortrait, setIsMobilePortrait] = useState(false);
+  const [showDealAnimation, setShowDealAnimation] = useState(false);
+  const [dealingCardIndex, setDealingCardIndex] = useState(0);
+  const [playerBalances, setPlayerBalances] = useState<Record<string, number>>({});
   const prevTurnStateRef = useRef<{ isMyTurn: boolean; hasTakenAction: boolean }>({
     isMyTurn: false,
     hasTakenAction: false,
   });
+  const previousStatusRef = useRef<string | null>(null);
   const maxPlayers = 4;
   const {
     balance,
@@ -55,7 +59,7 @@ const GameTable: React.FC = () => {
 
   useEffect(() => {
     if (tableId && user) {
-      connect(tableId, user._id, user.username);
+      connect(tableId, user._id, user.username, user.avatarUrl);
     }
 
     const handlePlayerLeft = ({ userId: leftPlayerId }: { userId: string }) => {
@@ -83,8 +87,10 @@ const GameTable: React.FC = () => {
     if (!socket || !user?._id) return;
 
     const handleWalletBalanceUpdate = (payload: { userId: string; balance: number }) => {
-      if (payload.userId !== user._id) return;
-      window.dispatchEvent(new Event("wallet-balance-refresh"));
+      setPlayerBalances((prev) => ({ ...prev, [payload.userId]: payload.balance }));
+      if (payload.userId === user._id) {
+        window.dispatchEvent(new Event("wallet-balance-refresh"));
+      }
     };
 
     socket.on("walletBalanceUpdate", handleWalletBalanceUpdate);
@@ -92,6 +98,11 @@ const GameTable: React.FC = () => {
       socket.off("walletBalanceUpdate", handleWalletBalanceUpdate);
     };
   }, [socket, user?._id]);
+
+  useEffect(() => {
+    if (!user?._id || balance === null) return;
+    setPlayerBalances((prev) => ({ ...prev, [user._id]: balance }));
+  }, [user?._id, balance]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1024px) and (orientation: portrait)");
@@ -107,6 +118,34 @@ const GameTable: React.FC = () => {
       window.removeEventListener("resize", applyOrientationState);
     };
   }, []);
+
+  useEffect(() => {
+    if (!gameState) return;
+    const previousStatus = previousStatusRef.current;
+    const status = gameState.status;
+    const cameFromRoundEnd = previousStatus === "round-end" && status !== "round-end";
+
+    if (cameFromRoundEnd) {
+      setShowDealAnimation(true);
+      setDealingCardIndex(0);
+      const interval = window.setInterval(() => {
+        setDealingCardIndex((idx) => idx + 1);
+      }, 120);
+      const timeout = window.setTimeout(() => {
+        window.clearInterval(interval);
+        setShowDealAnimation(false);
+      }, 2200);
+
+      previousStatusRef.current = status;
+      return () => {
+        window.clearInterval(interval);
+        window.clearTimeout(timeout);
+      };
+    }
+
+    previousStatusRef.current = status;
+    return undefined;
+  }, [gameState]);
 
   const currentPlayer = gameState?.players.find((p) => p.userId === user?._id);
   const isMyTurn = !!(
@@ -257,6 +296,18 @@ const GameTable: React.FC = () => {
   const getPayout = (userId: string) => {
     return gameState.payouts?.[userId] ?? 0;
   };
+  const roundReasonLabel =
+    gameState.roundEndedBy === "REGULAR"
+      ? "Drop / Hand Empty"
+      : gameState.roundEndedBy === "REEM"
+        ? "Reem"
+        : gameState.roundEndedBy === "AUTO_TRIPLE"
+          ? "Automatic Win (41/<=11)"
+          : gameState.roundEndedBy === "DECK_EMPTY"
+            ? "Deck Empty"
+            : gameState.roundEndedBy === "CAUGHT_DROP"
+              ? "Caught Drop"
+              : "Round End";
 
   const renderOpponentHand = (count: number, size: "sm" | "md" = "sm") => {
     if (count <= 0) {
@@ -273,6 +324,34 @@ const GameTable: React.FC = () => {
         />
         <div className="absolute -bottom-2 -right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full border border-white/10">
           {count}
+        </div>
+      </div>
+    );
+  };
+
+  const renderSeatInfo = (
+    player: typeof gameState.players[number] | null,
+    className: string,
+    align: "left" | "right" = "left"
+  ) => {
+    if (!player) return null;
+    const isActive = gameState.players[gameState.currentPlayerIndex]?.userId === player.userId;
+    return (
+      <div className={`absolute z-20 pointer-events-none ${className}`}>
+        <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
+          {renderOpponentHand(player.hand.length, "sm")}
+          <div className={`px-2 py-1 rounded-lg border ${isActive ? "border-yellow-400/80 bg-yellow-400/10" : "border-white/10 bg-black/35"} min-w-[110px]`}>
+            <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse" : ""}`}>
+              <PlayerAvatar player={{ name: player.username, avatarUrl: player.avatarUrl }} size="sm" />
+              <div>
+                <div className="text-[11px] text-white font-semibold leading-tight">{player.username}</div>
+                <div className="text-[10px] text-white/60 leading-tight">Cards: {player.hand.length}</div>
+                <div className="text-[10px] text-yellow-300 leading-tight">
+                  {playerBalances[player.userId] !== undefined ? formatCurrency(playerBalances[player.userId]) : "--"}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -371,52 +450,42 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              {topPlayer && (
-                <div className="seat absolute w-[34vw] max-w-[240px] h-[110px] flex items-center justify-center pointer-events-none top-1 left-1/2 -translate-x-1/2">
-                  <div className="flex flex-col items-center gap-1">
-                    <div className={`px-2 py-1 rounded-lg border ${gameState.players[gameState.currentPlayerIndex]?.userId === topPlayer.userId ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/30'}`}>
-                      <div className="text-[11px] text-white font-semibold">{topPlayer.username}</div>
-                      <div className="text-[10px] text-white/60">Cards: {topPlayer.hand.length}</div>
-                    </div>
-                    <div className="opponent-cards">
-                      {renderOpponentHand(topPlayer.hand.length, "sm")}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {leftPlayer && (
-                <div className="seat absolute w-[34vw] max-w-[240px] h-[110px] flex items-center justify-center pointer-events-none left-[-8%] top-1/2 -translate-y-1/2">
-                  <div className="flex flex-col items-center gap-1">
-                    <div className={`px-2 py-1 rounded-lg border ${gameState.players[gameState.currentPlayerIndex]?.userId === leftPlayer.userId ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/30'}`}>
-                      <div className="text-[11px] text-white font-semibold">{leftPlayer.username}</div>
-                      <div className="text-[10px] text-white/60">Cards: {leftPlayer.hand.length}</div>
-                    </div>
-                    <div className="opponent-cards">
-                      {renderOpponentHand(leftPlayer.hand.length, "sm")}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {rightPlayer && (
-                <div className="seat absolute w-[34vw] max-w-[240px] h-[110px] flex items-center justify-center pointer-events-none right-[-8%] top-1/2 -translate-y-1/2">
-                  <div className="flex flex-col items-center gap-1">
-                    <div className={`px-2 py-1 rounded-lg border ${gameState.players[gameState.currentPlayerIndex]?.userId === rightPlayer.userId ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/30'}`}>
-                      <div className="text-[11px] text-white font-semibold">{rightPlayer.username}</div>
-                      <div className="text-[10px] text-white/60">Cards: {rightPlayer.hand.length}</div>
-                    </div>
-                    <div className="opponent-cards">
-                      {renderOpponentHand(rightPlayer.hand.length, "sm")}
-                    </div>
-                  </div>
-                </div>
-              )}
+              {renderSeatInfo(topPlayer, "top-2 left-[58%] -translate-x-1/2", "left")}
+              {renderSeatInfo(leftPlayer, "left-[1.5%] top-1/2 -translate-y-1/2", "left")}
+              {renderSeatInfo(rightPlayer, "right-[1.5%] top-1/2 -translate-y-1/2", "right")}
 
               {renderSpreadZone(topPlayer, "Top Spread", "left-1/2 top-[20%] -translate-x-1/2 w-[30%] max-w-[260px]")}
               {renderSpreadZone(leftPlayer, "Left Spread", "left-[5%] top-[44%] -translate-y-1/2 w-[19%] max-w-[170px]")}
               {renderSpreadZone(rightPlayer, "Right Spread", "right-[5%] top-[44%] -translate-y-1/2 w-[19%] max-w-[170px]")}
               {renderSpreadZone(currentPlayer ?? null, "Your Spread", "left-1/2 bottom-[33%] -translate-x-1/2 w-[30%] max-w-[260px]")}
+
+              {showDealAnimation && (
+                <div className="absolute inset-0 z-30 pointer-events-none">
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                    <motion.div
+                      className="w-9 h-14 rounded-lg border border-white/20 shadow-xl"
+                      style={{ backgroundImage: `url(${backCardImage})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                      initial={{ rotate: -18, scale: 0.9, opacity: 0.8 }}
+                      animate={{ rotate: 18, scale: 1.02, opacity: 1 }}
+                      transition={{ repeat: Infinity, repeatType: "reverse", duration: 0.35 }}
+                    />
+                  </div>
+                  {Array.from({ length: 20 }).map((_, idx) => (
+                    <motion.div
+                      key={`deal-${idx}`}
+                      className="absolute left-1/2 top-1/2 w-8 h-12 rounded-md border border-white/20"
+                      style={{ backgroundImage: `url(${backCardImage})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                      initial={{ x: 0, y: 0, opacity: 0 }}
+                      animate={{
+                        x: idx % 4 === 0 ? -230 : idx % 4 === 1 ? 0 : idx % 4 === 2 ? 230 : 0,
+                        y: idx % 4 === 0 ? 20 : idx % 4 === 1 ? -150 : idx % 4 === 2 ? 20 : 145,
+                        opacity: dealingCardIndex >= idx ? 1 : 0,
+                      }}
+                      transition={{ duration: 0.28, ease: "easeOut" }}
+                    />
+                  ))}
+                </div>
+              )}
 
               <div className="center-pile absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
                 <div className="flex items-center gap-4">
@@ -454,50 +523,60 @@ const GameTable: React.FC = () => {
                 <TurnTimer timeLeft={15} maxTime={30} />
               </div>
 
-              <div className="seat absolute w-[40vw] max-w-[440px] h-[150px] flex items-center justify-center bottom-3 left-1/2 -translate-x-1/2 pointer-events-auto">
-                <div className="flex flex-col items-center gap-1 w-full">
-                  <div className={`px-2 py-1 rounded-lg border ${isMyTurn ? 'border-yellow-400/80 bg-yellow-400/10' : 'border-white/10 bg-black/30'}`}>
-                    <div className="text-[11px] text-white font-semibold">{user.username}</div>
-                    <div className="text-[10px] text-white/60">Cards: {hand.length}</div>
-                  </div>
-
-                  <div className="hand relative h-24 w-full max-w-[700px] pointer-events-auto">
-                    <AnimatePresence>
-                      <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
-                        {hand.map((card) => (
-                          <motion.div
-                            key={`${card.rank}-${card.suit}`}
-                            className="card"
-                            initial={{ y: 30, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            exit={{ y: -20, opacity: 0 }}
-                            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                          >
-                            <CardComponent
-                              suit={card.suit}
-                              rank={card.rank}
-                              isSelected={selectedCards.some(c => c.rank === card.rank && c.suit === card.suit)}
-                              onClick={() => toggleCardSelection(card)}
-                              className="w-10 h-14 sm:w-11 sm:h-16"
-                            />
-                          </motion.div>
-                        ))}
+              <div className="seat absolute w-[96%] max-w-[820px] h-[164px] bottom-2 left-1/2 -translate-x-1/2 pointer-events-auto">
+                <div className="flex items-end gap-2 w-full h-full">
+                  <div className={`mb-6 px-2 py-2 rounded-lg border ${isMyTurn ? "border-yellow-400/80 bg-yellow-400/10" : "border-white/10 bg-black/30"} min-w-[132px]`}>
+                    <div className="flex items-center gap-2">
+                      <PlayerAvatar player={{ name: user.username, avatarUrl: user.avatarUrl }} size="sm" />
+                      <div>
+                        <div className="text-[11px] text-white font-semibold leading-tight">{user.username}</div>
+                        <div className="text-[10px] text-white/60 leading-tight">Cards: {hand.length}</div>
+                        <div className="text-[10px] text-yellow-300 leading-tight">
+                          {balanceLoading ? "..." : formatCurrency(balance)}
+                        </div>
                       </div>
-                    </AnimatePresence>
+                    </div>
                   </div>
 
-                  {isMyTurn && (
-                    <div className="actions flex gap-1.5 mt-1 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs">
-                      <GameActions
-                        canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
-                        canSpread={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length >= 3)}
-                        canHit={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)}
-                        onDrop={handleDrop}
-                        onSpread={handleSpread}
-                        onHit={handleHitClick}
-                      />
+                  <div className="flex-1 flex flex-col items-center">
+                    <div className="hand relative h-24 w-full max-w-[700px] pointer-events-auto">
+                      <AnimatePresence>
+                        <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
+                          {hand.map((card) => (
+                            <motion.div
+                              key={`${card.rank}-${card.suit}`}
+                              className="card"
+                              initial={{ y: 30, opacity: 0 }}
+                              animate={{ y: 0, opacity: 1 }}
+                              exit={{ y: -20, opacity: 0 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                            >
+                              <CardComponent
+                                suit={card.suit}
+                                rank={card.rank}
+                                isSelected={selectedCards.some((c) => c.rank === card.rank && c.suit === card.suit)}
+                                onClick={() => toggleCardSelection(card)}
+                                className="w-10 h-14 sm:w-11 sm:h-16"
+                              />
+                            </motion.div>
+                          ))}
+                        </div>
+                      </AnimatePresence>
                     </div>
-                  )}
+
+                    {isMyTurn && (
+                      <div className="actions flex gap-1.5 mt-1 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs">
+                        <GameActions
+                          canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
+                          canSpread={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length >= 3)}
+                          canHit={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)}
+                          onDrop={handleDrop}
+                          onSpread={handleSpread}
+                          onHit={handleHitClick}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -505,82 +584,44 @@ const GameTable: React.FC = () => {
         </div>
 
         {gameState.status === 'round-end' && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-2xl shadow-2xl border-2 border-yellow-500/50 max-w-lg w-full transform scale-100 transition-all">
-              <h2 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-200 mb-6 text-center drop-shadow-lg">
-                ROUND OVER
-              </h2>
-              <div className="space-y-6">
-                <div className="text-center p-4 bg-black/40 rounded-xl border border-white/5">
-                  <p className="text-gray-400 text-sm uppercase tracking-widest mb-1">Reason</p>
-                  <p className="text-2xl font-bold text-white mb-4">
-                    {gameState.roundEndedBy === 'REGULAR' && "Player Drop"}
-                    {gameState.roundEndedBy === 'REEM' && "Reem!"}
-                    {gameState.roundEndedBy === 'AUTO_TRIPLE' && "Automatic Win (41/<=11)"}
-                    {gameState.roundEndedBy === 'DECK_EMPTY' && "Deck Empty"}
-                    {gameState.roundEndedBy === 'CAUGHT_DROP' && "Caught Dropping"}
-                  </p>
-                  <p className="text-gray-400 text-sm uppercase tracking-widest mb-1">Winner</p>
-                  <p className="text-3xl font-black text-green-400">
-                    {gameState.players.find(p => p.userId === gameState.roundWinnerId)?.username || "Unknown"}
-                    {gameState.payouts && gameState.roundWinnerId && (
-                      <span className="text-xl text-yellow-400 ml-2">
-                        +${getPayout(gameState.roundWinnerId)}
-                      </span>
-                    )}
-                  </p>
+          <div className="absolute right-3 top-3 z-40 w-[min(46vw,420px)] rounded-xl border border-yellow-500/40 bg-black/70 backdrop-blur-md p-3 pointer-events-auto">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-[11px] uppercase tracking-widest text-white/60">Round Over</div>
+                <div className="text-sm font-semibold text-white">{roundReasonLabel}</div>
+              </div>
+              <Button onClick={handleRequestLeaveTable} variant="danger" size="sm">Leave</Button>
+            </div>
+            <div className="mt-2 text-sm text-green-400 font-bold">
+              Winner: {gameState.players.find((p) => p.userId === gameState.roundWinnerId)?.username || "Unknown"}
+              {gameState.payouts && gameState.roundWinnerId && (
+                <span className="text-yellow-300 ml-1">{getPayout(gameState.roundWinnerId) >= 0 ? "+" : ""}${getPayout(gameState.roundWinnerId)}</span>
+              )}
+            </div>
+            {gameState.handScores && (
+              <div className="mt-2 max-h-[42vh] overflow-auto rounded-lg border border-white/10 bg-black/35">
+                <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-white/50 grid grid-cols-[1.4fr_0.5fr_0.6fr] gap-2">
+                  <span>Player</span>
+                  <span>Score</span>
+                  <span>Payout</span>
                 </div>
-                {gameState.handScores && (
-                  <div className="bg-black/40 rounded-xl overflow-hidden border border-white/5">
-                    <div className="bg-white/5 px-4 py-2 flex justify-between items-center">
-                      <span className="text-sm font-bold text-gray-300 uppercase tracking-wider">Player</span>
-                      <span className="text-sm font-bold text-gray-300 uppercase tracking-wider">Score</span>
-                      {gameState.payouts && <span className="text-sm font-bold text-gray-300 uppercase tracking-wider">Payout</span>}
+                <div className="divide-y divide-white/10">
+                  {gameState.players.map((player) => (
+                    <div
+                      key={player.userId}
+                      className={`px-2 py-1.5 grid grid-cols-[1.4fr_0.5fr_0.6fr] gap-2 items-center text-xs ${player.userId === gameState.roundWinnerId ? "bg-green-500/10" : ""}`}
+                    >
+                      <div className="truncate text-white">{player.username}</div>
+                      <div className="font-mono text-white/80">{gameState.handScores?.[player.userId] ?? "-"}</div>
+                      <div className={`font-mono ${getPayout(player.userId) >= 0 ? "text-green-300" : "text-red-300"}`}>
+                        {getPayout(player.userId) >= 0 ? "+" : "-"}${Math.abs(getPayout(player.userId))}
+                      </div>
                     </div>
-                    <div className="divide-y divide-white/5">
-                      {gameState.players.map(player => (
-                        <div key={player.userId} className={`px-4 py-3 flex justify-between items-center ${player.userId === gameState.roundWinnerId ? 'bg-green-500/10' : ''}`}>
-                          <div className="flex items-center gap-3">
-                            <PlayerAvatar player={{ name: player.username, avatarUrl: '' }} size="sm" />
-                            <div>
-                              <span className={`font-medium ${player.userId === gameState.roundWinnerId ? 'text-green-400' : 'text-gray-300'}`}>
-                                {player.username}
-                              </span>
-                              <div className="text-yellow-400">${player.currentBuyIn}</div>
-                            </div>
-                          </div>
-                          <span className={`font-mono font-bold ${player.userId === gameState.roundWinnerId ? 'text-green-400' : 'text-gray-400'}`}>
-                            {gameState.handScores?.[player.userId] ?? '-'}
-                          </span>
-                          {gameState.payouts && (
-                            <span className={`font-mono font-bold ${getPayout(player.userId) > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {getPayout(player.userId) > 0 ? `+$${getPayout(player.userId)}` : `-$${Math.abs(getPayout(player.userId))}`}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-4 flex justify-center space-x-4">
-                  <Button
-                    onClick={() => {}}
-                    className="px-8 py-3 text-lg font-bold"
-                    disabled
-                  >
-                    Next round starts soon...
-                  </Button>
-                  <Button
-                    onClick={handleRequestLeaveTable}
-                    variant="danger"
-                    className="px-8 py-3 text-lg font-bold"
-                  >
-                    Leave Table
-                  </Button>
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
+            <div className="mt-2 text-[11px] text-white/60">Cards stay visible until the next clockwise deal starts.</div>
           </div>
         )}
       </div>

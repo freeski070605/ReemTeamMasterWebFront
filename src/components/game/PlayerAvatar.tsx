@@ -6,9 +6,10 @@ interface PlayerAvatarProps {
     avatarUrl?: string;
   };
   size?: 'sm' | 'md' | 'lg';
+  showName?: boolean;
 }
 
-const PlayerAvatar: React.FC<PlayerAvatarProps> = ({ player, size = 'md' }) => {
+const PlayerAvatar: React.FC<PlayerAvatarProps> = ({ player, size = 'md', showName = false }) => {
   const sizeClasses = {
     sm: 'w-12 h-12 text-sm',
     md: 'w-16 h-16 text-xl',
@@ -26,7 +27,7 @@ const PlayerAvatar: React.FC<PlayerAvatarProps> = ({ player, size = 'md' }) => {
           player.name.substring(0, 2).toUpperCase()
         )}
       </div>
-      <div className="text-white font-semibold mt-2 text-sm tracking-wide">{player.name}</div>
+      {showName && <div className="text-white font-semibold mt-2 text-sm tracking-wide">{player.name}</div>}
     </div>
   );
 };

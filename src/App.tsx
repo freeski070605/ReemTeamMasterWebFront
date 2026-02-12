@@ -48,7 +48,15 @@ const App: React.FC = () => {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
-      <ToastContainer position="bottom-right" theme="dark" />
+      <ToastContainer
+        position="bottom-right"
+        theme="dark"
+        autoClose={2200}
+        closeButton={false}
+        hideProgressBar
+        className="compact-toast-container"
+        toastClassName="compact-toast"
+      />
     </Router>
   );
 };
