@@ -201,6 +201,25 @@ const GameTable: React.FC = () => {
       const cardsPerPlayer = Math.max(0, ...gameState.players.map((player) => player.hand.length));
       const cardsToDeal = playersInRound * cardsPerPlayer;
       const dealDurationMs = Math.max(2200, cardsToDeal * 130 + 450);
+      let startedDeckPlacement = false;
+
+      const startDeckPlacement = () => {
+        if (startedDeckPlacement) return;
+        startedDeckPlacement = true;
+        if (interval !== null) {
+          window.clearInterval(interval);
+          interval = null;
+        }
+        if (dealTimeout !== null) {
+          window.clearTimeout(dealTimeout);
+          dealTimeout = null;
+        }
+        setPlaceDeckPhase(true);
+        placeDeckTimeout = window.setTimeout(() => {
+          setPlaceDeckPhase(false);
+          setShowDealAnimation(false);
+        }, 450);
+      };
 
       setShufflePhase(true);
       setPlaceDeckPhase(false);
@@ -212,21 +231,33 @@ const GameTable: React.FC = () => {
 
       const shuffleTimeout = window.setTimeout(() => {
         setShufflePhase(false);
+        if (cardsToDeal === 0) {
+          startDeckPlacement();
+          return;
+        }
         interval = window.setInterval(() => {
-          setDealingCardIndex((idx) => idx + 1);
+          setDealingCardIndex((idx) => {
+            const nextIdx = Math.min(idx + 1, cardsToDeal);
+            if (nextIdx >= cardsToDeal) {
+              startDeckPlacement();
+            }
+            return nextIdx;
+          });
         }, 130);
         dealTimeout = window.setTimeout(() => {
-          if (interval !== null) window.clearInterval(interval);
-          setPlaceDeckPhase(true);
-          placeDeckTimeout = window.setTimeout(() => {
-            setPlaceDeckPhase(false);
-            setShowDealAnimation(false);
-          }, 450);
+          startDeckPlacement();
         }, dealDurationMs);
       }, 750);
 
+      const failsafeTimeout = window.setTimeout(() => {
+        setShufflePhase(false);
+        setPlaceDeckPhase(false);
+        setShowDealAnimation(false);
+      }, 9000);
+
       return () => {
         window.clearTimeout(shuffleTimeout);
+        window.clearTimeout(failsafeTimeout);
         if (interval !== null) window.clearInterval(interval);
         if (dealTimeout !== null) window.clearTimeout(dealTimeout);
         if (placeDeckTimeout !== null) window.clearTimeout(placeDeckTimeout);
