@@ -43,6 +43,7 @@ const GameTable: React.FC = () => {
   const [isMobilePortrait, setIsMobilePortrait] = useState(false);
   const [showDealAnimation, setShowDealAnimation] = useState(false);
   const [shufflePhase, setShufflePhase] = useState(false);
+  const [placeDeckPhase, setPlaceDeckPhase] = useState(false);
   const [dealingCardIndex, setDealingCardIndex] = useState(0);
   const [roundCountdownSeconds, setRoundCountdownSeconds] = useState<number | null>(null);
   const [playerBalances, setPlayerBalances] = useState<Record<string, number>>({});
@@ -160,36 +161,8 @@ const GameTable: React.FC = () => {
     };
   }, [gameState?.status, gameState?.lastAction?.timestamp]);
 
-  useEffect(() => {
-    if (!gameState) return;
-
-    const playDealAnimation = () => {
-      setShufflePhase(true);
-      setShowDealAnimation(true);
-      setDealingCardIndex(0);
-      let interval: number | null = null;
-      let dealTimeout: number | null = null;
-
-      const shuffleTimeout = window.setTimeout(() => {
-        setShufflePhase(false);
-        interval = window.setInterval(() => {
-          setDealingCardIndex((idx) => idx + 1);
-        }, 130);
-        dealTimeout = window.setTimeout(() => {
-          if (interval !== null) window.clearInterval(interval);
-          setShufflePhase(false);
-          setShowDealAnimation(false);
-        }, Math.max(2200, totalCardsToDeal * 130 + 450));
-      }, 750);
-
-      return () => {
-        window.clearTimeout(shuffleTimeout);
-        if (interval !== null) window.clearInterval(interval);
-        if (dealTimeout !== null) window.clearTimeout(dealTimeout);
-        setShufflePhase(false);
-      };
-    };
-
+  const roundAnimationKey = (() => {
+    if (!gameState) return null;
     const status = gameState.status;
     const isRoundStartState =
       (status === "starting" || status === "in-progress") &&
@@ -198,11 +171,9 @@ const GameTable: React.FC = () => {
       gameState.players.length > 0 &&
       gameState.players.every((p) => p.hand.length === 5);
 
-    if (!isRoundStartState) {
-      return undefined;
-    }
+    if (!isRoundStartState) return null;
 
-    const roundKey = [
+    return [
       `table:${gameState.tableId}`,
       `dealer:${gameState.currentDealerIndex}`,
       `players:${gameState.players.map((p) => p.userId).join(",")}`,
@@ -210,14 +181,58 @@ const GameTable: React.FC = () => {
         .map((p) => p.hand.map((c) => `${c.rank}-${c.suit}`).join("."))
         .join("|")}`,
     ].join(";");
+  })();
 
-    if (lastAnimatedRoundKeyRef.current === roundKey) {
+  useEffect(() => {
+    if (!gameState || !roundAnimationKey) return;
+
+    const playDealAnimation = () => {
+      const playersInRound = Math.max(1, gameState.players.length);
+      const cardsPerPlayer = Math.max(0, ...gameState.players.map((player) => player.hand.length));
+      const cardsToDeal = playersInRound * cardsPerPlayer;
+      const dealDurationMs = Math.max(2200, cardsToDeal * 130 + 450);
+
+      setShufflePhase(true);
+      setPlaceDeckPhase(false);
+      setShowDealAnimation(true);
+      setDealingCardIndex(0);
+      let interval: number | null = null;
+      let dealTimeout: number | null = null;
+      let placeDeckTimeout: number | null = null;
+
+      const shuffleTimeout = window.setTimeout(() => {
+        setShufflePhase(false);
+        interval = window.setInterval(() => {
+          setDealingCardIndex((idx) => idx + 1);
+        }, 130);
+        dealTimeout = window.setTimeout(() => {
+          if (interval !== null) window.clearInterval(interval);
+          setPlaceDeckPhase(true);
+          placeDeckTimeout = window.setTimeout(() => {
+            setPlaceDeckPhase(false);
+            setShowDealAnimation(false);
+          }, 450);
+        }, dealDurationMs);
+      }, 750);
+
+      return () => {
+        window.clearTimeout(shuffleTimeout);
+        if (interval !== null) window.clearInterval(interval);
+        if (dealTimeout !== null) window.clearTimeout(dealTimeout);
+        if (placeDeckTimeout !== null) window.clearTimeout(placeDeckTimeout);
+        setShufflePhase(false);
+        setPlaceDeckPhase(false);
+        setShowDealAnimation(false);
+      };
+    };
+
+    if (lastAnimatedRoundKeyRef.current === roundAnimationKey) {
       return undefined;
     }
 
-    lastAnimatedRoundKeyRef.current = roundKey;
+    lastAnimatedRoundKeyRef.current = roundAnimationKey;
     return playDealAnimation();
-  }, [gameState]);
+  }, [roundAnimationKey]);
 
   useEffect(() => {
     if (showDealAnimation) {
@@ -369,10 +384,13 @@ const GameTable: React.FC = () => {
     ...gameState.players.map((player) => player.hand.length)
   );
   const totalCardsToDeal = totalPlayersInRound * cardsPerPlayerAtDeal;
+  const isRoundPresentationPending =
+    !!roundAnimationKey && lastAnimatedRoundKeyRef.current !== roundAnimationKey;
+  const hideCardsForPresentation = showDealAnimation || isRoundPresentationPending;
 
   const getVisibleCardCount = (playerUserId: string, actualCount: number) => {
-    if (!showDealAnimation) return actualCount;
-    if (shufflePhase) return 0;
+    if (!hideCardsForPresentation) return actualCount;
+    if (shufflePhase || placeDeckPhase || isRoundPresentationPending) return 0;
 
     const playerIndex = gameState.players.findIndex((player) => player.userId === playerUserId);
     if (playerIndex < 0) return actualCount;
@@ -479,6 +497,7 @@ const GameTable: React.FC = () => {
     _label: string,
     className: string
   ) => {
+    if (hideCardsForPresentation) return null;
     if (!player || player.spreads.length === 0) return null;
 
     return (
@@ -596,6 +615,16 @@ const GameTable: React.FC = () => {
                         />
                       ))}
                     </div>
+                  ) : placeDeckPhase ? (
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                      <motion.div
+                        className="w-9 h-14 rounded-lg border border-white/20 shadow-xl"
+                        style={{ backgroundImage: `url(${backCardImage})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                        initial={{ x: 0, y: 0, rotate: 0, opacity: 1 }}
+                        animate={{ x: -96, y: -6, rotate: -3, opacity: 1 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                      />
+                    </div>
                   ) : (
                     <>
                       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -629,16 +658,16 @@ const GameTable: React.FC = () => {
               <div className="center-pile absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
                 <div className="flex items-center gap-4">
                   <div className="relative w-8 h-12 sm:w-10 sm:h-14">
-                    {gameState.deck.length > 0 && (
+                    {!hideCardsForPresentation && gameState.deck.length > 0 && (
                       <div
-                        className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center cursor-pointer relative transition-transform ${isMyTurn && !currentPlayer?.hasTakenActionThisTurn && !showDealAnimation ? 'hover:scale-105' : ''}`}
+                        className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center cursor-pointer relative transition-transform ${isMyTurn && !currentPlayer?.hasTakenActionThisTurn && !hideCardsForPresentation ? 'hover:scale-105' : ''}`}
                         style={{
                           backgroundImage: `url(${backCardImage})`,
                           backgroundSize: "cover",
                           backgroundPosition: "center",
                         }}
                         onClick={() => {
-                          if (!showDealAnimation) handleDeckClick();
+                          if (!hideCardsForPresentation) handleDeckClick();
                         }}
                       >
                       </div>
@@ -648,10 +677,10 @@ const GameTable: React.FC = () => {
                   <div
                     className="relative w-8 h-12 sm:w-10 sm:h-14"
                     onClick={() => {
-                      if (!showDealAnimation) handleDiscardPileClick();
+                      if (!hideCardsForPresentation) handleDiscardPileClick();
                     }}
                   >
-                    {gameState.discardPile.length > 0 ? (
+                    {!hideCardsForPresentation && gameState.discardPile.length > 0 ? (
                       <div className={`relative ${isMyTurn ? 'cursor-pointer hover:scale-105 transition-all' : ''} ${isMyTurn && ((!currentPlayer?.hasTakenActionThisTurn) || (currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)) ? 'hover:ring-4 hover:ring-yellow-400 rounded-lg' : ''} ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'animate-pulse' : ''}`}>
                         <CardComponent
                           suit={gameState.discardPile[gameState.discardPile.length - 1].suit}
@@ -659,11 +688,11 @@ const GameTable: React.FC = () => {
                           className="w-8 h-12 sm:w-10 sm:h-14"
                         />
                       </div>
-                    ) : (
+                    ) : !hideCardsForPresentation ? (
                       <div className={`w-full h-full border-2 border-dashed border-white/30 rounded-lg flex items-center justify-center text-white/30 relative ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'cursor-pointer hover:bg-white/10 ring-4 ring-green-400 animate-pulse' : ''}`}>
                         Discard
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
                 <TurnTimer timeLeft={15} maxTime={30} />
@@ -710,7 +739,7 @@ const GameTable: React.FC = () => {
                       </AnimatePresence>
                     </div>
 
-                    {isMyTurn && !showDealAnimation && (
+                    {isMyTurn && !hideCardsForPresentation && (
                       <div className="actions flex gap-1.5 mt-1 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs">
                         <GameActions
                           canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
