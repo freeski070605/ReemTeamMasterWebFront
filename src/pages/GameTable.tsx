@@ -51,8 +51,7 @@ const GameTable: React.FC = () => {
     isMyTurn: false,
     hasTakenAction: false,
   });
-  const previousStatusRef = useRef<string | null>(null);
-  const hasPlayedInitialDealRef = useRef(false);
+  const lastAnimatedRoundKeyRef = useRef<string | null>(null);
   const maxPlayers = 4;
   const {
     balance,
@@ -178,7 +177,7 @@ const GameTable: React.FC = () => {
           if (interval !== null) window.clearInterval(interval);
           setShufflePhase(false);
           setShowDealAnimation(false);
-        }, 2400);
+        }, Math.max(2200, totalCardsToDeal * 130 + 450));
       }, 750);
 
       return () => {
@@ -189,26 +188,41 @@ const GameTable: React.FC = () => {
       };
     };
 
-    const previousStatus = previousStatusRef.current;
     const status = gameState.status;
-    const isInitialRound =
-      previousStatus === null && (status === "starting" || status === "in-progress");
-    const cameFromRoundEnd = previousStatus === "round-end" && status !== "round-end";
+    const isRoundStartState =
+      (status === "starting" || status === "in-progress") &&
+      gameState.turn === 1 &&
+      gameState.discardPile.length === 0 &&
+      gameState.players.length > 0 &&
+      gameState.players.every((p) => p.hand.length === 5);
 
-    if (isInitialRound && !hasPlayedInitialDealRef.current) {
-      hasPlayedInitialDealRef.current = true;
-      previousStatusRef.current = status;
-      return playDealAnimation();
+    if (!isRoundStartState) {
+      return undefined;
     }
 
-    if (cameFromRoundEnd) {
-      previousStatusRef.current = status;
-      return playDealAnimation();
+    const roundKey = [
+      `table:${gameState.tableId}`,
+      `dealer:${gameState.currentDealerIndex}`,
+      `players:${gameState.players.map((p) => p.userId).join(",")}`,
+      `hands:${gameState.players
+        .map((p) => p.hand.map((c) => `${c.rank}-${c.suit}`).join("."))
+        .join("|")}`,
+    ].join(";");
+
+    if (lastAnimatedRoundKeyRef.current === roundKey) {
+      return undefined;
     }
 
-    previousStatusRef.current = status;
-    return undefined;
+    lastAnimatedRoundKeyRef.current = roundKey;
+    return playDealAnimation();
   }, [gameState]);
+
+  useEffect(() => {
+    if (showDealAnimation) {
+      setSelectedCards([]);
+      setIsHitMode(false);
+    }
+  }, [showDealAnimation]);
 
   const currentPlayer = gameState?.players.find((p) => p.userId === user?._id);
   const isMyTurn = !!(
@@ -347,6 +361,38 @@ const GameTable: React.FC = () => {
   const topPlayer = seatAt(1);
   const rightPlayer = seatAt(2);
   const leftPlayer = seatAt(3);
+  const totalPlayersInRound = Math.max(1, gameState.players.length);
+  const cardsPerPlayerAtDeal = Math.max(
+    0,
+    ...gameState.players.map((player) => player.hand.length)
+  );
+  const totalCardsToDeal = totalPlayersInRound * cardsPerPlayerAtDeal;
+
+  const getVisibleCardCount = (playerUserId: string, actualCount: number) => {
+    if (!showDealAnimation) return actualCount;
+    if (shufflePhase) return 0;
+
+    const playerIndex = gameState.players.findIndex((player) => player.userId === playerUserId);
+    if (playerIndex < 0) return actualCount;
+    if (dealingCardIndex <= playerIndex) return 0;
+
+    const dealtToPlayer =
+      Math.floor((dealingCardIndex - 1 - playerIndex) / totalPlayersInRound) + 1;
+
+    return Math.max(0, Math.min(actualCount, dealtToPlayer));
+  };
+
+  const getDealTargetOffset = (dealIndex: number) => {
+    const recipientPlayerIndex = dealIndex % totalPlayersInRound;
+    const seatOffset =
+      ((recipientPlayerIndex - localIndex) % totalPlayersInRound + totalPlayersInRound) %
+      totalPlayersInRound;
+
+    if (seatOffset === 1) return { x: 0, y: -150 };
+    if (seatOffset === 2) return { x: 230, y: 20 };
+    if (seatOffset === 3) return { x: -230, y: 20 };
+    return { x: 0, y: 145 };
+  };
 
   const isReem = gameState.status === 'round-end' && gameState.roundEndedBy === 'REEM';
   const formatCurrency = (amount: number | null) => {
@@ -402,13 +448,15 @@ const GameTable: React.FC = () => {
     return (
       <div className={`absolute z-20 pointer-events-none ${className}`}>
         <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
-          {renderOpponentHand(player.hand.length, "sm")}
+          {renderOpponentHand(getVisibleCardCount(player.userId, player.hand.length), "sm")}
           <div className={`px-2 py-1 rounded-lg border ${isActive ? "border-yellow-400/80 bg-yellow-400/10" : "border-white/10 bg-black/35"} min-w-[110px]`}>
             <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse" : ""}`}>
               <PlayerAvatar player={{ name: player.username, avatarUrl: player.avatarUrl }} size="sm" />
               <div>
                 <div className="text-[11px] text-white font-semibold leading-tight">{player.username}</div>
-                <div className="text-[10px] text-white/60 leading-tight">Cards: {player.hand.length}</div>
+                <div className="text-[10px] text-white/60 leading-tight">
+                  Cards: {getVisibleCardCount(player.userId, player.hand.length)}
+                </div>
                 <div className="text-[10px] text-yellow-300 leading-tight">
                   {playerBalances[player.userId] !== undefined ? formatCurrency(playerBalances[player.userId]) : "--"}
                 </div>
@@ -421,6 +469,8 @@ const GameTable: React.FC = () => {
   };
 
   const hand = currentPlayer?.hand ?? [];
+  const visibleHand =
+    currentPlayer ? hand.slice(0, getVisibleCardCount(currentPlayer.userId, hand.length)) : [];
 
   const renderSpreadZone = (
     player: typeof gameState.players[number] | null,
@@ -555,15 +605,15 @@ const GameTable: React.FC = () => {
                           transition={{ repeat: Infinity, repeatType: "reverse", duration: 0.35 }}
                         />
                       </div>
-                      {Array.from({ length: 20 }).map((_, idx) => (
+                      {Array.from({ length: totalCardsToDeal || 20 }).map((_, idx) => (
                         <motion.div
                           key={`deal-${idx}`}
                           className="absolute left-1/2 top-1/2 w-8 h-12 rounded-md border border-white/20"
                           style={{ backgroundImage: `url(${backCardImage})`, backgroundSize: "cover", backgroundPosition: "center" }}
                           initial={{ x: 0, y: 0, opacity: 0 }}
                           animate={{
-                            x: idx % 4 === 0 ? -230 : idx % 4 === 1 ? 0 : idx % 4 === 2 ? 230 : 0,
-                            y: idx % 4 === 0 ? 20 : idx % 4 === 1 ? -150 : idx % 4 === 2 ? 20 : 145,
+                            x: getDealTargetOffset(idx).x,
+                            y: getDealTargetOffset(idx).y,
                             opacity: dealingCardIndex >= idx ? 1 : 0,
                           }}
                           transition={{ duration: 0.28, ease: "easeOut" }}
@@ -579,19 +629,26 @@ const GameTable: React.FC = () => {
                   <div className="relative w-8 h-12 sm:w-10 sm:h-14">
                     {gameState.deck.length > 0 && (
                       <div
-                        className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center cursor-pointer relative transition-transform ${isMyTurn && !currentPlayer?.hasTakenActionThisTurn ? 'hover:scale-105' : ''}`}
+                        className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center cursor-pointer relative transition-transform ${isMyTurn && !currentPlayer?.hasTakenActionThisTurn && !showDealAnimation ? 'hover:scale-105' : ''}`}
                         style={{
                           backgroundImage: `url(${backCardImage})`,
                           backgroundSize: "cover",
                           backgroundPosition: "center",
                         }}
-                        onClick={handleDeckClick}
+                        onClick={() => {
+                          if (!showDealAnimation) handleDeckClick();
+                        }}
                       >
                       </div>
                     )}
                   </div>
                   <Pot amount={gameState.pot} />
-                  <div className="relative w-8 h-12 sm:w-10 sm:h-14" onClick={handleDiscardPileClick}>
+                  <div
+                    className="relative w-8 h-12 sm:w-10 sm:h-14"
+                    onClick={() => {
+                      if (!showDealAnimation) handleDiscardPileClick();
+                    }}
+                  >
                     {gameState.discardPile.length > 0 ? (
                       <div className={`relative ${isMyTurn ? 'cursor-pointer hover:scale-105 transition-all' : ''} ${isMyTurn && ((!currentPlayer?.hasTakenActionThisTurn) || (currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)) ? 'hover:ring-4 hover:ring-yellow-400 rounded-lg' : ''} ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'animate-pulse' : ''}`}>
                         <CardComponent
@@ -617,7 +674,7 @@ const GameTable: React.FC = () => {
                       <PlayerAvatar player={{ name: user.username, avatarUrl: user.avatarUrl }} size="sm" />
                       <div>
                         <div className="text-[11px] text-white font-semibold leading-tight">{user.username}</div>
-                        <div className="text-[10px] text-white/60 leading-tight">Cards: {hand.length}</div>
+                        <div className="text-[10px] text-white/60 leading-tight">Cards: {visibleHand.length}</div>
                         <div className="text-[10px] text-yellow-300 leading-tight">
                           {balanceLoading ? "..." : formatCurrency(balance)}
                         </div>
@@ -629,7 +686,7 @@ const GameTable: React.FC = () => {
                     <div className="hand relative h-24 w-full max-w-[700px] pointer-events-auto">
                       <AnimatePresence>
                         <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
-                          {hand.map((card) => (
+                          {visibleHand.map((card) => (
                             <motion.div
                               key={`${card.rank}-${card.suit}`}
                               className="card"
@@ -651,7 +708,7 @@ const GameTable: React.FC = () => {
                       </AnimatePresence>
                     </div>
 
-                    {isMyTurn && (
+                    {isMyTurn && !showDealAnimation && (
                       <div className="actions flex gap-1.5 mt-1 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs">
                         <GameActions
                           canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
