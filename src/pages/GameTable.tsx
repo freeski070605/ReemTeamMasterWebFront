@@ -273,7 +273,7 @@ const GameTable: React.FC = () => {
 
     lastAnimatedRoundKeyRef.current = roundAnimationKey;
     return playDealAnimation();
-  }, [roundAnimationKey]);
+  }, [gameState, roundAnimationKey]);
 
   useEffect(() => {
     if (showDealAnimation) {
