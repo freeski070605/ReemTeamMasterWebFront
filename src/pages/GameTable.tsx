@@ -47,6 +47,7 @@ const GameTable: React.FC = () => {
   const [roundCountdownSeconds, setRoundCountdownSeconds] = useState<number | null>(null);
   const [playerBalances, setPlayerBalances] = useState<Record<string, number>>({});
   const [tableMaxWidthPx, setTableMaxWidthPx] = useState(860);
+  const [useLargeScreenTableSizing, setUseLargeScreenTableSizing] = useState(false);
   const prevTurnStateRef = useRef<{ isMyTurn: boolean; hasTakenAction: boolean }>({
     isMyTurn: false,
     hasTakenAction: false,
@@ -128,6 +129,7 @@ const GameTable: React.FC = () => {
       const maxByHeight = window.innerHeight * 0.92 * (16 / 9);
       const maxByTV = 1800;
       setTableMaxWidthPx(Math.floor(Math.min(maxByViewport, maxByHeight, maxByTV)));
+      setUseLargeScreenTableSizing(window.innerWidth > 1024);
     };
 
     updateTableMaxWidth();
@@ -532,8 +534,8 @@ const GameTable: React.FC = () => {
         <div className={`game-wrapper flex-1 relative overflow-hidden touch-manipulation pb-6 ${isMobilePortrait ? "pointer-events-none" : ""}`}>
           <div className="table-area relative w-full h-full flex items-center justify-center">
             <div
-              className={`table relative w-full aspect-[16/9] rounded-[28px] border-[12px] shadow-2xl overflow-hidden bg-black/20 ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
-              style={{ maxWidth: `${tableMaxWidthPx}px` }}
+              className={`table relative aspect-[16/9] rounded-[28px] border-[12px] shadow-2xl overflow-hidden bg-black/20 ${useLargeScreenTableSizing ? "w-full" : "w-[96vw] max-w-[860px]"} ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
+              style={useLargeScreenTableSizing ? { maxWidth: `${tableMaxWidthPx}px` } : undefined}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.06),transparent_60%)]" />
               <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-2">
