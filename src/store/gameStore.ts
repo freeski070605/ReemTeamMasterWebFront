@@ -37,6 +37,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     const socket = io(BACKEND_URL);
+    let lastRoundEndTimestamp: number | null = null;
 
     socket.on('connect', () => {
       console.log('Connected to game server');
@@ -56,6 +57,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       
       // Check for round end and notify
       if (gameState.status === 'round-end') {
+          const roundEndTimestamp = gameState.lastAction?.timestamp ?? Date.now();
+          if (lastRoundEndTimestamp === roundEndTimestamp) {
+            return;
+          }
+          lastRoundEndTimestamp = roundEndTimestamp;
+
           if (gameState.roundEndedBy === 'REEM') {
               const winner = gameState.players.find(p => p.userId === gameState.roundWinnerId);
               toast.success(`${winner?.username} REEMED!`);
@@ -66,6 +73,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
               const winner = gameState.players.find(p => p.userId === gameState.roundWinnerId);
               toast.info(`Deck empty. ${winner?.username} wins on lowest hand.`);
           }
+          toast.info("Next round starts in 30 seconds.", { autoClose: 30000 });
+      } else {
+          lastRoundEndTimestamp = null;
       }
     });
     

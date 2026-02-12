@@ -42,13 +42,17 @@ const GameTable: React.FC = () => {
   const [isHitMode, setIsHitMode] = useState(false);
   const [isMobilePortrait, setIsMobilePortrait] = useState(false);
   const [showDealAnimation, setShowDealAnimation] = useState(false);
+  const [shufflePhase, setShufflePhase] = useState(false);
   const [dealingCardIndex, setDealingCardIndex] = useState(0);
+  const [roundCountdownSeconds, setRoundCountdownSeconds] = useState<number | null>(null);
   const [playerBalances, setPlayerBalances] = useState<Record<string, number>>({});
+  const [tableMaxWidthPx, setTableMaxWidthPx] = useState(860);
   const prevTurnStateRef = useRef<{ isMyTurn: boolean; hasTakenAction: boolean }>({
     isMyTurn: false,
     hasTakenAction: false,
   });
   const previousStatusRef = useRef<string | null>(null);
+  const hasPlayedInitialDealRef = useRef(false);
   const maxPlayers = 4;
   const {
     balance,
@@ -120,27 +124,86 @@ const GameTable: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!gameState) return;
-    const previousStatus = previousStatusRef.current;
-    const status = gameState.status;
-    const cameFromRoundEnd = previousStatus === "round-end" && status !== "round-end";
+    const updateTableMaxWidth = () => {
+      const maxByViewport = window.innerWidth * 0.96;
+      const maxByHeight = window.innerHeight * 0.92 * (16 / 9);
+      const maxByTV = 1800;
+      setTableMaxWidthPx(Math.floor(Math.min(maxByViewport, maxByHeight, maxByTV)));
+    };
 
-    if (cameFromRoundEnd) {
+    updateTableMaxWidth();
+    window.addEventListener("resize", updateTableMaxWidth);
+    return () => {
+      window.removeEventListener("resize", updateTableMaxWidth);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (gameState?.status !== "round-end") {
+      setRoundCountdownSeconds(null);
+      return;
+    }
+
+    const roundEndAt = gameState.lastAction?.timestamp ?? Date.now();
+    const roundRestartAt = roundEndAt + 30000;
+
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.ceil((roundRestartAt - Date.now()) / 1000));
+      setRoundCountdownSeconds(remaining);
+    };
+
+    updateCountdown();
+    const interval = window.setInterval(updateCountdown, 250);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [gameState?.status, gameState?.lastAction?.timestamp]);
+
+  useEffect(() => {
+    if (!gameState) return;
+
+    const playDealAnimation = () => {
+      setShufflePhase(true);
       setShowDealAnimation(true);
       setDealingCardIndex(0);
-      const interval = window.setInterval(() => {
-        setDealingCardIndex((idx) => idx + 1);
-      }, 120);
-      const timeout = window.setTimeout(() => {
-        window.clearInterval(interval);
-        setShowDealAnimation(false);
-      }, 2200);
+      let interval: number | null = null;
+      let dealTimeout: number | null = null;
 
-      previousStatusRef.current = status;
+      const shuffleTimeout = window.setTimeout(() => {
+        setShufflePhase(false);
+        interval = window.setInterval(() => {
+          setDealingCardIndex((idx) => idx + 1);
+        }, 130);
+        dealTimeout = window.setTimeout(() => {
+          if (interval !== null) window.clearInterval(interval);
+          setShufflePhase(false);
+          setShowDealAnimation(false);
+        }, 2400);
+      }, 750);
+
       return () => {
-        window.clearInterval(interval);
-        window.clearTimeout(timeout);
+        window.clearTimeout(shuffleTimeout);
+        if (interval !== null) window.clearInterval(interval);
+        if (dealTimeout !== null) window.clearTimeout(dealTimeout);
+        setShufflePhase(false);
       };
+    };
+
+    const previousStatus = previousStatusRef.current;
+    const status = gameState.status;
+    const isInitialRound =
+      previousStatus === null && (status === "starting" || status === "in-progress");
+    const cameFromRoundEnd = previousStatus === "round-end" && status !== "round-end";
+
+    if (isInitialRound && !hasPlayedInitialDealRef.current) {
+      hasPlayedInitialDealRef.current = true;
+      previousStatusRef.current = status;
+      return playDealAnimation();
+    }
+
+    if (cameFromRoundEnd) {
+      previousStatusRef.current = status;
+      return playDealAnimation();
     }
 
     previousStatusRef.current = status;
@@ -419,7 +482,8 @@ const GameTable: React.FC = () => {
         <div className={`game-wrapper flex-1 relative overflow-hidden touch-manipulation pb-6 ${isMobilePortrait ? "pointer-events-none" : ""}`}>
           <div className="table-area relative w-full h-full flex items-center justify-center">
             <div
-              className={`table relative w-[96vw] max-w-[860px] aspect-[16/9] rounded-[28px] border-[12px] shadow-2xl overflow-hidden bg-black/20 ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
+              className={`table relative w-full aspect-[16/9] rounded-[28px] border-[12px] shadow-2xl overflow-hidden bg-black/20 ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
+              style={{ maxWidth: `${tableMaxWidthPx}px` }}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.06),transparent_60%)]" />
               <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-2">
@@ -461,29 +525,52 @@ const GameTable: React.FC = () => {
 
               {showDealAnimation && (
                 <div className="absolute inset-0 z-30 pointer-events-none">
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                    <motion.div
-                      className="w-9 h-14 rounded-lg border border-white/20 shadow-xl"
-                      style={{ backgroundImage: `url(${backCardImage})`, backgroundSize: "cover", backgroundPosition: "center" }}
-                      initial={{ rotate: -18, scale: 0.9, opacity: 0.8 }}
-                      animate={{ rotate: 18, scale: 1.02, opacity: 1 }}
-                      transition={{ repeat: Infinity, repeatType: "reverse", duration: 0.35 }}
-                    />
-                  </div>
-                  {Array.from({ length: 20 }).map((_, idx) => (
-                    <motion.div
-                      key={`deal-${idx}`}
-                      className="absolute left-1/2 top-1/2 w-8 h-12 rounded-md border border-white/20"
-                      style={{ backgroundImage: `url(${backCardImage})`, backgroundSize: "cover", backgroundPosition: "center" }}
-                      initial={{ x: 0, y: 0, opacity: 0 }}
-                      animate={{
-                        x: idx % 4 === 0 ? -230 : idx % 4 === 1 ? 0 : idx % 4 === 2 ? 230 : 0,
-                        y: idx % 4 === 0 ? 20 : idx % 4 === 1 ? -150 : idx % 4 === 2 ? 20 : 145,
-                        opacity: dealingCardIndex >= idx ? 1 : 0,
-                      }}
-                      transition={{ duration: 0.28, ease: "easeOut" }}
-                    />
-                  ))}
+                  {shufflePhase ? (
+                    <div className="absolute left-1/2 top-[40%] -translate-x-1/2 -translate-y-1/2">
+                      {Array.from({ length: 3 }).map((_, idx) => (
+                        <motion.div
+                          key={`shuffle-${idx}`}
+                          className="absolute w-9 h-14 rounded-lg border border-white/20 shadow-xl"
+                          style={{
+                            backgroundImage: `url(${backCardImage})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            left: `${idx * 4}px`,
+                            top: `${idx * 2}px`,
+                          }}
+                          initial={{ y: -130, rotate: -20 + idx * 10, opacity: 0 }}
+                          animate={{ y: 0, rotate: 10 - idx * 7, opacity: 1 }}
+                          transition={{ duration: 0.32, delay: idx * 0.08, ease: "easeOut" }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                        <motion.div
+                          className="w-9 h-14 rounded-lg border border-white/20 shadow-xl"
+                          style={{ backgroundImage: `url(${backCardImage})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                          initial={{ rotate: -16, scale: 0.95, opacity: 0.9 }}
+                          animate={{ rotate: 16, scale: 1.02, opacity: 1 }}
+                          transition={{ repeat: Infinity, repeatType: "reverse", duration: 0.35 }}
+                        />
+                      </div>
+                      {Array.from({ length: 20 }).map((_, idx) => (
+                        <motion.div
+                          key={`deal-${idx}`}
+                          className="absolute left-1/2 top-1/2 w-8 h-12 rounded-md border border-white/20"
+                          style={{ backgroundImage: `url(${backCardImage})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                          initial={{ x: 0, y: 0, opacity: 0 }}
+                          animate={{
+                            x: idx % 4 === 0 ? -230 : idx % 4 === 1 ? 0 : idx % 4 === 2 ? 230 : 0,
+                            y: idx % 4 === 0 ? 20 : idx % 4 === 1 ? -150 : idx % 4 === 2 ? 20 : 145,
+                            opacity: dealingCardIndex >= idx ? 1 : 0,
+                          }}
+                          transition={{ duration: 0.28, ease: "easeOut" }}
+                        />
+                      ))}
+                    </>
+                  )}
                 </div>
               )}
 
@@ -591,6 +678,9 @@ const GameTable: React.FC = () => {
                 <div className="text-sm font-semibold text-white">{roundReasonLabel}</div>
               </div>
               <Button onClick={handleRequestLeaveTable} variant="danger" size="sm">Leave</Button>
+            </div>
+            <div className="mt-1 text-[11px] text-yellow-300">
+              Next round starts in {roundCountdownSeconds ?? 30}s
             </div>
             <div className="mt-2 text-sm text-green-400 font-bold">
               Winner: {gameState.players.find((p) => p.userId === gameState.roundWinnerId)?.username || "Unknown"}
