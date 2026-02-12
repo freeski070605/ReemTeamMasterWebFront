@@ -173,13 +173,23 @@ const GameTable: React.FC = () => {
 
     if (!isRoundStartState) return null;
 
+    const stableHandSignature = [...gameState.players]
+      .map((player) => ({
+        userId: player.userId,
+        handSignature: player.hand
+          .map((card) => `${card.rank}-${card.suit}`)
+          .sort()
+          .join("."),
+      }))
+      .sort((a, b) => a.userId.localeCompare(b.userId))
+      .map((entry) => `${entry.userId}:${entry.handSignature}`)
+      .join("|");
+
     return [
       `table:${gameState.tableId}`,
       `dealer:${gameState.currentDealerIndex}`,
-      `players:${gameState.players.map((p) => p.userId).join(",")}`,
-      `hands:${gameState.players
-        .map((p) => p.hand.map((c) => `${c.rank}-${c.suit}`).join("."))
-        .join("|")}`,
+      `players:${gameState.players.map((p) => p.userId).sort().join(",")}`,
+      `hands:${stableHandSignature}`,
     ].join(";");
   })();
 
@@ -645,7 +655,7 @@ const GameTable: React.FC = () => {
                           animate={{
                             x: getDealTargetOffset(idx).x,
                             y: getDealTargetOffset(idx).y,
-                            opacity: dealingCardIndex >= idx ? 1 : 0,
+                            opacity: dealingCardIndex > idx ? 1 : 0,
                           }}
                           transition={{ duration: 0.28, ease: "easeOut" }}
                         />
