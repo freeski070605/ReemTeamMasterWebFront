@@ -161,7 +161,7 @@ const GameTable: React.FC = () => {
     };
   }, [gameState?.status, gameState?.lastAction?.timestamp]);
 
-  const roundAnimationKey = (() => {
+  const roundAnimationPlan = (() => {
     if (!gameState) return null;
     const status = gameState.status;
     const isRoundStartState =
@@ -172,6 +172,10 @@ const GameTable: React.FC = () => {
       gameState.players.every((p) => p.hand.length === 5);
 
     if (!isRoundStartState) return null;
+
+    const playersInRound = Math.max(1, gameState.players.length);
+    const cardsPerPlayer = Math.max(0, ...gameState.players.map((player) => player.hand.length));
+    const cardsToDeal = playersInRound * cardsPerPlayer;
 
     const stableHandSignature = [...gameState.players]
       .map((player) => ({
@@ -185,21 +189,28 @@ const GameTable: React.FC = () => {
       .map((entry) => `${entry.userId}:${entry.handSignature}`)
       .join("|");
 
-    return [
+    const key = [
       `table:${gameState.tableId}`,
       `dealer:${gameState.currentDealerIndex}`,
       `players:${gameState.players.map((p) => p.userId).sort().join(",")}`,
       `hands:${stableHandSignature}`,
     ].join(";");
+
+    return {
+      key,
+      playersInRound,
+      cardsPerPlayer,
+      cardsToDeal,
+    };
   })();
+  const roundAnimationKey = roundAnimationPlan?.key ?? null;
+  const roundAnimationCardsToDeal = roundAnimationPlan?.cardsToDeal ?? 0;
 
   useEffect(() => {
-    if (!gameState || !roundAnimationKey) return;
+    if (!roundAnimationKey) return;
 
     const playDealAnimation = () => {
-      const playersInRound = Math.max(1, gameState.players.length);
-      const cardsPerPlayer = Math.max(0, ...gameState.players.map((player) => player.hand.length));
-      const cardsToDeal = playersInRound * cardsPerPlayer;
+      const cardsToDeal = roundAnimationCardsToDeal;
       const dealDurationMs = Math.max(2200, cardsToDeal * 130 + 450);
       let startedDeckPlacement = false;
 
@@ -273,7 +284,7 @@ const GameTable: React.FC = () => {
 
     lastAnimatedRoundKeyRef.current = roundAnimationKey;
     return playDealAnimation();
-  }, [gameState, roundAnimationKey]);
+  }, [roundAnimationCardsToDeal, roundAnimationKey]);
 
   useEffect(() => {
     if (showDealAnimation) {
