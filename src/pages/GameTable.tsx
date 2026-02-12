@@ -543,6 +543,8 @@ const GameTable: React.FC = () => {
   const hand = currentPlayer?.hand ?? [];
   const visibleHand =
     currentPlayer ? hand.slice(0, getVisibleCardCount(currentPlayer.userId, hand.length)) : [];
+  const canDrawFromDeck =
+    isMyTurn && !currentPlayer?.hasTakenActionThisTurn && !hideCardsForPresentation;
 
   const renderSpreadZone = (
     player: typeof gameState.players[number] | null,
@@ -712,14 +714,14 @@ const GameTable: React.FC = () => {
                   <div className="relative w-8 h-12 sm:w-10 sm:h-14">
                     {!hideCardsForPresentation && gameState.deck.length > 0 && (
                       <div
-                        className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center cursor-pointer relative transition-transform ${isMyTurn && !currentPlayer?.hasTakenActionThisTurn && !hideCardsForPresentation ? 'hover:scale-105' : ''}`}
+                        className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center relative transition-transform ${canDrawFromDeck ? 'cursor-pointer hover:scale-105' : 'cursor-not-allowed opacity-90'}`}
                         style={{
                           backgroundImage: `url(${backCardImage})`,
                           backgroundSize: "cover",
                           backgroundPosition: "center",
                         }}
                         onClick={() => {
-                          if (!hideCardsForPresentation) handleDeckClick();
+                          if (canDrawFromDeck) handleDeckClick();
                         }}
                       >
                       </div>
