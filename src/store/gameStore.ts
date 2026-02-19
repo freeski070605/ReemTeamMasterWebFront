@@ -22,6 +22,7 @@ interface GameStore {
   hit: (tableId: string, userId: string, card: Card, targetPlayerId: string, targetSpreadIndex: number) => void;
   drop: (tableId: string, userId: string) => void;
   requestLeaveTable: (tableId: string, userId: string) => void;
+  putIn: (tableId: string, userId: string) => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -158,5 +159,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   requestLeaveTable: (tableId, userId) => {
     const { socket } = get();
     if (socket) socket.emit('requestLeaveTable', { tableId, userId });
+  },
+
+  putIn: (tableId, userId) => {
+    const { socket } = get();
+    if (socket) socket.emit('putIn', { tableId, userId });
   },
 }));

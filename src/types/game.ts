@@ -42,6 +42,8 @@ export interface IGameState {
   caughtDroppingPlayerId?: string;
   handScores?: { [userId: string]: number };
   payouts?: { [userId: string]: number };
+  roundReadyPlayerIds?: string[];
+  roundReadyDeadline?: number | null;
 }
 
 export interface Table {

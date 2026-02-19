@@ -36,6 +36,7 @@ const GameTable: React.FC = () => {
     hit,
     drop,
     requestLeaveTable,
+    putIn,
   } = useGameStore();
 
   const [selectedCards, setSelectedCards] = useState<CardType[]>([]);
@@ -146,8 +147,7 @@ const GameTable: React.FC = () => {
       return;
     }
 
-    const roundEndAt = gameState.lastAction?.timestamp ?? Date.now();
-    const roundRestartAt = roundEndAt + 30000;
+    const roundRestartAt = gameState.roundReadyDeadline ?? ((gameState.lastAction?.timestamp ?? Date.now()) + 30000);
 
     const updateCountdown = () => {
       const remaining = Math.max(0, Math.ceil((roundRestartAt - Date.now()) / 1000));
@@ -424,6 +424,12 @@ const GameTable: React.FC = () => {
     }
   };
 
+  const handlePutIn = () => {
+    if (tableId && user && gameState.status === "round-end") {
+      putIn(tableId, user._id);
+    }
+  };
+
   const localIndex = gameState.players.findIndex((p) => p.userId === user._id);
   const totalPlayers = gameState.players.length;
   const seatAt = (offset: number) => {
@@ -472,6 +478,10 @@ const GameTable: React.FC = () => {
   };
 
   const isReem = gameState.status === 'round-end' && gameState.roundEndedBy === 'REEM';
+  const readyPlayerIds = new Set(gameState.roundReadyPlayerIds ?? []);
+  const isReadyForNextRound = !!user && readyPlayerIds.has(user._id);
+  const readyCount = readyPlayerIds.size;
+  const totalRoundPlayers = gameState.players.length;
   const formatCurrency = (amount: number | null) => {
     if (amount === null) return "$0.00";
     return new Intl.NumberFormat("en-US", {
@@ -648,9 +658,9 @@ const GameTable: React.FC = () => {
               {renderSeatInfo(leftPlayer, "left-[1.5%] top-1/2 -translate-y-1/2", "left")}
               {renderSeatInfo(rightPlayer, "right-[1.5%] top-1/2 -translate-y-1/2", "right")}
 
-              {renderSpreadZone(topPlayer, "Top Spread", "left-1/2 top-[20%] -translate-x-1/2 w-[30%] max-w-[260px]")}
-              {renderSpreadZone(leftPlayer, "Left Spread", "left-[5%] top-[44%] -translate-y-1/2 w-[19%] max-w-[170px]")}
-              {renderSpreadZone(rightPlayer, "Right Spread", "right-[5%] top-[44%] -translate-y-1/2 w-[19%] max-w-[170px]")}
+              {renderSpreadZone(topPlayer, "Top Spread", "left-1/2 top-[28%] -translate-x-1/2 w-[34%] max-w-[300px]")}
+              {renderSpreadZone(leftPlayer, "Left Spread", "left-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]")}
+              {renderSpreadZone(rightPlayer, "Right Spread", "right-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]")}
               {renderSpreadZone(currentPlayer ?? null, "Your Spread", "left-1/2 bottom-[33%] -translate-x-1/2 w-[30%] max-w-[260px]")}
 
               {showDealAnimation && (
@@ -828,6 +838,14 @@ const GameTable: React.FC = () => {
             </div>
             <div className="mt-1 text-[11px] text-yellow-300">
               Next round starts in {roundCountdownSeconds ?? 30}s
+            </div>
+            <div className="mt-1 text-[11px] text-white/70">
+              Ready: {readyCount}/{totalRoundPlayers}
+            </div>
+            <div className="mt-2">
+              <Button onClick={handlePutIn} variant="primary" size="sm" disabled={isReadyForNextRound}>
+                {isReadyForNextRound ? "Put In: Ready" : "Put In"}
+              </Button>
             </div>
             <div className="mt-2 text-sm text-green-400 font-bold">
               Winner: {gameState.players.find((p) => p.userId === gameState.roundWinnerId)?.username || "Unknown"}
