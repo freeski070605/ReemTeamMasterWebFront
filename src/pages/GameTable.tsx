@@ -159,7 +159,7 @@ const GameTable: React.FC = () => {
     return () => {
       window.clearInterval(interval);
     };
-  }, [gameState?.status, gameState?.lastAction?.timestamp]);
+  }, [gameState?.status, gameState?.lastAction?.timestamp, gameState?.roundReadyDeadline]);
 
   const roundAnimationPlan = (() => {
     if (!gameState) return null;
