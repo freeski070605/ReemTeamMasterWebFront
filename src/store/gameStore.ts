@@ -39,6 +39,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const socket = io(BACKEND_URL);
     let lastRoundEndTimestamp: number | null = null;
+    let activeRoundEndToastId: string | number | null = null;
 
     socket.on('connect', () => {
       console.log('Connected to game server');
@@ -74,8 +75,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
               const winner = gameState.players.find(p => p.userId === gameState.roundWinnerId);
               toast.info(`Deck empty. ${winner?.username} wins on lowest hand.`);
           }
-          toast.info("Next round starts in 30 seconds.", { autoClose: 30000 });
+          if (activeRoundEndToastId !== null) {
+            toast.dismiss(activeRoundEndToastId);
+          }
+          activeRoundEndToastId = toast.info("Next round starts in 30 seconds.", { autoClose: 30000 });
       } else {
+          if (activeRoundEndToastId !== null) {
+            toast.dismiss(activeRoundEndToastId);
+            activeRoundEndToastId = null;
+          }
           lastRoundEndTimestamp = null;
       }
     });
@@ -107,6 +115,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     socket.on('disconnect', () => {
       console.log('Disconnected from game server');
+      if (activeRoundEndToastId !== null) {
+        toast.dismiss(activeRoundEndToastId);
+        activeRoundEndToastId = null;
+      }
       set({ isConnected: false });
     });
 
