@@ -22,6 +22,7 @@ const ContestLobby: React.FC = () => {
   const [joiningContestId, setJoiningContestId] = useState<string | null>(null);
   const [stakeFilter, setStakeFilter] = useState<number | 'all'>(initialStakeFilter);
   const [selectedTicketByContest, setSelectedTicketByContest] = useState<Record<string, string>>({});
+  const currentUserId = user?._id ?? null;
 
   const getParticipantCount = (contest: Contest): number => {
     return Array.isArray(contest.participants) ? contest.participants.length : 0;
@@ -32,10 +33,10 @@ const ContestLobby: React.FC = () => {
   };
 
   const isUserJoined = (contest: Contest): boolean => {
-    if (!user?._id) {
+    if (!currentUserId) {
       return false;
     }
-    return (contest.participants ?? []).some((participantId) => participantId === user._id);
+    return (contest.participants ?? []).some((participantId) => participantId === currentUserId);
   };
 
   const availableTickets = useMemo(() => {
@@ -50,7 +51,9 @@ const ContestLobby: React.FC = () => {
     return contests
       .filter((contest) => contest.mode === 'USD_CONTEST')
       .filter((contest) => {
-        const joined = isUserJoined(contest);
+        const joined = currentUserId
+          ? (contest.participants ?? []).some((participantId) => participantId === currentUserId)
+          : false;
         if (joined) {
           return contest.status === 'open' || contest.status === 'locked' || contest.status === 'in-progress';
         }
@@ -61,7 +64,7 @@ const ContestLobby: React.FC = () => {
         if (a.entryFee !== b.entryFee) return a.entryFee - b.entryFee;
         return getParticipantCount(b) - getParticipantCount(a);
       });
-  }, [contests, stakeFilter, user?._id]);
+  }, [contests, stakeFilter, currentUserId]);
 
   const stakeOptions = useMemo(() => {
     return Array.from(new Set(contests.map((contest) => contest.entryFee))).sort((a, b) => a - b);
