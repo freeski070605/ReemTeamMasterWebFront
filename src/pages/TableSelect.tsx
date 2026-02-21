@@ -1,11 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Crown, DollarSign, Users } from 'lucide-react';
+import { Coins, Crown, DollarSign, Users } from 'lucide-react';
 import client from '../api/client';
 import { Table } from '../types/game';
 import { Button } from '../components/ui/Button';
 import { Loader } from '../components/ui/Loader';
 import { Modal } from '../components/ui/Modal';
+import {
+  getModeBadge,
+  getModeDescription,
+  getStakeDisplay,
+  getStakeTierHeading,
+  getTableDisplayName,
+} from '../branding/modeCopy';
 
 const TableSelect: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
@@ -23,7 +30,7 @@ const TableSelect: React.FC = () => {
       setTables(sortedTables);
       setError('');
     } catch (err) {
-      setError('Failed to load tables. Please try again.');
+      setError('Could not load crib tables right now. Try again.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -81,30 +88,30 @@ const TableSelect: React.FC = () => {
   return (
     <div className="space-y-6">
       <header className="rt-panel-strong rounded-3xl p-7">
-        <div className="text-xs uppercase tracking-[0.2em] text-white/50">Table Lobby</div>
-        <h1 className="mt-2 text-4xl rt-page-title font-semibold">Pick Your Arena</h1>
+        <div className="text-xs uppercase tracking-[0.2em] text-white/50">Crib Lobby</div>
+        <h1 className="mt-2 text-4xl rt-page-title font-semibold">Choose Your Crib</h1>
         <p className="mt-2 text-white/65">
-          FREE and RTC tables start instantly. USD mode is now contest-driven from the contest lobby.
+          RTC cribs run instantly. Cash Crown seats open through the contest lane.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button variant="secondary" onClick={() => navigate('/contests')}>
-            Open Contests
+            Open Cash Crowns
           </Button>
-          <Button onClick={() => void fetchTables()}>Refresh Tables</Button>
+          <Button onClick={() => void fetchTables()}>Reload Cribs</Button>
         </div>
       </header>
 
       <section className="grid gap-4 sm:grid-cols-3">
         <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">All Tables</div>
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Live Cribs</div>
           <div className="mt-2 text-3xl rt-page-title">{tables.length}</div>
         </div>
         <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">In Progress</div>
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Hands Live</div>
           <div className="mt-2 text-3xl rt-page-title">{metrics.active}</div>
         </div>
         <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">RTC / USD</div>
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">RTC / Cash</div>
           <div className="mt-2 text-3xl rt-page-title">{metrics.rtc} / {metrics.usd}</div>
         </div>
       </section>
@@ -114,13 +121,14 @@ const TableSelect: React.FC = () => {
           <div key={stake}>
             <div className="flex items-center gap-3 mb-4">
               <Crown className="w-5 h-5 text-amber-300" />
-              <h2 className="text-2xl rt-page-title">${stake} Stake Tier</h2>
+              <h2 className="text-2xl rt-page-title">{getStakeTierHeading(stake)}</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
               {stakeTables.map((table) => {
                 const isUsdTable = table.mode === 'USD_CONTEST';
                 const isDisabled = !isUsdTable && table.currentPlayerCount >= table.maxPlayers;
-                const tableName = table.name || `Table ${table._id.slice(-4)}`;
+                const tableName = getTableDisplayName(table);
+                const stakeDisplay = getStakeDisplay(table.stake, table.mode);
 
                 return (
                   <article key={table._id} className="rt-panel-strong rounded-2xl p-5">
@@ -133,28 +141,30 @@ const TableSelect: React.FC = () => {
                             : 'bg-emerald-500/20 text-emerald-200'
                         }`}
                       >
-                        {table.status === 'in-game' ? 'In Progress' : 'Waiting'}
+                        {table.status === 'in-game' ? 'Hand Live' : 'Waiting'}
                       </span>
                     </div>
 
                     <div className="mt-3 inline-flex rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/70">
-                      {table.mode || 'FREE_RTC_TABLE'}
+                      {getModeBadge(table.mode)}
                     </div>
 
                     <div className="mt-4 flex items-baseline text-amber-300">
-                      <DollarSign className="w-5 h-5 mr-1" />
-                      <span className="text-3xl rt-page-title">{table.stake}</span>
-                      <span className="ml-2 text-sm text-white/60">{isUsdTable ? 'USD Entry' : 'RTC Stake'}</span>
+                      {isUsdTable ? <DollarSign className="w-5 h-5 mr-1" /> : <Coins className="w-5 h-5 mr-1" />}
+                      <span className="text-3xl rt-page-title">{stakeDisplay.amount}</span>
+                      <span className="ml-2 text-sm text-white/60">{stakeDisplay.unit}</span>
                     </div>
+
+                    <div className="mt-2 text-sm text-white/60">{getModeDescription(table.mode)}</div>
 
                     <div className="mt-4 flex items-center text-white/65 text-sm">
                       <Users className="w-4 h-4 mr-2" />
-                      {table.currentPlayerCount}/{table.maxPlayers} players
+                      {table.currentPlayerCount}/{table.maxPlayers} seats
                     </div>
 
                     {isUsdTable && (
                       <div className="mt-4 rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs text-amber-100">
-                        Contest-driven entry: open the contest lobby to pick or redeem entry.
+                        Cash Crown rooms are contest-locked. Buy in or redeem from the crown lobby.
                       </div>
                     )}
 
@@ -165,10 +175,10 @@ const TableSelect: React.FC = () => {
                       onClick={() => handleJoinClick(table)}
                     >
                       {isUsdTable
-                        ? 'Browse Contests'
+                        ? 'Go to Cash Crowns'
                         : table.currentPlayerCount >= table.maxPlayers
-                          ? 'Table Full'
-                          : 'Join Table'}
+                          ? 'Crib Full'
+                          : 'Pull Up'}
                     </Button>
                   </article>
                 );
@@ -180,7 +190,7 @@ const TableSelect: React.FC = () => {
 
       {tables.length === 0 && !loading && (
         <div className="rt-panel-strong rounded-2xl p-8 text-center text-white/55">
-          No tables are currently available.
+          No cribs are live right now.
         </div>
       )}
 
@@ -189,9 +199,9 @@ const TableSelect: React.FC = () => {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onConfirm={handleConfirmJoin}
-          title={`Join ${selectedTable.name || `Table ${selectedTable._id.slice(-4)}`}?`}
+          title={`Pull up to ${getTableDisplayName(selectedTable)}?`}
         >
-          <p>Start a session on this table with stake tier {selectedTable.stake}.</p>
+          <p>Start a crib run at {getStakeTierHeading(selectedTable.stake)}.</p>
         </Modal>
       )}
     </div>

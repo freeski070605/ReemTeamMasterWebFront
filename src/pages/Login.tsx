@@ -45,11 +45,11 @@ const Login: React.FC = () => {
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="rt-panel-strong rounded-3xl p-8">
           <div className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
-            ReemTeam Account Access
+            ReemTeam Player Access
           </div>
           <h1 className="mt-5 rt-page-title text-4xl font-semibold">Welcome Back</h1>
           <p className="mt-3 text-white/70">
-            Continue into table play, contest join, and account management with one sign-in.
+            Jump back into crib play, crown entries, and wallet management with one sign-in.
           </p>
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <div className="rt-glass rounded-2xl p-4">

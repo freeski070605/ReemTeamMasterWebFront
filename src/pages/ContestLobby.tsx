@@ -6,6 +6,10 @@ import { Button } from '../components/ui/Button';
 import { Loader } from '../components/ui/Loader';
 import { useAuthStore } from '../store/authStore';
 import { Contest, Table, TournamentTicket } from '../types/game';
+import {
+  getContestDisplayName,
+  getContestStatusLabel,
+} from '../branding/modeCopy';
 
 const ContestLobby: React.FC = () => {
   const navigate = useNavigate();
@@ -92,7 +96,7 @@ const ContestLobby: React.FC = () => {
       setContests(contestData.filter((contest) => contest.mode === 'USD_CONTEST'));
       setTickets(Array.isArray(ticketResponse.data) ? ticketResponse.data : []);
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to load contests.');
+      setError(err?.response?.data?.message || 'Could not load cash crown contests.');
       setContests([]);
       setTickets([]);
     } finally {
@@ -118,7 +122,7 @@ const ContestLobby: React.FC = () => {
       });
 
     if (candidates.length === 0) {
-      throw new Error('No joinable USD contest table is currently available for this stake tier.');
+      throw new Error('No joinable cash crown table is open for this tier right now.');
     }
 
     return candidates[0]._id;
@@ -126,7 +130,7 @@ const ContestLobby: React.FC = () => {
 
   const handleContestJoin = async (contest: Contest, joinMethod: 'usd' | 'ticket') => {
     if (!user?._id) {
-      toast.error('You must be logged in to join contests.');
+      toast.error('Sign in to join cash crowns.');
       return;
     }
 
@@ -137,13 +141,13 @@ const ContestLobby: React.FC = () => {
 
       if (!alreadyJoined) {
         if (isContestFull(contest)) {
-          throw new Error('This contest is already full.');
+          throw new Error('This cash crown is already full.');
         }
 
         if (joinMethod === 'ticket') {
           const ticketId = getPreferredTicketId(contest.contestId);
           if (!ticketId) {
-            throw new Error('No eligible ticket is available for this contest.');
+            throw new Error('No eligible ticket is available for this cash crown.');
           }
 
           const response = await client.post(`/contests/${contest.contestId}/join`, {
@@ -170,10 +174,23 @@ const ContestLobby: React.FC = () => {
       const tableId = await resolveTableForContest(activeContest);
       navigate(`/game/${tableId}?contestId=${encodeURIComponent(activeContest.contestId)}`);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to join contest.');
+      toast.error(err?.response?.data?.message || err?.message || 'Could not join this cash crown.');
     } finally {
       setJoiningContestId(null);
     }
+  };
+
+  const getStatusClasses = (status: Contest['status']): string => {
+    if (status === 'open') {
+      return 'bg-emerald-500/20 text-emerald-200';
+    }
+    if (status === 'locked') {
+      return 'bg-amber-500/20 text-amber-100';
+    }
+    if (status === 'in-progress') {
+      return 'bg-sky-500/20 text-sky-100';
+    }
+    return 'bg-white/10 text-white/70';
   };
 
   useEffect(() => {
@@ -199,10 +216,10 @@ const ContestLobby: React.FC = () => {
   return (
     <div className="space-y-6">
       <header className="rt-panel-strong rounded-3xl p-7">
-        <div className="text-xs uppercase tracking-[0.2em] text-white/50">USD Contest Lobby</div>
-        <h1 className="mt-2 text-4xl rt-page-title font-semibold">Join Competitive USD Sessions</h1>
+        <div className="text-xs uppercase tracking-[0.2em] text-white/50">Cash Crown Lobby</div>
+        <h1 className="mt-2 text-4xl rt-page-title font-semibold">Lock Into Cash Crown Contests</h1>
         <p className="mt-2 text-white/65">
-          Enter with USD or use an RTC satellite ticket. Contest locks and payout happen server-side.
+          Buy in with USD or redeem a satellite ticket. Payouts settle after placements return.
         </p>
       </header>
 
@@ -212,13 +229,13 @@ const ContestLobby: React.FC = () => {
           <div className="mt-2 text-3xl rt-page-title">{filteredContests.length}</div>
         </div>
         <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Available Tickets</div>
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Redeemable Tickets</div>
           <div className="mt-2 text-3xl rt-page-title">{availableTickets.length}</div>
         </div>
         <div className="rt-glass rounded-2xl p-4 flex flex-col justify-between">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Sync</div>
           <Button size="sm" variant="secondary" onClick={() => void fetchLobbyData()}>
-            Refresh Lobby
+            Refresh Crowns
           </Button>
         </div>
       </section>
@@ -230,7 +247,7 @@ const ContestLobby: React.FC = () => {
             variant={stakeFilter === 'all' ? 'primary' : 'secondary'}
             onClick={() => setStakeFilter('all')}
           >
-            All Stakes
+            All Buy-Ins
           </Button>
           {stakeOptions.map((stake) => (
             <Button
@@ -239,7 +256,7 @@ const ContestLobby: React.FC = () => {
               variant={stakeFilter === stake ? 'primary' : 'secondary'}
               onClick={() => setStakeFilter(stake)}
             >
-              ${stake}
+              ${stake} Crown
             </Button>
           ))}
         </div>
@@ -247,7 +264,7 @@ const ContestLobby: React.FC = () => {
 
       {filteredContests.length === 0 ? (
         <div className="rt-panel-strong rounded-2xl p-8 text-center text-white/70">
-          No contest rows match the current filter.
+          No cash crowns match the current filter.
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -262,30 +279,30 @@ const ContestLobby: React.FC = () => {
               <article key={contest.contestId} className="rt-panel-strong rounded-2xl p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <div className="text-xs uppercase tracking-[0.18em] text-white/50">Contest ID</div>
-                    <h2 className="mt-1 text-xl rt-page-title">{contest.contestId}</h2>
+                    <div className="text-xs uppercase tracking-[0.18em] text-white/50">Crown ID</div>
+                    <h2 className="mt-1 text-xl rt-page-title">{getContestDisplayName(contest.contestId)}</h2>
                   </div>
-                  <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-200">
-                    {contest.status}
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(contest.status)}`}>
+                    {getContestStatusLabel(contest.status)}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-sm mb-5">
                   <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <div className="text-white/50 text-xs uppercase tracking-[0.14em]">Entry</div>
+                    <div className="text-white/50 text-xs uppercase tracking-[0.14em]">Buy-In</div>
                     <div className="mt-1 text-white rt-page-title text-lg">${contest.entryFee}</div>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <div className="text-white/50 text-xs uppercase tracking-[0.14em]">Prize Pool</div>
+                    <div className="text-white/50 text-xs uppercase tracking-[0.14em]">Locked Pool</div>
                     <div className="mt-1 text-white rt-page-title text-lg">${contest.prizePool}</div>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-white/5 p-3 col-span-2">
-                    <div className="text-white/50 text-xs uppercase tracking-[0.14em]">Players</div>
+                    <div className="text-white/50 text-xs uppercase tracking-[0.14em]">Seats</div>
                     <div className="mt-1 text-white rt-page-title text-lg">
                       {participantCount}/{contest.playerCount}
                     </div>
                     {joined && (
-                      <div className="mt-2 text-xs text-emerald-300">You are registered in this contest.</div>
+                      <div className="mt-2 text-xs text-emerald-300">You are locked into this crown.</div>
                     )}
                   </div>
                 </div>
@@ -296,7 +313,7 @@ const ContestLobby: React.FC = () => {
                     disabled={joining || (!joined && contestFull)}
                     onClick={() => void handleContestJoin(contest, 'usd')}
                   >
-                    {joined ? 'Enter Table' : contestFull ? 'Contest Full' : 'Join with USD'}
+                    {joined ? 'Enter Crown Table' : contestFull ? 'Crown Full' : 'Buy In with USD'}
                   </Button>
 
                   {!joined && (
@@ -314,7 +331,7 @@ const ContestLobby: React.FC = () => {
                         disabled={joining || availableTickets.length === 0}
                       >
                         <option value="">
-                          {availableTickets.length === 0 ? 'No tickets available' : 'Select a ticket'}
+                          {availableTickets.length === 0 ? 'No eligible tickets' : 'Pick a ticket to redeem'}
                         </option>
                         {availableTickets.map((ticket) => (
                           <option key={ticket._id} value={ticket._id}>
@@ -329,7 +346,7 @@ const ContestLobby: React.FC = () => {
                         disabled={joining || contestFull || !preferredTicketId}
                         onClick={() => void handleContestJoin(contest, 'ticket')}
                       >
-                        Join with Ticket
+                        Redeem Ticket
                       </Button>
                     </>
                   )}

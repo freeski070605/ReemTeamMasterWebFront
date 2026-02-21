@@ -46,16 +46,16 @@ const Register: React.FC = () => {
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="rt-panel-strong rounded-3xl p-8">
           <div className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
-            Create Player Identity
+            Claim Your Seat
           </div>
           <h1 className="mt-5 rt-page-title text-4xl font-semibold">Join ReemTeam</h1>
           <p className="mt-3 text-white/70">
-            One account unlocks tables, contests, wallet tracking, and tournament ticket flow.
+            One account unlocks crib runs, cash crowns, wallet tracking, and ticket lanes.
           </p>
           <div className="mt-8 space-y-3 text-sm text-white/70">
-            <div className="rt-glass rounded-xl p-3">Play FREE_RTC_TABLE, RTC_TOURNAMENT, RTC_SATELLITE, and USD_CONTEST modes.</div>
-            <div className="rt-glass rounded-xl p-3">Track match outcomes and wallet activity from a single dashboard.</div>
-            <div className="rt-glass rounded-xl p-3">Use satellite tickets to enter USD contests without USD conversion.</div>
+            <div className="rt-glass rounded-xl p-3">Run open cribs, block brackets, ticket grind tables, and cash crown contests.</div>
+            <div className="rt-glass rounded-xl p-3">Track outcomes and wallet movement from one account dashboard.</div>
+            <div className="rt-glass rounded-xl p-3">Redeem satellite tickets for cash crowns without converting RTC to USD.</div>
           </div>
         </section>
 

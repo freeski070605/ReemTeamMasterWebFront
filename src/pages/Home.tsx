@@ -4,6 +4,11 @@ import client from '../api/client';
 import { useAuthStore } from '../store/authStore';
 import { Table } from '../types/game';
 import { Button } from '../components/ui/Button';
+import {
+  getModeLabel,
+  getStakeDisplay,
+  getTableDisplayName,
+} from '../branding/modeCopy';
 
 const Home: React.FC = () => {
   const { isAuthenticated } = useAuthStore();
@@ -28,10 +33,9 @@ const Home: React.FC = () => {
 
   const tableSummary = useMemo(() => {
     const active = tables.filter((table) => table.status === 'in-game').length;
-    const waiting = tables.filter((table) => table.status === 'waiting').length;
     const usd = tables.filter((table) => table.mode === 'USD_CONTEST').length;
     const rtc = tables.filter((table) => table.mode !== 'USD_CONTEST').length;
-    return { active, waiting, usd, rtc };
+    return { active, usd, rtc };
   }, [tables]);
 
   const featured = useMemo(() => {
@@ -42,6 +46,15 @@ const Home: React.FC = () => {
       return b.stake - a.stake;
     })[0];
   }, [tables]);
+
+  const featuredMeta = useMemo(() => {
+    if (!featured) {
+      return null;
+    }
+
+    const stake = getStakeDisplay(featured.stake, featured.mode);
+    return `${getModeLabel(featured.mode)} | ${stake.amount} ${stake.unit} | ${featured.currentPlayerCount}/${featured.maxPlayers} seats`;
+  }, [featured]);
 
   return (
     <div className="space-y-8">
@@ -57,25 +70,25 @@ const Home: React.FC = () => {
         <div className="relative z-10 grid gap-8 md:grid-cols-[1.15fr_0.85fr]">
           <div>
             <div className="mb-4 inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/70">
-              Dual-Currency Competitive Arena
+              Urban Crib Tonk Ecosystem
             </div>
             <h1 className="rt-page-title text-4xl md:text-6xl font-semibold leading-tight">
-              Skill-first Tonk.
-              <span className="block text-amber-300">Refactored for RTC and USD modes.</span>
+              Crib-style Tonk.
+              <span className="block text-amber-300">Built for RTC grind and Cash Crown pressure.</span>
             </h1>
             <p className="mt-5 max-w-xl text-white/70">
-              Free RTC tables for pace, structured RTC tournaments for progression, and USD contests for fixed
-              prize competition. Same gameboard flow, cleaner ecosystem.
+              Pull up to open RTC cribs, lock into block brackets, grind ticket runs, and chase fixed-pool cash
+              crowns. Same board mechanics, stronger front-end identity.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               {isAuthenticated ? (
                 <>
                   <Link to="/tables">
-                    <Button size="lg">Browse Tables</Button>
+                    <Button size="lg">Pull Up to Cribs</Button>
                   </Link>
                   <Link to="/contests">
                     <Button variant="secondary" size="lg">
-                      Open Contests
+                      Hit Cash Crowns
                     </Button>
                   </Link>
                 </>
@@ -96,19 +109,19 @@ const Home: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="rt-glass rounded-2xl p-4">
-              <div className="text-xs uppercase tracking-[0.2em] text-white/55">Tables</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-white/55">Open Cribs</div>
               <div className="mt-2 text-3xl rt-page-title">{loading ? '--' : tables.length}</div>
             </div>
             <div className="rt-glass rounded-2xl p-4">
-              <div className="text-xs uppercase tracking-[0.2em] text-white/55">In Progress</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-white/55">Hands Live</div>
               <div className="mt-2 text-3xl rt-page-title">{loading ? '--' : tableSummary.active}</div>
             </div>
             <div className="rt-glass rounded-2xl p-4">
-              <div className="text-xs uppercase tracking-[0.2em] text-white/55">RTC Modes</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-white/55">RTC Rooms</div>
               <div className="mt-2 text-3xl rt-page-title">{loading ? '--' : tableSummary.rtc}</div>
             </div>
             <div className="rt-glass rounded-2xl p-4">
-              <div className="text-xs uppercase tracking-[0.2em] text-white/55">USD Modes</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-white/55">Cash Crowns</div>
               <div className="mt-2 text-3xl rt-page-title">{loading ? '--' : tableSummary.usd}</div>
             </div>
           </div>
@@ -117,24 +130,26 @@ const Home: React.FC = () => {
 
       <section className="grid gap-6 md:grid-cols-3">
         <div className="rt-glass rounded-2xl p-6">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Free Mode</div>
-          <h2 className="mt-3 rt-page-title text-2xl">FREE_RTC_TABLE</h2>
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Open Crib</div>
+          <h2 className="mt-3 rt-page-title text-2xl">{getModeLabel('FREE_RTC_TABLE')} (RTC)</h2>
           <p className="mt-3 text-white/70 text-sm">
-            Continuous round-based sessions with AI support and immediate RTC movement.
+            Round-based RTC tables with drop-in and pull-out between rounds.
           </p>
         </div>
         <div className="rt-glass rounded-2xl p-6">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Competitive RTC</div>
-          <h2 className="mt-3 rt-page-title text-2xl">RTC_TOURNAMENT / SATELLITE</h2>
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">RTC Competition</div>
+          <h2 className="mt-3 rt-page-title text-2xl">
+            {getModeLabel('RTC_TOURNAMENT')} + {getModeLabel('RTC_SATELLITE')}
+          </h2>
           <p className="mt-3 text-white/70 text-sm">
-            Locked-player structured matches with entry, placements, and ticket path to USD contests.
+            Locked-seat RTC brackets plus ticket qualifiers feeding the cash crown lane.
           </p>
         </div>
         <div className="rt-glass rounded-2xl p-6">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Paid Contests</div>
-          <h2 className="mt-3 rt-page-title text-2xl">USD_CONTEST</h2>
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Cash Play</div>
+          <h2 className="mt-3 rt-page-title text-2xl">{getModeLabel('USD_CONTEST')}</h2>
           <p className="mt-3 text-white/70 text-sm">
-            Fixed entry, locked prize pool, and placement-based payout after engine results.
+            Fixed USD buy-ins, locked pools, and placement payout after engine results.
           </p>
         </div>
       </section>
@@ -142,22 +157,20 @@ const Home: React.FC = () => {
       <section className="rt-panel-strong rounded-2xl p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-white/50">Featured Arena</div>
+            <div className="text-xs uppercase tracking-[0.2em] text-white/50">Featured Crib</div>
             <div className="mt-2 text-2xl rt-page-title">
-              {featured ? (featured.name || `Table ${featured._id.slice(-4)}`) : 'No active table'}
+              {featured ? getTableDisplayName(featured) : 'No live crib'}
             </div>
             <div className="mt-1 text-sm text-white/65">
-              {featured
-                ? `${featured.mode || 'FREE_RTC_TABLE'} • Stake ${featured.stake} • ${featured.currentPlayerCount}/${featured.maxPlayers} players`
-                : 'Tables appear here once seeded and available.'}
+              {featuredMeta || 'Live cribs show up here once rooms are seeded.'}
             </div>
           </div>
           <div className="flex gap-2">
             <Link to="/tables">
-              <Button variant="secondary">Tables</Button>
+              <Button variant="secondary">Cribs</Button>
             </Link>
             <Link to="/contests">
-              <Button>Contests</Button>
+              <Button>Cash Crowns</Button>
             </Link>
           </div>
         </div>

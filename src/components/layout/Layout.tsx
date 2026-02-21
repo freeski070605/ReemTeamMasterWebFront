@@ -14,8 +14,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   const navLinks = useMemo(
     () => [
-      { to: '/tables', label: 'Tables' },
-      { to: '/contests', label: 'Contests' },
+      { to: '/tables', label: 'Cribs' },
+      { to: '/contests', label: 'Cash Crowns' },
       { to: '/account', label: 'Account' },
     ],
     []
