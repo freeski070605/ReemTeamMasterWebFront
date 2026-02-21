@@ -57,12 +57,13 @@ const GameTable: React.FC = () => {
   });
   const lastAnimatedRoundKeyRef = useRef<string | null>(null);
   const maxPlayers = 4;
+  const walletCurrency = gameState?.mode === "USD_CONTEST" ? "usd" : "rtc";
   const {
     balance,
     loading: balanceLoading,
     error: balanceError,
     refresh: refreshBalance,
-  } = useWalletBalance({ refreshIntervalMs: 15000 });
+  } = useWalletBalance({ refreshIntervalMs: 15000, currency: walletCurrency });
   const contestId = searchParams.get("contestId") ?? undefined;
 
   useEffect(() => {
@@ -489,12 +490,17 @@ const GameTable: React.FC = () => {
   const isReadyForNextRound = !!user && readyPlayerIds.has(user._id);
   const readyCount = readyPlayerIds.size;
   const totalRoundPlayers = gameState.players.length;
-  const formatCurrency = (amount: number | null) => {
-    if (amount === null) return "$0.00";
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
+  const formatBalance = (amount: number | null) => {
+    if (walletCurrency === "usd") {
+      if (amount === null) return "$0.00";
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(amount);
+    }
+
+    if (amount === null) return "0 RTC";
+    return `${Math.max(0, Math.floor(amount)).toLocaleString("en-US")} RTC`;
   };
   const roundReasonLabel =
     gameState.roundEndedBy === "REGULAR"
@@ -574,7 +580,7 @@ const GameTable: React.FC = () => {
                   Cards: {getVisibleCardCount(player.userId, player.hand.length)}
                 </div>
                 <div className="text-[10px] text-yellow-300 leading-tight">
-                  {playerBalances[player.userId] !== undefined ? formatCurrency(playerBalances[player.userId]) : "--"}
+                  {playerBalances[player.userId] !== undefined ? formatBalance(playerBalances[player.userId]) : "--"}
                 </div>
               </div>
             </div>
@@ -674,9 +680,11 @@ const GameTable: React.FC = () => {
                     <span className="font-bold">{gameState.players.length}/{maxPlayers}</span>
                   </div>
                   <div className="flex items-center gap-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded-full border border-white/10 backdrop-blur-sm">
-                    <span className="uppercase tracking-widest text-[9px] text-white/60">Balance</span>
+                    <span className="uppercase tracking-widest text-[9px] text-white/60">
+                      {walletCurrency === "usd" ? "USD Balance" : "RTC Balance"}
+                    </span>
                     <span className="font-bold">
-                      {balanceLoading ? "..." : balanceError ? "Error" : formatCurrency(balance)}
+                      {balanceLoading ? "..." : balanceError ? "Error" : formatBalance(balance)}
                     </span>
                   </div>
                   <Button variant="danger" size="sm" onClick={handleLeaveTable}>Leave</Button>
@@ -805,7 +813,7 @@ const GameTable: React.FC = () => {
                         <div className="text-[11px] text-white font-semibold leading-tight">{user.username}</div>
                         <div className="text-[10px] text-white/60 leading-tight">Cards: {visibleHand.length}</div>
                         <div className="text-[10px] text-yellow-300 leading-tight">
-                          {balanceLoading ? "..." : formatCurrency(balance)}
+                          {balanceLoading ? "..." : formatBalance(balance)}
                         </div>
                       </div>
                     </div>

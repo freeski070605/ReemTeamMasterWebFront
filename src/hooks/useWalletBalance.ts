@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { getWalletBalance } from "../api/wallet";
+import { getWalletBalance, WalletCurrency } from "../api/wallet";
 
 export type UseWalletBalanceOptions = {
   refreshIntervalMs?: number;
   refreshKey?: string | number;
+  currency?: WalletCurrency;
 };
 
 export type UseWalletBalanceResult = {
@@ -16,7 +17,7 @@ export type UseWalletBalanceResult = {
 export const useWalletBalance = (
   options: UseWalletBalanceOptions = {}
 ): UseWalletBalanceResult => {
-  const { refreshIntervalMs, refreshKey } = options;
+  const { refreshIntervalMs, refreshKey, currency = "usd" } = options;
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,14 +26,14 @@ export const useWalletBalance = (
     setLoading(true);
     setError(null);
     try {
-      const nextBalance = await getWalletBalance();
+      const nextBalance = await getWalletBalance(currency);
       setBalance(nextBalance);
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to fetch balance.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currency]);
 
   useEffect(() => {
     fetchBalance();
