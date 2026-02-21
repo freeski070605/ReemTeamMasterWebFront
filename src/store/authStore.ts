@@ -20,8 +20,6 @@ interface AuthState {
   checkAuth: () => void;
   uploadAvatar: (file: File) => Promise<void>;
   selectDefaultAvatar: (avatarUrl: string) => Promise<void>;
-  linkFacebook: (accessToken: string) => Promise<void>;
-  facebookLogin: (accessToken: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -116,36 +114,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       toast.success('Avatar updated successfully!');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Avatar update failed');
-    }
-  },
-
-  linkFacebook: async (accessToken: string) => {
-    try {
-      await client.post('/users/facebook/link', { accessToken });
-      // TODO: update user state with facebook info
-      toast.success('Facebook account linked successfully!');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Facebook account linking failed');
-    }
-  },
-  
-  facebookLogin: async (accessToken: string) => {
-    set({ isLoading: true });
-    try {
-      const response = await client.post('/auth/facebook/token', { accessToken });
-      const { token, userId, username, email } = response.data;
-      
-      const user = { _id: userId, username: username || 'User', email: email };
-      
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      set({ user, token, isAuthenticated: true, isLoading: false });
-      toast.success('Facebook login successful!');
-    } catch (error: any) {
-      set({ isLoading: false });
-      toast.error(error.response?.data?.message || 'Facebook login failed');
-      throw error;
     }
   },
 }));

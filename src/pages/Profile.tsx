@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import FacebookLogin from 'react-facebook-login/dist/facebook-login-render-props';
 import { useAuthStore } from '../store/authStore';
 import PlayerAvatar from '../components/game/PlayerAvatar';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 
 const Profile: React.FC = () => {
-  const { user, uploadAvatar, selectDefaultAvatar, linkFacebook } = useAuthStore();
+  const { user, uploadAvatar, selectDefaultAvatar } = useAuthStore();
   const [file, setFile] = useState<File | null>(null);
   const logoSrc = "/assets/logo.png";
 
@@ -78,24 +77,10 @@ const Profile: React.FC = () => {
           </div>
 
           <div className="border-t border-white/10 pt-4">
-            <h3 className="text-lg font-medium mb-3 text-white">Social Media Accounts</h3>
-            <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-medium text-white">Facebook</h4>
-                            <p className="text-sm text-white/60">Not connected</p>
-                          </div>
-                          <FacebookLogin
-                                          appId="YOUR_FACEBOOK_APP_ID" // TODO: Replace with your App ID
-                                          autoLoad={false}
-                                          fields="name,email,picture"
-                                          callback={(response: any) => linkFacebook(response.accessToken)}
-                                          render={(renderProps: any) => (
-                                            <Button variant="secondary" onClick={renderProps.onClick}>
-                                              Link Account
-                                            </Button>
-                                          )}
-                                        />
-                        </div>
+            <h3 className="text-lg font-medium mb-3 text-white">Sign-In Method</h3>
+            <p className="text-sm text-white/60">
+              Social login has been removed. Use your email and password to access this account.
+            </p>
           </div>
         </div>
       </div>

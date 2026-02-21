@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import FacebookLogin from 'react-facebook-login/dist/facebook-login-render-props';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/authStore';
 import { createCheckout } from '../api/wallet';
@@ -13,7 +12,7 @@ import { Input } from '../components/ui/Input';
 const QUICK_DEPOSIT_AMOUNTS = [25, 50, 100, 250];
 
 const Account: React.FC = () => {
-  const { user, uploadAvatar, selectDefaultAvatar, linkFacebook } = useAuthStore();
+  const { user, uploadAvatar, selectDefaultAvatar } = useAuthStore();
   const [file, setFile] = useState<File | null>(null);
   const [depositBusy, setDepositBusy] = useState(false);
   const [customDeposit, setCustomDeposit] = useState('');
@@ -63,7 +62,7 @@ const Account: React.FC = () => {
         <div className="text-xs uppercase tracking-[0.2em] text-white/50">Account Dashboard</div>
         <h1 className="mt-2 text-4xl rt-page-title font-semibold">Wallet, Profile, and Identity</h1>
         <p className="mt-2 text-white/65">
-          Manage deposits, withdrawals, history, avatar, and social account links from one place.
+          Manage deposits, withdrawals, history, and avatar settings from one place.
         </p>
       </header>
 
@@ -142,24 +141,11 @@ const Account: React.FC = () => {
           </div>
 
           <div className="rt-panel-strong rounded-2xl p-6">
-            <div className="text-xs uppercase tracking-[0.2em] text-white/50">Social Account</div>
-            <h3 className="mt-2 text-xl rt-page-title">Facebook</h3>
+            <div className="text-xs uppercase tracking-[0.2em] text-white/50">Account Security</div>
+            <h3 className="mt-2 text-xl rt-page-title">Email + Password Login</h3>
             <p className="mt-2 text-sm text-white/65">
-              Link Facebook for one-click sign-in on future sessions.
+              Social sign-in has been removed. This account now uses direct credentials only.
             </p>
-            <div className="mt-4">
-              <FacebookLogin
-                appId="1437814761308514"
-                autoLoad={false}
-                fields="name,email,picture"
-                callback={(response: any) => linkFacebook(response.accessToken)}
-                render={(renderProps: any) => (
-                  <Button variant="secondary" className="w-full" onClick={renderProps.onClick}>
-                    Link Facebook Account
-                  </Button>
-                )}
-              />
-            </div>
           </div>
 
           <PayoutForm />
