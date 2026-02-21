@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
-import { IGameState, Card } from '../types/game';
+import { IGameState, Card, RoundResult } from '../types/game';
 import { toast } from 'react-toastify';
 
 const BACKEND_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -8,10 +8,17 @@ const BACKEND_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http:
 interface GameStore {
   socket: Socket | null;
   gameState: IGameState | null;
+  lastRoundResult: RoundResult | null;
   isConnected: boolean;
   error: string | null;
 
-  connect: (tableId: string, userId: string, username: string, avatarUrl?: string) => void;
+  connect: (
+    tableId: string,
+    userId: string,
+    username: string,
+    avatarUrl?: string,
+    contestId?: string
+  ) => void;
   disconnect: () => void;
   
   // Actions
@@ -28,10 +35,11 @@ interface GameStore {
 export const useGameStore = create<GameStore>((set, get) => ({
   socket: null,
   gameState: null,
+  lastRoundResult: null,
   isConnected: false,
   error: null,
 
-  connect: (tableId, userId, username, avatarUrl) => {
+  connect: (tableId, userId, username, avatarUrl, contestId) => {
     const existingSocket = get().socket;
     if (existingSocket) {
         existingSocket.disconnect();
@@ -45,7 +53,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       console.log('Connected to game server');
       set({ isConnected: true, error: null });
       console.log(`Emitting joinTable for ${username} (${userId}) in table ${tableId}`);
-      socket.emit('joinTable', { tableId, userId, username, avatarUrl });
+      socket.emit('joinTable', { tableId, userId, username, avatarUrl, contestId });
     });
 
     socket.on('initialGameState', (gameState: IGameState) => {
@@ -64,21 +72,29 @@ export const useGameStore = create<GameStore>((set, get) => ({
             return;
           }
           lastRoundEndTimestamp = roundEndTimestamp;
+          const winnerPlacement = (gameState.placements ?? []).find((placement) => placement.rank === 1);
+          const winner = winnerPlacement
+            ? gameState.players.find((player) => player.userId === winnerPlacement.userId)
+            : gameState.players.find((player) => player.userId === gameState.roundWinnerId);
 
           if (gameState.roundEndedBy === 'REEM') {
-              const winner = gameState.players.find(p => p.userId === gameState.roundWinnerId);
               toast.success(`${winner?.username} REEMED!`);
           } else if (gameState.roundEndedBy === 'REGULAR') {
-              const winner = gameState.players.find(p => p.userId === gameState.roundWinnerId);
                toast.info(`${winner?.username} wins on lowest hand.`);
           } else if (gameState.roundEndedBy === 'DECK_EMPTY') {
-              const winner = gameState.players.find(p => p.userId === gameState.roundWinnerId);
               toast.info(`Deck empty. ${winner?.username} wins on lowest hand.`);
           }
           if (activeRoundEndToastId !== null) {
             toast.dismiss(activeRoundEndToastId);
           }
-          activeRoundEndToastId = toast.info("Next round starts in 30 seconds.", { autoClose: 30000 });
+          const isContinuousMode = !gameState.mode || gameState.mode === 'FREE_RTC_TABLE';
+          if (isContinuousMode) {
+            activeRoundEndToastId = toast.info("Next round starts in 30 seconds.", { autoClose: 30000 });
+          } else {
+            activeRoundEndToastId = toast.info("Match complete. Return to the lobby to start another session.", {
+              autoClose: 5000,
+            });
+          }
       } else {
           if (activeRoundEndToastId !== null) {
             toast.dismiss(activeRoundEndToastId);
@@ -86,6 +102,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
           }
           lastRoundEndTimestamp = null;
       }
+    });
+
+    socket.on('roundResult', (roundResult: RoundResult) => {
+      console.log('Received roundResult:', roundResult);
+      set({ lastRoundResult: roundResult });
     });
     
     socket.on('tableUpdate', (data: { message: string, table: any, gameState?: IGameState }) => {
@@ -129,7 +150,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { socket } = get();
     if (socket) {
       socket.disconnect();
-      set({ socket: null, gameState: null, isConnected: false });
+      set({ socket: null, gameState: null, lastRoundResult: null, isConnected: false });
     }
   },
 

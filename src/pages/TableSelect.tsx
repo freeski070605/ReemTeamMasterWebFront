@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Crown, DollarSign, Users } from 'lucide-react';
 import client from '../api/client';
 import { Table } from '../types/game';
 import { Button } from '../components/ui/Button';
 import { Loader } from '../components/ui/Loader';
-import { Users, DollarSign, Crown } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 
 const TableSelect: React.FC = () => {
@@ -15,123 +15,183 @@ const TableSelect: React.FC = () => {
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const navigate = useNavigate();
 
+  const fetchTables = async () => {
+    try {
+      setLoading(true);
+      const response = await client.get<Table[]>('/tables');
+      const sortedTables = response.data.sort((a, b) => a.stake - b.stake);
+      setTables(sortedTables);
+      setError('');
+    } catch (err) {
+      setError('Failed to load tables. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchTables();
+  }, []);
+
+  const groupedByStake = useMemo(() => {
+    const byStake = new Map<number, Table[]>();
+    for (const table of tables) {
+      const list = byStake.get(table.stake) ?? [];
+      list.push(table);
+      byStake.set(table.stake, list);
+    }
+    return Array.from(byStake.entries()).sort(([a], [b]) => a - b);
+  }, [tables]);
+
+  const metrics = useMemo(() => {
+    const active = tables.filter((table) => table.status === 'in-game').length;
+    const usd = tables.filter((table) => table.mode === 'USD_CONTEST').length;
+    const rtc = tables.filter((table) => table.mode !== 'USD_CONTEST').length;
+    return { active, usd, rtc };
+  }, [tables]);
+
   const handleJoinClick = (table: Table) => {
+    if (table.mode === 'USD_CONTEST') {
+      navigate(`/contests?stake=${encodeURIComponent(String(table.stake))}`);
+      return;
+    }
+
     setSelectedTable(table);
     setIsModalOpen(true);
   };
 
   const handleConfirmJoin = () => {
-    if (selectedTable) {
-      navigate(`/game/${selectedTable._id}`);
-    }
+    if (!selectedTable) return;
+    navigate(`/game/${selectedTable._id}`);
   };
 
-  useEffect(() => {
-    const fetchTables = async () => {
-      try {
-        const response = await client.get('/tables');
-        // Sort tables by baseStake to ensure consistent order
-        const sortedTables = response.data.sort((a: Table, b: Table) => a.stake - b.stake);
-        setTables(sortedTables);
-      } catch (err) {
-        setError('Failed to load tables. Please try again.');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader />
+      </div>
+    );
+  }
 
-    fetchTables();
-  }, []);
-
-  if (loading) return <div className="flex justify-center items-center h-screen"><Loader /></div>;
-  if (error) return <div className="text-red-500 text-center mt-10 text-xl">{error}</div>;
-  
-  const stakes = Array.from(new Set(tables.map(t => t.stake))).sort((a,b) => a - b);
+  if (error) {
+    return <div className="rt-panel-strong rounded-2xl p-8 text-center text-red-300">{error}</div>;
+  }
 
   return (
-    <div className="min-h-screen text-white p-4 sm:p-6 md:p-8">
-      <div
-        className="fixed inset-0 -z-10"
-        style={{
-          background:
-            "radial-gradient(1200px 600px at 10% 10%, rgba(255,199,74,0.18), transparent 60%)," +
-            "radial-gradient(900px 500px at 90% 10%, rgba(244,138,24,0.2), transparent 55%)," +
-            "linear-gradient(180deg, #0a0b0d 0%, #151414 55%, #0a0b0d 100%)",
-        }}
-        aria-hidden
-      />
-      <header className="text-center mb-10">
-        <h1 className="text-4xl sm:text-5xl font-bold text-white">
-          Choose Your Arena
-        </h1>
-        <p className="text-white/60 mt-2 text-lg">Select a table and show your skill.</p>
+    <div className="space-y-6">
+      <header className="rt-panel-strong rounded-3xl p-7">
+        <div className="text-xs uppercase tracking-[0.2em] text-white/50">Table Lobby</div>
+        <h1 className="mt-2 text-4xl rt-page-title font-semibold">Pick Your Arena</h1>
+        <p className="mt-2 text-white/65">
+          FREE and RTC tables start instantly. USD mode is now contest-driven from the contest lobby.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button variant="secondary" onClick={() => navigate('/contests')}>
+            Open Contests
+          </Button>
+          <Button onClick={() => void fetchTables()}>Refresh Tables</Button>
+        </div>
       </header>
-      
-      <div className="space-y-12">
-        {stakes.map(stake => (
+
+      <section className="grid gap-4 sm:grid-cols-3">
+        <div className="rt-glass rounded-2xl p-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">All Tables</div>
+          <div className="mt-2 text-3xl rt-page-title">{tables.length}</div>
+        </div>
+        <div className="rt-glass rounded-2xl p-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">In Progress</div>
+          <div className="mt-2 text-3xl rt-page-title">{metrics.active}</div>
+        </div>
+        <div className="rt-glass rounded-2xl p-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">RTC / USD</div>
+          <div className="mt-2 text-3xl rt-page-title">{metrics.rtc} / {metrics.usd}</div>
+        </div>
+      </section>
+
+      <section className="space-y-8">
+        {groupedByStake.map(([stake, stakeTables]) => (
           <div key={stake}>
-            <div className="flex items-center mb-4">
-              <Crown className="w-6 h-6 text-yellow-400 mr-3" />
-              <h2 className="text-2xl font-bold text-gray-200">${stake} Stake Tables</h2>
+            <div className="flex items-center gap-3 mb-4">
+              <Crown className="w-5 h-5 text-amber-300" />
+              <h2 className="text-2xl rt-page-title">${stake} Stake Tier</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {tables.filter(table => table.stake === stake).map((table) => (
-                <div key={table._id} className="bg-black/50 backdrop-blur-sm border border-white/10 rounded-2xl shadow-lg transition-all duration-300 hover:border-yellow-400/60 hover:shadow-yellow-400/10">
-                  <div className="p-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-xl font-semibold text-white">{table.name || `Table ${table._id.slice(-4)}`}</h3>
-                      <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                        table.status === 'in-game' 
-                          ? 'bg-yellow-500/20 text-yellow-200' 
-                          : 'bg-emerald-500/20 text-emerald-300'
-                      }`}>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {stakeTables.map((table) => {
+                const isUsdTable = table.mode === 'USD_CONTEST';
+                const isDisabled = !isUsdTable && table.currentPlayerCount >= table.maxPlayers;
+                const tableName = table.name || `Table ${table._id.slice(-4)}`;
+
+                return (
+                  <article key={table._id} className="rt-panel-strong rounded-2xl p-5">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xl rt-page-title">{tableName}</h3>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          table.status === 'in-game'
+                            ? 'bg-amber-500/20 text-amber-100'
+                            : 'bg-emerald-500/20 text-emerald-200'
+                        }`}
+                      >
                         {table.status === 'in-game' ? 'In Progress' : 'Waiting'}
                       </span>
                     </div>
 
-                    <div className="flex items-baseline text-yellow-300 mb-5">
-                      <DollarSign className="w-6 h-6 mr-2" />
-                      <span className="text-3xl font-bold">{table.stake}</span>
-                       <span className="text-white/50 ml-2">Stake</span>
+                    <div className="mt-3 inline-flex rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/70">
+                      {table.mode || 'FREE_RTC_TABLE'}
                     </div>
 
-                    <div className="flex items-center text-white/60 mb-6">
-                      <Users className="w-5 h-5 mr-3" />
-                      <span>{table.currentPlayerCount} / {table.maxPlayers} Players</span>
+                    <div className="mt-4 flex items-baseline text-amber-300">
+                      <DollarSign className="w-5 h-5 mr-1" />
+                      <span className="text-3xl rt-page-title">{table.stake}</span>
+                      <span className="ml-2 text-sm text-white/60">{isUsdTable ? 'USD Entry' : 'RTC Stake'}</span>
                     </div>
 
-                      <Button
-                        className="w-full text-lg font-bold"
-                        disabled={table.currentPlayerCount >= table.maxPlayers}
-                        variant={table.currentPlayerCount >= table.maxPlayers ? "secondary" : "primary"}
-                        onClick={() => handleJoinClick(table)}
-                      >
-                        {table.currentPlayerCount >= table.maxPlayers ? 'Table Full' : 'Join Table'}
-                      </Button>
-                  </div>
-                </div>
-              ))}
+                    <div className="mt-4 flex items-center text-white/65 text-sm">
+                      <Users className="w-4 h-4 mr-2" />
+                      {table.currentPlayerCount}/{table.maxPlayers} players
+                    </div>
+
+                    {isUsdTable && (
+                      <div className="mt-4 rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs text-amber-100">
+                        Contest-driven entry: open the contest lobby to pick or redeem entry.
+                      </div>
+                    )}
+
+                    <Button
+                      className="mt-5 w-full"
+                      disabled={isDisabled}
+                      variant={isDisabled ? 'secondary' : 'primary'}
+                      onClick={() => handleJoinClick(table)}
+                    >
+                      {isUsdTable
+                        ? 'Browse Contests'
+                        : table.currentPlayerCount >= table.maxPlayers
+                          ? 'Table Full'
+                          : 'Join Table'}
+                    </Button>
+                  </article>
+                );
+              })}
             </div>
           </div>
         ))}
+      </section>
 
-        {tables.length === 0 && !loading && (
-          <div className="text-center text-white/50 mt-16">
-            <h2 className="text-2xl font-semibold mb-2">No Tables Available</h2>
-            <p>Please check back in a moment.</p>
-          </div>
-        )}
-      </div>
+      {tables.length === 0 && !loading && (
+        <div className="rt-panel-strong rounded-2xl p-8 text-center text-white/55">
+          No tables are currently available.
+        </div>
+      )}
 
-      {selectedTable && (
+      {selectedTable && selectedTable.mode !== 'USD_CONTEST' && (
         <Modal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onConfirm={handleConfirmJoin}
-          title={`Join ${selectedTable.name}?`}
+          title={`Join ${selectedTable.name || `Table ${selectedTable._id.slice(-4)}`}?`}
         >
-          <p>Are you sure you want to join this table with a stake of ${selectedTable.stake}?</p>
+          <p>Start a session on this table with stake tier {selectedTable.stake}.</p>
         </Modal>
       )}
     </div>

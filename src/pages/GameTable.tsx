@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameStore } from "../store/gameStore";
 import { useAuthStore } from "../store/authStore";
 import { Loader } from "../components/ui/Loader";
@@ -19,6 +19,7 @@ import backCardImage from "../assets/cards/back.png";
 
 const GameTable: React.FC = () => {
   const { tableId } = useParams<{ tableId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const logoSrc = "/assets/logo.png";
@@ -62,10 +63,11 @@ const GameTable: React.FC = () => {
     error: balanceError,
     refresh: refreshBalance,
   } = useWalletBalance({ refreshIntervalMs: 15000 });
+  const contestId = searchParams.get("contestId") ?? undefined;
 
   useEffect(() => {
     if (tableId && user) {
-      connect(tableId, user._id, user.username, user.avatarUrl);
+      connect(tableId, user._id, user.username, user.avatarUrl, contestId);
     }
 
     const handlePlayerLeft = ({ userId: leftPlayerId }: { userId: string }) => {
@@ -81,7 +83,7 @@ const GameTable: React.FC = () => {
       useGameStore.getState().socket?.off('playerLeft', handlePlayerLeft);
       disconnect();
     };
-  }, [tableId, user, connect, disconnect, navigate]);
+  }, [tableId, user, connect, disconnect, navigate, contestId]);
 
   useEffect(() => {
     if (gameState?.status === "round-end") {
@@ -425,7 +427,12 @@ const GameTable: React.FC = () => {
   };
 
   const handlePutIn = () => {
-    if (tableId && user && gameState.status === "round-end") {
+    if (
+      tableId &&
+      user &&
+      gameState.status === "round-end" &&
+      (!gameState.mode || gameState.mode === "FREE_RTC_TABLE")
+    ) {
       putIn(tableId, user._id);
     }
   };
@@ -489,9 +496,6 @@ const GameTable: React.FC = () => {
       currency: "USD",
     }).format(amount);
   };
-  const getPayout = (userId: string) => {
-    return gameState.payouts?.[userId] ?? 0;
-  };
   const roundReasonLabel =
     gameState.roundEndedBy === "REGULAR"
       ? "Drop / Hand Empty"
@@ -504,6 +508,31 @@ const GameTable: React.FC = () => {
             : gameState.roundEndedBy === "CAUGHT_DROP"
               ? "Caught Drop"
               : "Round End";
+  const placementByUserId = new Map((gameState.placements ?? []).map((placement) => [placement.userId, placement]));
+  const isContinuousMode = !gameState.mode || gameState.mode === "FREE_RTC_TABLE";
+  const rankedRoundPlayers = [...gameState.players].sort((a, b) => {
+    const aRank = placementByUserId.get(a.userId)?.rank ?? Number.MAX_SAFE_INTEGER;
+    const bRank = placementByUserId.get(b.userId)?.rank ?? Number.MAX_SAFE_INTEGER;
+    return aRank - bRank;
+  });
+  const winnerPlacement = (gameState.placements ?? []).find((placement) => placement.rank === 1);
+  const winnerPlayer = winnerPlacement
+    ? gameState.players.find((player) => player.userId === winnerPlacement.userId)
+    : gameState.players.find((player) => player.userId === gameState.roundWinnerId);
+  const settlementLabel =
+    gameState.roundSettlementStatus === "settled"
+      ? "Settled"
+      : gameState.roundSettlementStatus === "failed"
+        ? "Settlement Failed"
+        : "Settlement Pending";
+  const formatPlacementWinType = (winType?: string) => {
+    if (!winType || winType === "LOSS") return "Loss";
+    if (winType === "AUTO_TRIPLE") return "Auto Triple";
+    if (winType === "CAUGHT_DROP") return "Caught Drop";
+    if (winType === "DECK_EMPTY") return "Deck Empty";
+    if (winType === "REEM") return "Reem";
+    return "Regular";
+  };
 
   const renderOpponentHand = (count: number, size: "sm" | "md" = "sm") => {
     if (count <= 0) {
@@ -834,45 +863,59 @@ const GameTable: React.FC = () => {
                 <div className="text-[11px] uppercase tracking-widest text-white/60">Round Over</div>
                 <div className="text-sm font-semibold text-white">{roundReasonLabel}</div>
               </div>
-              <Button onClick={handleRequestLeaveTable} variant="danger" size="sm">Leave</Button>
-            </div>
-            <div className="mt-1 text-[11px] text-yellow-300">
-              Next round starts in {roundCountdownSeconds ?? 30}s
-            </div>
-            <div className="mt-1 text-[11px] text-white/70">
-              Ready: {readyCount}/{totalRoundPlayers}
-            </div>
-            <div className="mt-2">
-              <Button onClick={handlePutIn} variant="primary" size="sm" disabled={isReadyForNextRound}>
-                {isReadyForNextRound ? "Put In: Ready" : "Put In"}
+              <Button onClick={isContinuousMode ? handleRequestLeaveTable : handleLeaveTable} variant="danger" size="sm">
+                Leave
               </Button>
             </div>
+            {isContinuousMode && (
+              <div className="mt-1 text-[11px] text-yellow-300">
+                Next round starts in {roundCountdownSeconds ?? 30}s
+              </div>
+            )}
+            {isContinuousMode && (
+              <div className="mt-1 text-[11px] text-white/70">
+                Ready: {readyCount}/{totalRoundPlayers}
+              </div>
+            )}
+            <div className="mt-1 text-[11px] text-white/70">
+              {settlementLabel}
+            </div>
+            {isContinuousMode && (
+              <div className="mt-2">
+                <Button onClick={handlePutIn} variant="primary" size="sm" disabled={isReadyForNextRound}>
+                  {isReadyForNextRound ? "Put In: Ready" : "Put In"}
+                </Button>
+              </div>
+            )}
             <div className="mt-2 text-sm text-green-400 font-bold">
-              Winner: {gameState.players.find((p) => p.userId === gameState.roundWinnerId)?.username || "Unknown"}
-              {gameState.payouts && gameState.roundWinnerId && (
-                <span className="text-yellow-300 ml-1">{getPayout(gameState.roundWinnerId) >= 0 ? "+" : ""}${getPayout(gameState.roundWinnerId)}</span>
-              )}
+              Winner: {winnerPlayer?.username || "Unknown"}
             </div>
             {gameState.handScores && (
               <div className="mt-2 max-h-[42vh] overflow-auto rounded-lg border border-white/10 bg-black/35">
-                <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-white/50 grid grid-cols-[1.4fr_0.5fr_0.6fr] gap-2">
+                <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-white/50 grid grid-cols-[1.3fr_0.4fr_0.8fr_0.5fr] gap-2">
                   <span>Player</span>
+                  <span>Rank</span>
+                  <span>Result</span>
                   <span>Score</span>
-                  <span>Payout</span>
                 </div>
                 <div className="divide-y divide-white/10">
-                  {gameState.players.map((player) => (
+                  {rankedRoundPlayers.map((player) => {
+                    const placement = placementByUserId.get(player.userId);
+                    const isWinner = placement?.rank === 1 || player.userId === gameState.roundWinnerId;
+                    return (
                     <div
                       key={player.userId}
-                      className={`px-2 py-1.5 grid grid-cols-[1.4fr_0.5fr_0.6fr] gap-2 items-center text-xs ${player.userId === gameState.roundWinnerId ? "bg-green-500/10" : ""}`}
+                      className={`px-2 py-1.5 grid grid-cols-[1.3fr_0.4fr_0.8fr_0.5fr] gap-2 items-center text-xs ${isWinner ? "bg-green-500/10" : ""}`}
                     >
                       <div className="truncate text-white">{player.username}</div>
-                      <div className="font-mono text-white/80">{gameState.handScores?.[player.userId] ?? "-"}</div>
-                      <div className={`font-mono ${getPayout(player.userId) >= 0 ? "text-green-300" : "text-red-300"}`}>
-                        {getPayout(player.userId) >= 0 ? "+" : "-"}${Math.abs(getPayout(player.userId))}
+                      <div className="font-mono text-white/80">{placement?.rank ?? "-"}</div>
+                      <div className={`${isWinner ? "text-green-300" : "text-white/70"}`}>
+                        {formatPlacementWinType(placement?.winType)}
                       </div>
+                      <div className="font-mono text-white/80">{gameState.handScores?.[player.userId] ?? "-"}</div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               </div>
             )}

@@ -40,17 +40,18 @@ const PayoutForm: React.FC = () => {
   };
 
   return (
-    <div className="bg-white/5 p-6 rounded-2xl shadow-sm border border-white/10">
-      <h2 className="text-lg font-semibold text-white mb-4">Request Payout</h2>
+    <div className="rt-panel-strong p-6 rounded-2xl">
+      <h2 className="text-lg font-semibold text-white mb-2 rt-page-title">Request Payout</h2>
+      <p className="text-xs text-white/55 mb-5">Withdrawals are reviewed manually for security.</p>
       <form onSubmit={handlePayout}>
         <div className="mb-4">
-          <label className="block text-xs uppercase tracking-wider text-white/60 mb-2">
+          <label className="block text-xs uppercase tracking-[0.2em] text-white/60 mb-2">
             Payout Method
           </label>
           <select
             value={payoutMethod}
             onChange={(e) => setPayoutMethod(e.target.value as "Cash App" | "Apple Pay" | "PayPal")}
-            className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
+            className="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-transparent"
           >
             <option value="Cash App">Cash App</option>
             <option value="Apple Pay">Apple Pay</option>
@@ -59,6 +60,7 @@ const PayoutForm: React.FC = () => {
         </div>
         <div className="mb-4">
           <Input
+            label="Amount"
             type="number"
             value={amount}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAmount(e.target.value)}
@@ -68,6 +70,7 @@ const PayoutForm: React.FC = () => {
         </div>
         <div className="mb-6">
           <Input
+            label="Payout Address"
             type="text"
             value={address}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddress(e.target.value)}

@@ -37,32 +37,32 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ embedded = fals
 
   const content = (
     <>
-      <h2 className="text-lg font-semibold text-white mb-4">Transaction History</h2>
+      <h2 className="text-lg font-semibold text-white mb-4 rt-page-title">Transaction History</h2>
       {transactions.length === 0 ? (
-        <div className="text-white/50">No transactions yet.</div>
+        <div className="text-white/50 rounded-xl border border-white/10 bg-white/5 p-4">No transactions yet.</div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white/5 rounded-lg">
+        <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/20">
+          <table className="min-w-full">
             <thead>
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-white/60 uppercase tracking-wider">Amount</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-white/60 uppercase tracking-wider">Status</th>
+              <tr className="border-b border-white/10 bg-white/5">
+                <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">Type</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-white/60 uppercase tracking-wider">Amount</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-white/60 uppercase tracking-wider">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
               {transactions.map((tx) => (
-                <tr key={tx._id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-white/80">{new Date(tx.date).toLocaleDateString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-white/80">{tx.type}</td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm text-right ${tx.amount > 0 ? "text-green-400" : "text-red-400"}`}>
+                <tr key={tx._id} className="hover:bg-white/[0.03]">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-white/80">{new Date(tx.date).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-white/80">{tx.type}</td>
+                  <td className={`px-4 py-3 whitespace-nowrap text-sm text-right ${tx.amount > 0 ? "text-emerald-300" : "text-rose-300"}`}>
                     {tx.amount > 0 ? `+$${tx.amount}` : `-$${Math.abs(tx.amount)}`}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
                     <span
                       className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        tx.status === "Completed" ? "bg-green-500/20 text-green-200" : tx.status === "Pending" ? "bg-yellow-500/20 text-yellow-200" : "bg-red-500/20 text-red-200"
+                        tx.status === "Completed" ? "bg-emerald-500/20 text-emerald-200" : tx.status === "Pending" ? "bg-amber-500/20 text-amber-100" : "bg-red-500/20 text-red-200"
                       }`}
                     >
                       {tx.status}
@@ -82,7 +82,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ embedded = fals
   }
 
   return (
-    <div className="bg-white/5 p-6 rounded-2xl shadow-sm border border-white/10">
+    <div className="rt-panel-strong p-6 rounded-2xl">
       {content}
     </div>
   );

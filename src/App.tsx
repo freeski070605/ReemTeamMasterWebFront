@@ -11,6 +11,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import TableSelect from './pages/TableSelect';
+import ContestLobby from './pages/ContestLobby';
 import GameTable from './pages/GameTable';
 import Admin from './pages/Admin';
 import Account from './pages/Account';
@@ -38,6 +39,7 @@ const App: React.FC = () => {
           
           <Route element={<ProtectedRoute />}>
             <Route path="/tables" element={<TableSelect />} />
+            <Route path="/contests" element={<ContestLobby />} />
             <Route path="/game/:tableId" element={<GameTable />} />
             <Route path="/account" element={<Account />} />
             <Route path="/wallet" element={<Navigate to="/account" replace />} />

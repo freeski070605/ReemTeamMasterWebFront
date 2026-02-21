@@ -16,7 +16,7 @@ const NavbarBalance: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-white/60 animate-pulse">
+      <div className="px-3 py-1 rounded-full border border-white/12 bg-white/5 text-xs text-white/60 animate-pulse">
         Balance...
       </div>
     );
@@ -31,8 +31,8 @@ const NavbarBalance: React.FC = () => {
   }
 
   return (
-    <div className="px-3 py-1 rounded-full border border-yellow-400/30 bg-yellow-400/10 text-xs text-yellow-200">
-      Balance {formatCurrency(balance)}
+    <div className="px-3 py-1 rounded-full border border-amber-300/35 bg-amber-300/12 text-xs text-amber-100 shadow-[0_0_0_1px_rgba(247,188,58,0.12)_inset]">
+      USD {formatCurrency(balance)}
     </div>
   );
 };

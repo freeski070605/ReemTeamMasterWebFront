@@ -37,9 +37,10 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
   };
 
   return (
-    <div className={`bg-white/5 p-6 rounded-2xl text-center border border-white/10 shadow-sm ${className || ""}`}>
-      <h2 className="text-sm uppercase tracking-[0.2em] text-white/50 mb-2">{label}</h2>
-      <p className="text-4xl font-semibold text-white">{formatCurrency(balance)}</p>
+    <div className={`rt-panel-strong rounded-2xl p-6 ${className || ""}`}>
+      <h2 className="text-xs uppercase tracking-[0.2em] text-white/50 mb-3">{label}</h2>
+      <p className="text-4xl font-semibold text-white rt-page-title">{formatCurrency(balance)}</p>
+      <p className="mt-2 text-xs text-white/55">USD withdrawable balance</p>
     </div>
   );
 };

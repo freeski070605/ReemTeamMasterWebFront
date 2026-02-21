@@ -20,11 +20,11 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center backdrop-blur-sm">
-      <Card className="p-5 rounded-2xl border border-white/10 bg-black/80">
-        <h2 className="text-xl font-bold mb-4 text-white">{title}</h2>
-        <div className="text-white/70">{children}</div>
-        <div className="flex justify-end space-x-2 mt-4">
+    <div className="fixed inset-0 bg-black/80 z-50 flex justify-center items-center p-4 backdrop-blur-sm">
+      <Card className="w-full max-w-lg p-6 rounded-2xl border border-white/15 bg-[#0f1218]/95 shadow-[0_25px_60px_rgba(0,0,0,0.45)]">
+        <h2 className="text-2xl font-semibold mb-3 text-white rt-page-title">{title}</h2>
+        <div className="text-white/75 text-sm">{children}</div>
+        <div className="flex justify-end gap-2 mt-6">
           <Button onClick={onClose} variant="secondary">
             Cancel
           </Button>
