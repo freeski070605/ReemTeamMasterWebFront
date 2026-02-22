@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { useAuthStore } from './store/authStore';
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { AdminRoute } from './components/layout/AdminRoute';
 
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -43,8 +44,11 @@ const App: React.FC = () => {
             <Route path="/game/:tableId" element={<GameTable />} />
             <Route path="/account" element={<Account />} />
             <Route path="/wallet" element={<Navigate to="/account" replace />} />
-            <Route path="/admin" element={<Admin />} />
             <Route path="/profile" element={<Navigate to="/account" replace />} />
+          </Route>
+
+          <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<Admin />} />
           </Route>
           
           <Route path="*" element={<Navigate to="/" replace />} />

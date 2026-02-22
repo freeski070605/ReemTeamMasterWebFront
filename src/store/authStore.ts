@@ -7,6 +7,7 @@ interface User {
   username: string;
   email: string;
   avatarUrl?: string;
+  isAdmin?: boolean;
 }
 
 interface AuthState {
@@ -23,7 +24,11 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  user: JSON.parse(localStorage.getItem('user') || 'null'),
+  user: (() => {
+    const stored = JSON.parse(localStorage.getItem('user') || 'null');
+    if (!stored) return null;
+    return { ...stored, isAdmin: !!stored.isAdmin };
+  })(),
   token: localStorage.getItem('token'),
   isAuthenticated: !!localStorage.getItem('token'),
   isLoading: false,
@@ -32,9 +37,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await client.post('/auth/login', { email, password });
-      const { token, userId, username, email: userEmail } = response.data;
+      const { token, userId, username, email: userEmail, isAdmin } = response.data;
       
-      const user = { _id: userId, username: username || 'User', email: userEmail || email };
+      const user = {
+        _id: userId,
+        username: username || 'User',
+        email: userEmail || email,
+        isAdmin: !!isAdmin,
+      };
       
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -52,9 +62,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await client.post('/auth/register', { username, email, password });
-      const { token, userId } = response.data;
+      const { token, userId, isAdmin } = response.data;
       
-      const user = { _id: userId, username, email };
+      const user = { _id: userId, username, email, isAdmin: !!isAdmin };
       
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -78,8 +88,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   checkAuth: () => {
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user') || 'null');
+    const normalizedUser = user ? { ...user, isAdmin: !!user.isAdmin } : null;
     if (token && user) {
-        set({ token, user, isAuthenticated: true });
+        set({ token, user: normalizedUser, isAuthenticated: true });
     } else {
         set({ token: null, user: null, isAuthenticated: false });
     }

@@ -13,12 +13,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const isGameRoute = location.pathname.startsWith('/game/');
 
   const navLinks = useMemo(
-    () => [
-      { to: '/tables', label: 'Cribs' },
-      { to: '/contests', label: 'Cash Crowns' },
-      { to: '/account', label: 'Account' },
-    ],
-    []
+    () => {
+      const links = [
+        { to: '/tables', label: 'Cribs' },
+        { to: '/contests', label: 'Cash Crowns' },
+        { to: '/account', label: 'Account' },
+      ];
+      if (user?.isAdmin) {
+        links.push({ to: '/admin', label: 'Admin' });
+      }
+      return links;
+    },
+    [user?.isAdmin]
   );
 
   const handleLogout = () => {
