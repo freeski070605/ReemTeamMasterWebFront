@@ -37,12 +37,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await client.post('/auth/login', { email, password });
-      const { token, userId, username, email: userEmail, isAdmin } = response.data;
+      const { token, userId, username, email: userEmail, avatarUrl, isAdmin } = response.data;
       
       const user = {
         _id: userId,
         username: username || 'User',
         email: userEmail || email,
+        avatarUrl,
         isAdmin: !!isAdmin,
       };
       
@@ -62,9 +63,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await client.post('/auth/register', { username, email, password });
-      const { token, userId, isAdmin } = response.data;
+      const { token, userId, avatarUrl, isAdmin } = response.data;
       
-      const user = { _id: userId, username, email, isAdmin: !!isAdmin };
+      const user = { _id: userId, username, email, avatarUrl, isAdmin: !!isAdmin };
       
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -100,15 +101,20 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const formData = new FormData();
       formData.append('avatar', file);
-      const response = await client.post('/users/avatar', formData, {
+      const response = await client.post('/users/avatar/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      set((state) => ({
-        ...state,
-        user: { ...state.user!, avatarUrl: response.data.avatarUrl },
-      }));
+      set((state) => {
+        if (!state.user) {
+          return state;
+        }
+
+        const user = { ...state.user, avatarUrl: response.data.avatarUrl };
+        localStorage.setItem('user', JSON.stringify(user));
+        return { ...state, user };
+      });
       toast.success('Avatar updated successfully!');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Avatar upload failed');
@@ -117,11 +123,16 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   selectDefaultAvatar: async (avatarUrl: string) => {
     try {
-      const response = await client.post('/users/avatar/default', { avatarUrl });
-      set((state) => ({
-        ...state,
-        user: { ...state.user!, avatarUrl: response.data.avatarUrl },
-      }));
+      const response = await client.post('/users/avatar/select-default', { avatarUrl });
+      set((state) => {
+        if (!state.user) {
+          return state;
+        }
+
+        const user = { ...state.user, avatarUrl: response.data.avatarUrl };
+        localStorage.setItem('user', JSON.stringify(user));
+        return { ...state, user };
+      });
       toast.success('Avatar updated successfully!');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Avatar update failed');

@@ -3,6 +3,8 @@ import { useAuthStore } from '../store/authStore';
 import PlayerAvatar from '../components/game/PlayerAvatar';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { DEFAULT_AVATAR_PATHS } from '../constants/avatars';
+import { resolveAvatarUrl } from '../utils/avatar';
 
 const Profile: React.FC = () => {
   const { user, uploadAvatar, selectDefaultAvatar } = useAuthStore();
@@ -64,16 +66,19 @@ const Profile: React.FC = () => {
           <div className="border-t border-white/10 pt-4">
             <h3 className="text-lg font-medium mb-3 text-white">Select a Default Avatar</h3>
             <div className="flex gap-4">
-                          {['/avatars/avatar1.png', '/avatars/avatar2.png', '/avatars/avatar3.png', '/avatars/avatar4.png'].map((avatar) => (
-                            <img
-                              key={avatar}
-                              src={avatar}
-                              alt="Default Avatar"
-                              className="w-16 h-16 rounded-full cursor-pointer border-2 border-white/10 hover:border-yellow-400"
-                              onClick={() => selectDefaultAvatar(avatar)}
-                            />
-                          ))}
-                        </div>
+              {DEFAULT_AVATAR_PATHS.map((avatarPath) => {
+                const avatarPreviewUrl = resolveAvatarUrl(avatarPath) || avatarPath;
+                return (
+                  <img
+                    key={avatarPath}
+                    src={avatarPreviewUrl}
+                    alt="Default Avatar"
+                    className="w-16 h-16 rounded-full cursor-pointer border-2 border-white/10 hover:border-yellow-400"
+                    onClick={() => selectDefaultAvatar(avatarPath)}
+                  />
+                );
+              })}
+            </div>
           </div>
 
           <div className="border-t border-white/10 pt-4">

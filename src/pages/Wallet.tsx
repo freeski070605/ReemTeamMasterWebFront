@@ -15,11 +15,11 @@ const Wallet: React.FC = () => {
     const paymentStatus = searchParams.get("paymentStatus");
     if (paymentStatus === "success") {
       toast.success("Deposit completed. Your balance will update shortly.");
+      window.dispatchEvent(new Event("wallet-balance-refresh"));
       setRefreshKey(Date.now());
-      searchParams.delete("paymentStatus");
-      searchParams.delete("userId");
-      searchParams.delete("amount");
-      setSearchParams(searchParams, { replace: true });
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("paymentStatus");
+      setSearchParams(nextParams, { replace: true });
     }
   }, [searchParams, setSearchParams]);
 

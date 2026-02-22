@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/authStore';
 import { createCheckout } from '../api/wallet';
@@ -8,14 +9,37 @@ import PayoutForm from '../components/wallet/PayoutForm';
 import PlayerAvatar from '../components/game/PlayerAvatar';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { DEFAULT_AVATAR_PATHS } from '../constants/avatars';
+import { resolveAvatarUrl } from '../utils/avatar';
 
 const QUICK_DEPOSIT_AMOUNTS = [25, 50, 100, 250];
 
 const Account: React.FC = () => {
   const { user, uploadAvatar, selectDefaultAvatar } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [file, setFile] = useState<File | null>(null);
   const [depositBusy, setDepositBusy] = useState(false);
   const [customDeposit, setCustomDeposit] = useState('');
+
+  useEffect(() => {
+    const paymentStatus = searchParams.get('paymentStatus');
+    if (!paymentStatus) {
+      return;
+    }
+
+    if (paymentStatus === 'success') {
+      toast.success('Deposit completed. Your balance will update shortly.');
+      window.dispatchEvent(new Event('wallet-balance-refresh'));
+    } else {
+      toast.info(`Checkout status: ${paymentStatus}`);
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('paymentStatus');
+    nextParams.delete('userId');
+    nextParams.delete('amount');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
@@ -127,15 +151,18 @@ const Account: React.FC = () => {
             <div className="mt-6 border-t border-white/10 pt-5">
               <div className="text-xs uppercase tracking-[0.2em] text-white/50">Default Avatars</div>
               <div className="mt-3 flex flex-wrap gap-3">
-                {['/avatars/avatar1.png', '/avatars/avatar2.png', '/avatars/avatar3.png', '/avatars/avatar4.png'].map((avatar) => (
-                  <img
-                    key={avatar}
-                    src={avatar}
-                    alt="Default Avatar"
-                    className="w-14 h-14 rounded-full cursor-pointer border border-white/10 hover:border-amber-300 transition"
-                    onClick={() => selectDefaultAvatar(avatar)}
-                  />
-                ))}
+                {DEFAULT_AVATAR_PATHS.map((avatarPath) => {
+                  const avatarPreviewUrl = resolveAvatarUrl(avatarPath) || avatarPath;
+                  return (
+                    <img
+                      key={avatarPath}
+                      src={avatarPreviewUrl}
+                      alt="Default Avatar"
+                      className="w-14 h-14 rounded-full cursor-pointer border border-white/10 hover:border-amber-300 transition"
+                      onClick={() => selectDefaultAvatar(avatarPath)}
+                    />
+                  );
+                })}
               </div>
             </div>
           </div>

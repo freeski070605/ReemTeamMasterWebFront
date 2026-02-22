@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -19,6 +19,11 @@ import Account from './pages/Account';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import UserDataDeletion from './pages/UserDataDeletion';
+
+const WalletRedirect: React.FC = () => {
+  const location = useLocation();
+  return <Navigate to={`/account${location.search}`} replace />;
+};
 
 const App: React.FC = () => {
   const { checkAuth } = useAuthStore();
@@ -43,7 +48,7 @@ const App: React.FC = () => {
             <Route path="/contests" element={<ContestLobby />} />
             <Route path="/game/:tableId" element={<GameTable />} />
             <Route path="/account" element={<Account />} />
-            <Route path="/wallet" element={<Navigate to="/account" replace />} />
+            <Route path="/wallet" element={<WalletRedirect />} />
             <Route path="/profile" element={<Navigate to="/account" replace />} />
           </Route>
 
