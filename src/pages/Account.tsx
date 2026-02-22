@@ -69,7 +69,10 @@ const Account: React.FC = () => {
       toast.error('Failed to start checkout.');
     } catch (error) {
       console.error('Deposit error:', error);
-      toast.error('Failed to initiate deposit.');
+      const apiMessage =
+        (error as any)?.response?.data?.errors?.[0]?.detail ||
+        (error as any)?.response?.data?.message;
+      toast.error(apiMessage || 'Failed to initiate deposit.');
     } finally {
       setDepositBusy(false);
     }
