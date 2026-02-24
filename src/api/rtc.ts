@@ -10,10 +10,8 @@ interface RtcBundlesResponse {
   bundles: RtcPurchaseBundle[];
 }
 
-interface RtcPurchaseResponse {
-  message: string;
-  bundle: RtcPurchaseBundle;
-  rtcBalance: number;
+interface RtcCheckoutResponse {
+  checkoutUrl: string;
 }
 
 export const getRtcBundles = async (): Promise<RtcPurchaseBundle[]> => {
@@ -21,11 +19,7 @@ export const getRtcBundles = async (): Promise<RtcPurchaseBundle[]> => {
   return Array.isArray(data?.bundles) ? data.bundles : [];
 };
 
-export const purchaseRtcBundle = async (
-  bundleId: string,
-  paymentReferenceId?: string
-): Promise<RtcPurchaseResponse> => {
-  const payload = paymentReferenceId ? { bundleId, paymentReferenceId } : { bundleId };
-  const { data } = await client.post<RtcPurchaseResponse>('/rtc/purchase', payload);
-  return data;
+export const createRtcCheckout = async (bundleId: string): Promise<string> => {
+  const { data } = await client.post<RtcCheckoutResponse>('/payment/create-rtc-checkout', { bundleId });
+  return data.checkoutUrl;
 };

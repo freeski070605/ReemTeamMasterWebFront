@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/authStore';
 import { createCheckout } from '../api/wallet';
-import { getRtcBundles, purchaseRtcBundle, RtcPurchaseBundle } from '../api/rtc';
+import { createRtcCheckout, getRtcBundles, RtcPurchaseBundle } from '../api/rtc';
 import BalanceDisplay from '../components/wallet/BalanceDisplay';
 import TransactionHistory from '../components/wallet/TransactionHistory';
 import PayoutForm from '../components/wallet/PayoutForm';
@@ -35,12 +35,18 @@ const Account: React.FC = () => {
 
   useEffect(() => {
     const paymentStatus = searchParams.get('paymentStatus');
+    const paymentType = searchParams.get('paymentType');
     if (!paymentStatus) {
       return;
     }
 
     if (paymentStatus === 'success') {
-      toast.success('Deposit completed. Your balance will update shortly.');
+      if (paymentType === 'rtc') {
+        toast.success('RTC purchase completed. Your RTC balance will update shortly.');
+        void refreshRtcBalance();
+      } else {
+        toast.success('Deposit completed. Your balance will update shortly.');
+      }
       window.dispatchEvent(new Event('wallet-balance-refresh'));
     } else {
       toast.info(`Checkout status: ${paymentStatus}`);
@@ -48,10 +54,12 @@ const Account: React.FC = () => {
 
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('paymentStatus');
+    nextParams.delete('paymentType');
+    nextParams.delete('bundleId');
     nextParams.delete('userId');
     nextParams.delete('amount');
     setSearchParams(nextParams, { replace: true });
-  }, [searchParams, setSearchParams]);
+  }, [refreshRtcBalance, searchParams, setSearchParams]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
@@ -116,15 +124,15 @@ const Account: React.FC = () => {
   const handleRtcPurchase = async (bundleId: string) => {
     setPurchasingBundleId(bundleId);
     try {
-      const paymentReferenceId = `rtc-ui-${Date.now()}`;
-      const response = await purchaseRtcBundle(bundleId, paymentReferenceId);
-      toast.success(
-        `${response.bundle.rtcAmount.toLocaleString()} Reem Team Cash credited to your wallet.`
-      );
-      await refreshRtcBalance();
-      window.dispatchEvent(new Event('wallet-balance-refresh'));
+      const checkoutUrl = await createRtcCheckout(bundleId);
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+        return;
+      }
+
+      toast.error('Failed to start RTC checkout.');
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Could not complete Reem Team Cash purchase.');
+      toast.error(error?.response?.data?.message || 'Could not start Reem Team Cash checkout.');
     } finally {
       setPurchasingBundleId(null);
     }
