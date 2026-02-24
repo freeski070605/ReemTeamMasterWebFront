@@ -5,7 +5,7 @@ import { useAuthStore } from "../store/authStore";
 import { Loader } from "../components/ui/Loader";
 import { useWalletBalance } from "../hooks/useWalletBalance";
 import { Card as CardType } from "../types/game";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { toast } from "react-toastify";
 
 import { PlayingCard as CardComponent } from "../components/ui/Card";
@@ -16,6 +16,8 @@ import GameActions from "../components/game/GameActions";
 import { Button } from "../components/ui/Button";
 import bgImage from '../assets/bg.png';
 import backCardImage from "../assets/cards/back.png";
+
+type TurnStatusBadge = "DRAWING" | "MUST DISCARD" | "HIT MODE" | "WAITING";
 
 const GameTable: React.FC = () => {
   const { tableId } = useParams<{ tableId: string }>();
@@ -51,11 +53,15 @@ const GameTable: React.FC = () => {
   const [playerBalances, setPlayerBalances] = useState<Record<string, number>>({});
   const [tableMaxWidthPx, setTableMaxWidthPx] = useState(860);
   const [useLargeScreenTableSizing, setUseLargeScreenTableSizing] = useState(false);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [showTurnCompleteFeedback, setShowTurnCompleteFeedback] = useState(false);
   const prevTurnStateRef = useRef<{ isMyTurn: boolean; hasTakenAction: boolean }>({
     isMyTurn: false,
     hasTakenAction: false,
   });
   const lastAnimatedRoundKeyRef = useRef<string | null>(null);
+  const hasInitializedLastActionRef = useRef(false);
+  const lastObservedActionTimestampRef = useRef<number | null>(null);
   const maxPlayers = 4;
   const walletCurrency = gameState?.mode === "USD_CONTEST" ? "usd" : "rtc";
   const {
@@ -125,6 +131,19 @@ const GameTable: React.FC = () => {
     return () => {
       mediaQuery.removeEventListener("change", applyOrientationState);
       window.removeEventListener("resize", applyOrientationState);
+    };
+  }, []);
+
+  useEffect(() => {
+    const coarsePointerQuery = window.matchMedia("(pointer: coarse)");
+    const updateTouchState = () => {
+      setIsTouchDevice(coarsePointerQuery.matches || navigator.maxTouchPoints > 0);
+    };
+
+    updateTouchState();
+    coarsePointerQuery.addEventListener("change", updateTouchState);
+    return () => {
+      coarsePointerQuery.removeEventListener("change", updateTouchState);
     };
   }, []);
 
@@ -302,6 +321,8 @@ const GameTable: React.FC = () => {
     user &&
     gameState.players[gameState.currentPlayerIndex]?.userId === user._id
   );
+  const hasCurrentPlayer = !!currentPlayer;
+  const hasTakenActionThisTurn = !!currentPlayer?.hasTakenActionThisTurn;
   useEffect(() => {
     if (!currentPlayer) return;
     const prev = prevTurnStateRef.current;
@@ -314,6 +335,47 @@ const GameTable: React.FC = () => {
     };
   }, [isMyTurn, currentPlayer]);
 
+  useEffect(() => {
+    if (!gameState || hasInitializedLastActionRef.current) return;
+    hasInitializedLastActionRef.current = true;
+    lastObservedActionTimestampRef.current = gameState.lastAction?.timestamp ?? null;
+  }, [gameState]);
+
+  useEffect(() => {
+    if (!hasInitializedLastActionRef.current) return;
+    const action = gameState?.lastAction;
+    const actionTimestamp = action?.timestamp ?? null;
+
+    if (actionTimestamp === null || actionTimestamp === lastObservedActionTimestampRef.current) {
+      return;
+    }
+
+    lastObservedActionTimestampRef.current = actionTimestamp;
+
+    if (action?.type === "discardCard" && action.payload?.userId === user?._id) {
+      setShowTurnCompleteFeedback(true);
+      const timeoutId = window.setTimeout(() => {
+        setShowTurnCompleteFeedback(false);
+      }, 1600);
+      return () => window.clearTimeout(timeoutId);
+    }
+
+    return undefined;
+  }, [gameState?.lastAction, user?._id]);
+
+  useEffect(() => {
+    if (!isMyTurn || !hasCurrentPlayer) {
+      setSelectedCards([]);
+      setIsHitMode(false);
+      return;
+    }
+
+    if (!hasTakenActionThisTurn) {
+      setSelectedCards([]);
+      setIsHitMode(false);
+    }
+  }, [isMyTurn, hasCurrentPlayer, hasTakenActionThisTurn, gameState?.turn]);
+
   if (!isConnected || !gameState || !user) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-900">
@@ -322,6 +384,11 @@ const GameTable: React.FC = () => {
       </div>
     );
   }
+
+  const getCardId = (card: CardType) => `${card.rank}-${card.suit}`;
+  const restrictedDiscardCardId = currentPlayer?.restrictedDiscardCard ?? null;
+  const isRestrictedDiscardCard = (card: CardType) =>
+    restrictedDiscardCardId !== null && getCardId(card) === restrictedDiscardCardId;
 
   const toggleCardSelection = (card: CardType) => {
     if (selectedCards.some((c) => c.rank === card.rank && c.suit === card.suit)) {
@@ -335,6 +402,27 @@ const GameTable: React.FC = () => {
         setSelectedCards([...selectedCards, card]);
       }
     }
+  };
+
+  const discardSelectedCard = (): boolean => {
+    if (selectedCards.length !== 1) {
+      toast.error("Select exactly one card to discard.");
+      return false;
+    }
+
+    if (isRestrictedDiscardCard(selectedCards[0])) {
+      toast.error("Cannot discard this card this turn.");
+      return false;
+    }
+
+    if (tableId && user) {
+      discardCard(tableId, user._id, selectedCards[0]);
+      setSelectedCards([]);
+      setIsHitMode(false);
+      return true;
+    }
+
+    return false;
   };
 
   const handleDeckClick = () => {
@@ -357,15 +445,20 @@ const GameTable: React.FC = () => {
         drawCard(tableId, user._id, "discard");
       }
     } else {
-      if (selectedCards.length !== 1) {
-        toast.error("Select exactly one card to discard.");
-        return;
-      }
-      if (tableId && user) {
-        discardCard(tableId, user._id, selectedCards[0]);
-        setSelectedCards([]);
-      }
+      discardSelectedCard();
     }
+  };
+
+  const handleFlickDiscard = (card: CardType, info: PanInfo) => {
+    const isDiscardStep = isMyTurn && !!currentPlayer?.hasTakenActionThisTurn;
+    if (!isTouchDevice || !isDiscardStep || selectedCards.length !== 1) return;
+    if (selectedCards[0].rank !== card.rank || selectedCards[0].suit !== card.suit) return;
+
+    const movedTowardDiscard = info.offset.y < -85 && Math.abs(info.offset.x) < 170;
+    const quickFlickTowardDiscard = info.velocity.y < -700 && Math.abs(info.velocity.x) < 900;
+
+    if (!movedTowardDiscard && !quickFlickTowardDiscard) return;
+    discardSelectedCard();
   };
 
   const handleSpread = () => {
@@ -540,6 +633,113 @@ const GameTable: React.FC = () => {
     return "Regular";
   };
 
+  const activeTurnPlayer = gameState.players[gameState.currentPlayerIndex] ?? null;
+  const activeTurnPlayerName = activeTurnPlayer?.username ?? "Player";
+  const isDrawStep = isMyTurn && !currentPlayer?.hasTakenActionThisTurn;
+  const isDiscardStep = isMyTurn && !!currentPlayer?.hasTakenActionThisTurn;
+  const selectedIllegalDiscardCard =
+    isDiscardStep &&
+    selectedCards.length === 1 &&
+    isRestrictedDiscardCard(selectedCards[0]);
+  const canDrawFromDeck =
+    isDrawStep && gameState.deck.length > 0 && !hideCardsForPresentation;
+  const canDrawFromDiscard =
+    isDrawStep && gameState.discardPile.length > 0 && !hideCardsForPresentation;
+  const canTapDiscardPileToFinishTurn = isDiscardStep && !hideCardsForPresentation;
+  const canClickDiscardPile = canDrawFromDiscard || canTapDiscardPileToFinishTurn;
+  const deckPrimaryHighlightClass = canDrawFromDeck
+    ? "cursor-pointer hover:scale-105 ring-2 ring-cyan-300/90 shadow-[0_0_22px_rgba(56,189,248,0.45)] animate-pulse"
+    : "cursor-not-allowed opacity-90";
+  const discardPrimaryHighlightClass = canTapDiscardPileToFinishTurn
+    ? "cursor-pointer hover:scale-105 ring-2 ring-emerald-300/90 shadow-[0_0_22px_rgba(52,211,153,0.46)] animate-pulse"
+    : canDrawFromDiscard
+      ? "cursor-pointer hover:scale-105 ring-2 ring-cyan-300/90 shadow-[0_0_20px_rgba(56,189,248,0.35)] animate-pulse"
+      : "cursor-default";
+  const isDiscardReady =
+    isDiscardStep &&
+    selectedCards.length === 1 &&
+    !selectedIllegalDiscardCard;
+
+  const turnStepChipText = isMyTurn
+    ? `Your Turn - ${isDiscardStep ? "Step 2/2: Discard" : "Step 1/2: Draw"}`
+    : `${activeTurnPlayerName}'s Turn - ${
+        activeTurnPlayer?.hasTakenActionThisTurn ? "Step 2/2: Discard" : "Step 1/2: Draw"
+      }`;
+
+  const contextBannerText = isMyTurn
+    ? isDiscardStep
+      ? selectedCards.length === 1
+        ? selectedIllegalDiscardCard
+          ? "Select 1 card, then tap Discard"
+          : "Tap discard pile to finish turn."
+        : "Select 1 card, then tap Discard"
+      : "Draw from deck or discard pile"
+    : `You are waiting for ${activeTurnPlayerName}.`;
+
+  const discardHelperText = isDiscardStep
+    ? selectedCards.length === 1
+      ? selectedIllegalDiscardCard
+        ? "Cannot discard this card this turn."
+        : "Tap discard pile to finish turn."
+      : "Select exactly 1 card to discard"
+    : null;
+
+  const canDrop = !!(
+    isMyTurn &&
+    !currentPlayer?.hasTakenActionThisTurn &&
+    !currentPlayer?.isHitLocked
+  );
+  const dropDisabledReason = !isMyTurn
+    ? "Wait for your turn"
+    : currentPlayer?.hasTakenActionThisTurn
+      ? "Drop blocked: already took an action"
+      : currentPlayer?.isHitLocked
+        ? "Drop blocked: hit-locked."
+        : undefined;
+
+  const canSpread = !!(
+    isMyTurn &&
+    currentPlayer?.hasTakenActionThisTurn &&
+    selectedCards.length >= 3
+  );
+  const spreadDisabledReason = !isMyTurn
+    ? "Wait for your turn"
+    : !currentPlayer?.hasTakenActionThisTurn
+      ? "Draw first"
+      : selectedCards.length >= 3
+        ? undefined
+        : "Need 3+ cards selected";
+
+  const canHit = !!(
+    isMyTurn &&
+    currentPlayer?.hasTakenActionThisTurn &&
+    selectedCards.length === 1
+  );
+  const hitDisabledReason = !isMyTurn
+    ? "Wait for your turn"
+    : !currentPlayer?.hasTakenActionThisTurn
+      ? "Draw first"
+      : selectedCards.length === 1
+        ? undefined
+        : "Select exactly 1 card";
+
+  const getTurnStatus = (playerUserId: string, isSelfPanel = false): TurnStatusBadge => {
+    if (!activeTurnPlayer || activeTurnPlayer.userId !== playerUserId) {
+      return "WAITING";
+    }
+    if (isSelfPanel && isHitMode) {
+      return "HIT MODE";
+    }
+    return activeTurnPlayer.hasTakenActionThisTurn ? "MUST DISCARD" : "DRAWING";
+  };
+
+  const turnStatusClasses: Record<TurnStatusBadge, string> = {
+    DRAWING: "border-emerald-300/60 bg-emerald-400/15 text-emerald-200",
+    "MUST DISCARD": "border-amber-300/60 bg-amber-400/20 text-amber-100",
+    "HIT MODE": "border-fuchsia-300/60 bg-fuchsia-500/18 text-fuchsia-100",
+    WAITING: "border-white/20 bg-white/5 text-white/75",
+  };
+
   const renderOpponentHand = (count: number, size: "sm" | "md" = "sm") => {
     if (count <= 0) {
       return <div className="text-xs text-white/40">No cards</div>;
@@ -567,6 +767,7 @@ const GameTable: React.FC = () => {
   ) => {
     if (!player) return null;
     const isActive = gameState.players[gameState.currentPlayerIndex]?.userId === player.userId;
+    const turnStatus = getTurnStatus(player.userId);
     return (
       <div className={`absolute z-20 pointer-events-none ${className}`}>
         <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
@@ -575,6 +776,9 @@ const GameTable: React.FC = () => {
             <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse" : ""}`}>
               <PlayerAvatar player={{ name: player.username, avatarUrl: player.avatarUrl }} size="sm" />
               <div>
+                <div className={`mb-1 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold tracking-wide ${turnStatusClasses[turnStatus]}`}>
+                  {turnStatus}
+                </div>
                 <div className="text-[11px] text-white font-semibold leading-tight">{player.username}</div>
                 <div className="text-[10px] text-white/60 leading-tight">
                   Cards: {getVisibleCardCount(player.userId, player.hand.length)}
@@ -593,8 +797,8 @@ const GameTable: React.FC = () => {
   const hand = currentPlayer?.hand ?? [];
   const visibleHand =
     currentPlayer ? hand.slice(0, getVisibleCardCount(currentPlayer.userId, hand.length)) : [];
-  const canDrawFromDeck =
-    isMyTurn && !currentPlayer?.hasTakenActionThisTurn && !hideCardsForPresentation;
+  const myTurnStatus = getTurnStatus(user._id, true);
+  const canUseFlickDiscard = isTouchDevice && isDiscardReady;
 
   const renderSpreadZone = (
     player: typeof gameState.players[number] | null,
@@ -691,6 +895,12 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
+              <div className="absolute top-[62px] left-1/2 z-20 -translate-x-1/2">
+                <div className="rounded-full border border-amber-300/50 bg-black/65 px-3 py-1 text-[11px] font-semibold text-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.25)] backdrop-blur-sm">
+                  {turnStepChipText}
+                </div>
+              </div>
+
               {renderSeatInfo(topPlayer, "top-2 left-[58%] -translate-x-1/2", "left")}
               {renderSeatInfo(leftPlayer, "left-[1.5%] top-1/2 -translate-y-1/2", "left")}
               {renderSeatInfo(rightPlayer, "right-[1.5%] top-1/2 -translate-y-1/2", "right")}
@@ -766,7 +976,7 @@ const GameTable: React.FC = () => {
                   <div className="relative w-8 h-12 sm:w-10 sm:h-14">
                     {!hideCardsForPresentation && gameState.deck.length > 0 && (
                       <div
-                        className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center relative transition-transform ${canDrawFromDeck ? 'cursor-pointer hover:scale-105' : 'cursor-not-allowed opacity-90'}`}
+                        className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center relative transition-transform ${deckPrimaryHighlightClass}`}
                         style={{
                           backgroundImage: `url(${backCardImage})`,
                           backgroundSize: "cover",
@@ -783,11 +993,11 @@ const GameTable: React.FC = () => {
                   <div
                     className="relative w-8 h-12 sm:w-10 sm:h-14"
                     onClick={() => {
-                      if (!hideCardsForPresentation) handleDiscardPileClick();
+                      if (!hideCardsForPresentation && canClickDiscardPile) handleDiscardPileClick();
                     }}
                   >
                     {!hideCardsForPresentation && gameState.discardPile.length > 0 ? (
-                      <div className={`relative ${isMyTurn ? 'cursor-pointer hover:scale-105 transition-all' : ''} ${isMyTurn && ((!currentPlayer?.hasTakenActionThisTurn) || (currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)) ? 'hover:ring-4 hover:ring-yellow-400 rounded-lg' : ''} ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'animate-pulse' : ''}`}>
+                      <div className={`relative transition-all ${discardPrimaryHighlightClass}`}>
                         <CardComponent
                           suit={gameState.discardPile[gameState.discardPile.length - 1].suit}
                           rank={gameState.discardPile[gameState.discardPile.length - 1].rank}
@@ -795,7 +1005,7 @@ const GameTable: React.FC = () => {
                         />
                       </div>
                     ) : !hideCardsForPresentation ? (
-                      <div className={`w-full h-full border-2 border-dashed border-white/30 rounded-lg flex items-center justify-center text-white/30 relative ${isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1 ? 'cursor-pointer hover:bg-white/10 ring-4 ring-green-400 animate-pulse' : ''}`}>
+                      <div className={`w-full h-full border-2 border-dashed border-white/30 rounded-lg flex items-center justify-center text-white/40 relative ${discardPrimaryHighlightClass}`}>
                         Discard
                       </div>
                     ) : null}
@@ -810,6 +1020,9 @@ const GameTable: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <PlayerAvatar player={{ name: user.username, avatarUrl: user.avatarUrl }} size="sm" />
                       <div>
+                        <div className={`mb-1 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold tracking-wide ${turnStatusClasses[myTurnStatus]}`}>
+                          {myTurnStatus}
+                        </div>
                         <div className="text-[11px] text-white font-semibold leading-tight">{user.username}</div>
                         <div className="text-[10px] text-white/60 leading-tight">Cards: {visibleHand.length}</div>
                         <div className="text-[10px] text-yellow-300 leading-tight">
@@ -820,27 +1033,68 @@ const GameTable: React.FC = () => {
                   </div>
 
                   <div className="flex-1 flex flex-col items-center">
+                    <div className="mb-1 w-full max-w-[520px] rounded-lg border border-sky-300/30 bg-black/45 px-3 py-1.5 text-center text-[11px] font-medium text-sky-100 shadow-[0_0_18px_rgba(56,189,248,0.18)]">
+                      {contextBannerText}
+                    </div>
+                    {discardHelperText ? (
+                      <div
+                        className={`mb-1 text-[10px] font-semibold ${
+                          selectedIllegalDiscardCard ? "text-rose-300" : "text-emerald-200"
+                        }`}
+                      >
+                        {discardHelperText}
+                        {canUseFlickDiscard ? " Or flick selected card toward discard pile." : ""}
+                      </div>
+                    ) : (
+                      <div className="mb-1 h-4" aria-hidden />
+                    )}
+                    {showTurnCompleteFeedback ? (
+                      <div className="mb-1 rounded-full border border-emerald-300/60 bg-emerald-500/18 px-3 py-0.5 text-[10px] font-semibold text-emerald-100">
+                        Turn complete - next player
+                      </div>
+                    ) : (
+                      <div className="mb-1 h-5" aria-hidden />
+                    )}
+
                     <div className="hand relative h-24 w-full max-w-[700px] pointer-events-auto">
                       <AnimatePresence>
                         <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
-                          {visibleHand.map((card) => (
-                            <motion.div
-                              key={`${card.rank}-${card.suit}`}
-                              className="card"
-                              initial={{ y: 30, opacity: 0 }}
-                              animate={{ y: 0, opacity: 1 }}
-                              exit={{ y: -20, opacity: 0 }}
-                              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                            >
-                              <CardComponent
-                                suit={card.suit}
-                                rank={card.rank}
-                                isSelected={selectedCards.some((c) => c.rank === card.rank && c.suit === card.suit)}
-                                onClick={() => toggleCardSelection(card)}
-                                className="w-10 h-14 sm:w-11 sm:h-16"
-                              />
-                            </motion.div>
-                          ))}
+                          {visibleHand.map((card) => {
+                            const isSelectedCard = selectedCards.some(
+                              (c) => c.rank === card.rank && c.suit === card.suit
+                            );
+                            const isIllegalDiscardSelection =
+                              isSelectedCard && isDiscardStep && isRestrictedDiscardCard(card);
+                            const enableFlickDrag =
+                              canUseFlickDiscard && isSelectedCard && !isIllegalDiscardSelection;
+
+                            return (
+                              <motion.div
+                                key={`${card.rank}-${card.suit}`}
+                                className="card"
+                                initial={{ y: 30, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                exit={{ y: -20, opacity: 0 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                              >
+                                <CardComponent
+                                  suit={card.suit}
+                                  rank={card.rank}
+                                  isSelected={isSelectedCard}
+                                  onClick={() => toggleCardSelection(card)}
+                                  className="w-10 h-14 sm:w-11 sm:h-16"
+                                  badgeText={
+                                    isIllegalDiscardSelection
+                                      ? "Cannot discard this card this turn."
+                                      : undefined
+                                  }
+                                  badgeTone="danger"
+                                  dragEnabled={enableFlickDrag}
+                                  onDragEnd={(_, info) => handleFlickDiscard(card, info)}
+                                />
+                              </motion.div>
+                            );
+                          })}
                         </div>
                       </AnimatePresence>
                     </div>
@@ -848,9 +1102,18 @@ const GameTable: React.FC = () => {
                     {isMyTurn && !hideCardsForPresentation && (
                       <div className="actions flex gap-1.5 mt-1 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs">
                         <GameActions
-                          canDrop={!!(isMyTurn && !currentPlayer?.hasTakenActionThisTurn)}
-                          canSpread={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length >= 3)}
-                          canHit={!!(isMyTurn && currentPlayer?.hasTakenActionThisTurn && selectedCards.length === 1)}
+                          drop={{
+                            enabled: canDrop,
+                            reason: canDrop ? undefined : dropDisabledReason,
+                          }}
+                          spread={{
+                            enabled: canSpread,
+                            reason: canSpread ? undefined : spreadDisabledReason,
+                          }}
+                          hit={{
+                            enabled: canHit,
+                            reason: canHit ? undefined : hitDisabledReason,
+                          }}
                           onDrop={handleDrop}
                           onSpread={handleSpread}
                           onHit={handleHitClick}

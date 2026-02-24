@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, PanInfo } from 'framer-motion';
 import { CardSuit, CardRank } from '../../types/game';
 
 interface PlayingCardProps {
@@ -10,6 +10,11 @@ interface PlayingCardProps {
   onClick?: () => void;
   className?: string;
   style?: React.CSSProperties;
+  badgeText?: string;
+  badgeTone?: 'danger' | 'info';
+  dragEnabled?: boolean;
+  onDragEnd?: (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
+  dragSnapToOrigin?: boolean;
 }
 
 export const PlayingCard: React.FC<PlayingCardProps> = ({ 
@@ -19,7 +24,12 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
   isSelected = false, 
   onClick,
   className,
-  style
+  style,
+  badgeText,
+  badgeTone = 'info',
+  dragEnabled = false,
+  onDragEnd,
+  dragSnapToOrigin = true,
 }) => {
   const getCardAssetPath = (rank: CardRank, suit: CardSuit) => {
     const suitLower = suit.toLowerCase();
@@ -41,6 +51,11 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
       style={style}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
+      drag={dragEnabled}
+      dragElastic={dragEnabled ? 0.24 : 0}
+      dragMomentum={dragEnabled}
+      dragSnapToOrigin={dragSnapToOrigin}
+      onDragEnd={onDragEnd}
     >
       <img
         src={isHidden ? "/assets/cards/back.png" : getCardAssetPath(rank, suit)}
@@ -48,6 +63,17 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
         className="w-full h-full object-contain filter drop-shadow-sm"
         draggable={false}
       />
+      {badgeText ? (
+        <div
+          className={`absolute left-1 right-1 top-1 rounded-md px-1 py-0.5 text-center text-[9px] font-semibold leading-tight ${
+            badgeTone === 'danger'
+              ? 'bg-rose-600/95 text-white border border-rose-200/30'
+              : 'bg-sky-600/95 text-white border border-sky-200/30'
+          }`}
+        >
+          {badgeText}
+        </div>
+      ) : null}
     </motion.div>
   );
 };
