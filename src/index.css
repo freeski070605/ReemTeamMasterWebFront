@@ -90,3 +90,65 @@ a {
 .compact-toast-container {
   width: fit-content !important;
 }
+
+@keyframes account-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes account-aura-pulse {
+  0%,
+  100% {
+    opacity: 0.42;
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(-8px) scale(1.08);
+  }
+}
+
+.account-reveal {
+  animation: account-rise 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.account-aura {
+  animation: account-aura-pulse 8.2s ease-in-out infinite;
+}
+
+.account-hero {
+  background:
+    linear-gradient(128deg, rgba(13, 18, 24, 0.96) 0%, rgba(19, 23, 29, 0.92) 46%, rgba(31, 24, 15, 0.9) 100%);
+}
+
+.account-hero-pattern {
+  background:
+    radial-gradient(680px 300px at 14% -4%, rgba(247, 188, 58, 0.24), transparent 70%),
+    radial-gradient(560px 320px at 90% 14%, rgba(255, 138, 38, 0.2), transparent 72%),
+    repeating-linear-gradient(
+      126deg,
+      rgba(255, 255, 255, 0.035) 0px,
+      rgba(255, 255, 255, 0.035) 1px,
+      transparent 1px,
+      transparent 15px
+    );
+}
+
+.account-stat-tile {
+  background: linear-gradient(170deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-reveal,
+  .account-aura {
+    animation: none !important;
+  }
+}
