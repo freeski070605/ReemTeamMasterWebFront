@@ -35,6 +35,16 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ embedded = fals
     return <div className="text-red-500">{error}</div>;
   }
 
+  const formatAmount = (amount: number, currency: "USD" | "RTC") => {
+    const sign = amount > 0 ? "+" : "-";
+    const absoluteAmount = Math.abs(amount);
+
+    if (currency === "USD") {
+      return `${sign}$${absoluteAmount.toFixed(2)}`;
+    }
+    return `${sign}${absoluteAmount} RTC`;
+  };
+
   const content = (
     <>
       <h2 className="text-lg font-semibold text-white mb-4 rt-page-title">Transaction History</h2>
@@ -57,7 +67,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ embedded = fals
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-white/80">{new Date(tx.date).toLocaleDateString()}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-white/80">{tx.type}</td>
                   <td className={`px-4 py-3 whitespace-nowrap text-sm text-right ${tx.amount > 0 ? "text-emerald-300" : "text-rose-300"}`}>
-                    {tx.amount > 0 ? `+$${tx.amount}` : `-$${Math.abs(tx.amount)}`}
+                    {formatAmount(tx.amount, tx.currency)}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
                     <span

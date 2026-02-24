@@ -3,8 +3,10 @@ import client from "./client";
 
 export type WalletCurrency = "usd" | "rtc";
 
-export const getTransactionHistory = async (): Promise<Transaction[]> => {
-  const { data } = await client.get<Transaction[]>("/wallet/transactions");
+export const getTransactionHistory = async (currency?: WalletCurrency): Promise<Transaction[]> => {
+  const { data } = await client.get<Transaction[]>("/wallet/transactions", {
+    params: { currency },
+  });
   return data;
 };
 
