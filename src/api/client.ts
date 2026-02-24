@@ -27,8 +27,12 @@ client.interceptors.request.use(
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Token expired or invalid
+    const backendMessage = error?.response?.data?.message;
+    const isJwtAuthFailure = backendMessage === 'No token, authorization denied'
+      || backendMessage === 'Token is not valid';
+
+    if (error.response && error.response.status === 401 && isJwtAuthFailure) {
+      // Only clear session for backend JWT auth failures.
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       // Optional: Redirect to login or update state
