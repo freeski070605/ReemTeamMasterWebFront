@@ -16,7 +16,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     () => {
       const links = [
         { to: '/tables', label: 'Cribs' },
-        { to: '/contests', label: 'Cash Crowns' },
+        { to: '/contests', label: 'Cash Crown Tournaments' },
         { to: '/account', label: 'Account' },
       ];
       if (user?.isAdmin) {

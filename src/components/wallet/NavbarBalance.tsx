@@ -30,7 +30,7 @@ const NavbarBalance: React.FC = () => {
 
   return (
     <div className="px-3 py-1 rounded-full border border-amber-300/35 bg-amber-300/12 text-xs text-amber-100 shadow-[0_0_0_1px_rgba(247,188,58,0.12)_inset]">
-      RTC {formatRtc(balance)}
+      Reem Team Cash {formatRtc(balance)}
     </div>
   );
 };

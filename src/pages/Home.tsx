@@ -70,25 +70,25 @@ const Home: React.FC = () => {
         <div className="relative z-10 grid gap-8 md:grid-cols-[1.15fr_0.85fr]">
           <div>
             <div className="mb-4 inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/70">
-              Urban Crib Tonk Ecosystem
+              Start Here: Cribs First
             </div>
             <h1 className="rt-page-title text-4xl md:text-6xl font-semibold leading-tight">
-              Crib-style Tonk.
-              <span className="block text-amber-300">Built for RTC grind and Cash Crown pressure.</span>
+              Cribs are free Reem Team Cash games.
+              <span className="block text-amber-300">Cash Crowns are tournaments.</span>
             </h1>
             <p className="mt-5 max-w-xl text-white/70">
-              Pull up to open RTC cribs, lock into block brackets, grind ticket runs, and chase fixed-pool cash
-              crowns. Same board mechanics, stronger front-end identity.
+              Start in Cribs for free Reem Team Cash (RTC) play. When you want tournament structure, move into
+              Cash Crown tournaments with fixed buy-ins and locked prize pools.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               {isAuthenticated ? (
                 <>
                   <Link to="/tables">
-                    <Button size="lg">Pull Up to Cribs</Button>
+                    <Button size="lg">Play Free Cribs</Button>
                   </Link>
                   <Link to="/contests">
                     <Button variant="secondary" size="lg">
-                      Hit Cash Crowns
+                      View Cash Crown Tournaments
                     </Button>
                   </Link>
                 </>
@@ -117,11 +117,11 @@ const Home: React.FC = () => {
               <div className="mt-2 text-3xl rt-page-title">{loading ? '--' : tableSummary.active}</div>
             </div>
             <div className="rt-glass rounded-2xl p-4">
-              <div className="text-xs uppercase tracking-[0.2em] text-white/55">RTC Rooms</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-white/55">Reem Team Cash Rooms</div>
               <div className="mt-2 text-3xl rt-page-title">{loading ? '--' : tableSummary.rtc}</div>
             </div>
             <div className="rt-glass rounded-2xl p-4">
-              <div className="text-xs uppercase tracking-[0.2em] text-white/55">Cash Crowns</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-white/55">Cash Crown Tournaments</div>
               <div className="mt-2 text-3xl rt-page-title">{loading ? '--' : tableSummary.usd}</div>
             </div>
           </div>
@@ -130,26 +130,26 @@ const Home: React.FC = () => {
 
       <section className="grid gap-6 md:grid-cols-3">
         <div className="rt-glass rounded-2xl p-6">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Open Crib</div>
-          <h2 className="mt-3 rt-page-title text-2xl">{getModeLabel('FREE_RTC_TABLE')} (RTC)</h2>
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Recommended Start</div>
+          <h2 className="mt-3 rt-page-title text-2xl">{getModeLabel('FREE_RTC_TABLE')}</h2>
           <p className="mt-3 text-white/70 text-sm">
-            Round-based RTC tables with drop-in and pull-out between rounds.
+            Free Reem Team Cash games with drop-in and pull-out between rounds.
           </p>
         </div>
         <div className="rt-glass rounded-2xl p-6">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">RTC Competition</div>
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Reem Team Cash Tournaments</div>
           <h2 className="mt-3 rt-page-title text-2xl">
             {getModeLabel('RTC_TOURNAMENT')} + {getModeLabel('RTC_SATELLITE')}
           </h2>
           <p className="mt-3 text-white/70 text-sm">
-            Locked-seat RTC brackets plus ticket qualifiers feeding the cash crown lane.
+            Locked-seat Reem Team Cash tournaments plus ticket qualifiers feeding Cash Crown tournaments.
           </p>
         </div>
         <div className="rt-glass rounded-2xl p-6">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Cash Play</div>
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Cash Crown Tournaments</div>
           <h2 className="mt-3 rt-page-title text-2xl">{getModeLabel('USD_CONTEST')}</h2>
           <p className="mt-3 text-white/70 text-sm">
-            Fixed USD buy-ins, locked pools, and placement payout after engine results.
+            USD buy-in tournaments with locked pools and placement payout after engine results.
           </p>
         </div>
       </section>
@@ -157,9 +157,9 @@ const Home: React.FC = () => {
       <section className="rt-panel-strong rounded-2xl p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-white/50">Featured Crib</div>
+            <div className="text-xs uppercase tracking-[0.2em] text-white/50">Featured Crib (Start Here)</div>
             <div className="mt-2 text-2xl rt-page-title">
-              {featured ? getTableDisplayName(featured) : 'No live crib'}
+              {featured ? getTableDisplayName(featured) : 'No live free crib'}
             </div>
             <div className="mt-1 text-sm text-white/65">
               {featuredMeta || 'Live cribs show up here once rooms are seeded.'}
@@ -167,10 +167,10 @@ const Home: React.FC = () => {
           </div>
           <div className="flex gap-2">
             <Link to="/tables">
-              <Button variant="secondary">Cribs</Button>
+              <Button>Play Cribs</Button>
             </Link>
             <Link to="/contests">
-              <Button>Cash Crowns</Button>
+              <Button variant="secondary">Cash Crown Tournaments</Button>
             </Link>
           </div>
         </div>

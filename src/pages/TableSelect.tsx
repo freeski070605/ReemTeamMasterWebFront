@@ -26,7 +26,12 @@ const TableSelect: React.FC = () => {
     try {
       setLoading(true);
       const response = await client.get<Table[]>('/tables');
-      const sortedTables = response.data.sort((a, b) => a.stake - b.stake);
+      const sortedTables = [...response.data].sort((a, b) => {
+        if (a.stake !== b.stake) return a.stake - b.stake;
+        if (a.mode === 'USD_CONTEST' && b.mode !== 'USD_CONTEST') return 1;
+        if (a.mode !== 'USD_CONTEST' && b.mode === 'USD_CONTEST') return -1;
+        return a._id.localeCompare(b._id);
+      });
       setTables(sortedTables);
       setError('');
     } catch (err) {
@@ -88,16 +93,17 @@ const TableSelect: React.FC = () => {
   return (
     <div className="space-y-6">
       <header className="rt-panel-strong rounded-3xl p-7">
-        <div className="text-xs uppercase tracking-[0.2em] text-white/50">Crib Lobby</div>
-        <h1 className="mt-2 text-4xl rt-page-title font-semibold">Choose Your Crib</h1>
+        <div className="text-xs uppercase tracking-[0.2em] text-white/50">Crib Lobby (Recommended Start)</div>
+        <h1 className="mt-2 text-4xl rt-page-title font-semibold">Play Free Reem Team Cash Cribs</h1>
         <p className="mt-2 text-white/65">
-          RTC cribs run instantly. Cash Crown seats open through the contest lane.
+          Cribs are free Reem Team Cash (RTC) games and are the main experience right now. Cash Crowns are
+          tournaments and open through the Cash Crown Tournament Lobby.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
-          <Button variant="secondary" onClick={() => navigate('/contests')}>
-            Open Cash Crowns
-          </Button>
           <Button onClick={() => void fetchTables()}>Reload Cribs</Button>
+          <Button variant="secondary" onClick={() => navigate('/contests')}>
+            View Cash Crown Tournaments
+          </Button>
         </div>
       </header>
 
@@ -111,7 +117,7 @@ const TableSelect: React.FC = () => {
           <div className="mt-2 text-3xl rt-page-title">{metrics.active}</div>
         </div>
         <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">RTC / Cash</div>
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Reem Team Cash / Crown Tournaments</div>
           <div className="mt-2 text-3xl rt-page-title">{metrics.rtc} / {metrics.usd}</div>
         </div>
       </section>
@@ -164,7 +170,8 @@ const TableSelect: React.FC = () => {
 
                     {isUsdTable && (
                       <div className="mt-4 rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs text-amber-100">
-                        Cash Crown rooms are contest-locked. Buy in or redeem from the crown lobby.
+                        Cash Crown tournaments are contest-locked. Buy in or redeem from the Cash Crown Tournament
+                        Lobby.
                       </div>
                     )}
 
@@ -175,10 +182,10 @@ const TableSelect: React.FC = () => {
                       onClick={() => handleJoinClick(table)}
                     >
                       {isUsdTable
-                        ? 'Go to Cash Crowns'
+                        ? 'Go to Crown Tournaments'
                         : table.currentPlayerCount >= table.maxPlayers
                           ? 'Crib Full'
-                          : 'Pull Up'}
+                          : 'Join Free Crib'}
                     </Button>
                   </article>
                 );
@@ -201,7 +208,7 @@ const TableSelect: React.FC = () => {
           onConfirm={handleConfirmJoin}
           title={`Pull up to ${getTableDisplayName(selectedTable)}?`}
         >
-          <p>Start a crib run at {getStakeTierHeading(selectedTable.stake)}.</p>
+          <p>Start a free Reem Team Cash crib at {getStakeTierHeading(selectedTable.stake)}.</p>
         </Modal>
       )}
     </div>

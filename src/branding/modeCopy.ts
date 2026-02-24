@@ -10,24 +10,24 @@ interface ModeCopyEntry {
 
 const MODE_COPY: Record<GameMode, ModeCopyEntry> = {
   FREE_RTC_TABLE: {
-    label: 'Crib Run',
-    badge: 'Open Crib',
-    description: 'Continuous RTC hands where players can rotate in between rounds.',
+    label: 'Free Reem Team Cash Crib',
+    badge: 'Free Crib',
+    description: 'Free Reem Team Cash games with continuous hands and between-round seat rotation.',
   },
   RTC_TOURNAMENT: {
-    label: 'Block Bracket',
-    badge: 'Bracket Play',
-    description: 'Locked RTC bracket with fixed seats, fixed pool, and placement payout.',
+    label: 'Reem Team Cash Tournament',
+    badge: 'Reem Team Cash Tournament',
+    description: 'Locked-seat Reem Team Cash tournament with fixed pool and placement payout.',
   },
   RTC_SATELLITE: {
-    label: 'Ticket Grind',
-    badge: 'Ticket Hunt',
-    description: 'RTC qualifier tables where top finishers earn contest tickets.',
+    label: 'Reem Team Cash Satellite',
+    badge: 'Satellite Tournament',
+    description: 'Reem Team Cash qualifier tournament where top finishers earn Cash Crown tickets.',
   },
   USD_CONTEST: {
-    label: 'Cash Crown',
-    badge: 'Cash Crown',
-    description: 'Fixed USD buy-in contests with locked pools and post-match settlement.',
+    label: 'Cash Crown Tournament',
+    badge: 'Cash Crown Tournament',
+    description: 'USD tournament with a fixed buy-in, locked pool, and placement payout.',
   },
 };
 
@@ -52,7 +52,8 @@ export const getModeDescription = (mode?: GameMode): string => getModeCopy(mode)
 
 const rtcFromTier = (stakeTier: number): number => stakeTier * 1000;
 
-export const formatRtcStake = (stakeTier: number): string => `${rtcFromTier(stakeTier).toLocaleString()} RTC`;
+export const formatRtcStake = (stakeTier: number): string =>
+  `${rtcFromTier(stakeTier).toLocaleString()} Reem Team Cash`;
 
 export const getStakeDisplay = (
   stakeTier: number,
@@ -67,7 +68,7 @@ export const getStakeDisplay = (
 
   return {
     amount: rtcFromTier(stakeTier).toLocaleString(),
-    unit: 'RTC Ante',
+    unit: 'Reem Team Cash',
   };
 };
 
@@ -81,7 +82,7 @@ export const getTableDisplayName = (table: Pick<Table, '_id' | 'name' | 'mode'>)
 
   const suffix = table._id.slice(-4).toUpperCase();
   if (resolveMode(table.mode) === 'USD_CONTEST') {
-    return `Cash Crown Crib ${suffix}`;
+    return `Cash Crown Tournament ${suffix}`;
   }
 
   return `Crib ${suffix}`;
