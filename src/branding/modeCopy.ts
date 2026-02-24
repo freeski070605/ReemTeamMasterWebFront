@@ -10,9 +10,9 @@ interface ModeCopyEntry {
 
 const MODE_COPY: Record<GameMode, ModeCopyEntry> = {
   FREE_RTC_TABLE: {
-    label: 'Free Reem Team Cash Crib',
-    badge: 'Free Crib',
-    description: 'Free Reem Team Cash games with continuous hands and between-round seat rotation.',
+    label: 'Reem Team Cash Crib',
+    badge: 'Crib',
+    description: 'Reem Team Cash games with continuous hands and between-round seat rotation.',
   },
   RTC_TOURNAMENT: {
     label: 'Reem Team Cash Tournament',
@@ -72,17 +72,28 @@ export const getStakeDisplay = (
   };
 };
 
-export const getStakeTierHeading = (stakeTier: number): string =>
-  `$${stakeTier} Tier / ${formatRtcStake(stakeTier)}`;
-
-export const getTableDisplayName = (table: Pick<Table, '_id' | 'name' | 'mode'>): string => {
-  if (table.name && table.name.trim().length > 0) {
-    return table.name;
+export const getStakeTierHeading = (stakeTier: number, mode?: GameMode): string => {
+  if (resolveMode(mode) === 'USD_CONTEST') {
+    return `$${stakeTier} Tournament Tier`;
   }
 
+  return `${formatRtcStake(stakeTier)} Tier`;
+};
+
+export const getTableDisplayName = (table: Pick<Table, '_id' | 'name' | 'mode' | 'stake'>): string => {
+  const mode = resolveMode(table.mode);
+  const normalizedName = table.name?.trim();
+
   const suffix = table._id.slice(-4).toUpperCase();
-  if (resolveMode(table.mode) === 'USD_CONTEST') {
+  if (mode === 'USD_CONTEST') {
+    if (normalizedName) {
+      return normalizedName;
+    }
     return `Cash Crown Tournament ${suffix}`;
+  }
+
+  if (typeof table.stake === 'number' && Number.isFinite(table.stake)) {
+    return `Crib ${rtcFromTier(table.stake).toLocaleString()} Reem Team Cash`;
   }
 
   return `Crib ${suffix}`;

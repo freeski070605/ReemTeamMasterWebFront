@@ -70,21 +70,21 @@ const Home: React.FC = () => {
         <div className="relative z-10 grid gap-8 md:grid-cols-[1.15fr_0.85fr]">
           <div>
             <div className="mb-4 inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/70">
-              Start Here: Cribs First
+              Crib Smoke. Crown Stage.
             </div>
             <h1 className="rt-page-title text-4xl md:text-6xl font-semibold leading-tight">
-              Cribs are free Reem Team Cash games.
-              <span className="block text-amber-300">Cash Crowns are tournaments.</span>
+              Reem Team Cash Cribs stay active.
+              <span className="block text-amber-300">Cash Crowns close for real cash.</span>
             </h1>
             <p className="mt-5 max-w-xl text-white/70">
-              Start in Cribs for free Reem Team Cash (RTC) play. When you want tournament structure, move into
-              Cash Crown tournaments with fixed buy-ins and locked prize pools.
+              Run fast hands in crib lanes, stack Reem Team Cash, and sharpen your table rhythm. When you want
+              bracket pressure and real-money finishes, step into Cash Crown tournaments.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               {isAuthenticated ? (
                 <>
                   <Link to="/tables">
-                    <Button size="lg">Play Free Cribs</Button>
+                    <Button size="lg">Play Cribs</Button>
                   </Link>
                   <Link to="/contests">
                     <Button variant="secondary" size="lg">
@@ -133,7 +133,7 @@ const Home: React.FC = () => {
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Recommended Start</div>
           <h2 className="mt-3 rt-page-title text-2xl">{getModeLabel('FREE_RTC_TABLE')}</h2>
           <p className="mt-3 text-white/70 text-sm">
-            Free Reem Team Cash games with drop-in and pull-out between rounds.
+            Reem Team Cash games with drop-in and pull-out between rounds.
           </p>
         </div>
         <div className="rt-glass rounded-2xl p-6">
@@ -159,7 +159,7 @@ const Home: React.FC = () => {
           <div>
             <div className="text-xs uppercase tracking-[0.2em] text-white/50">Featured Crib (Start Here)</div>
             <div className="mt-2 text-2xl rt-page-title">
-              {featured ? getTableDisplayName(featured) : 'No live free crib'}
+              {featured ? getTableDisplayName(featured) : 'No live crib'}
             </div>
             <div className="mt-1 text-sm text-white/65">
               {featuredMeta || 'Live cribs show up here once rooms are seeded.'}

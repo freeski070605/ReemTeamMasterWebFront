@@ -31,10 +31,10 @@ const Register: React.FC = () => {
           </div>
           <h1 className="mt-5 rt-page-title text-4xl font-semibold">Join ReemTeam</h1>
           <p className="mt-3 text-white/70">
-            One account unlocks free Reem Team Cash cribs, Cash Crown tournaments, wallet tracking, and ticket lanes.
+            One account unlocks Reem Team Cash cribs, Cash Crown tournaments, wallet tracking, and ticket lanes.
           </p>
           <div className="mt-8 space-y-3 text-sm text-white/70">
-            <div className="rt-glass rounded-xl p-3">Run free Reem Team Cash cribs, Reem Team Cash tournaments, and Cash Crown tournaments.</div>
+            <div className="rt-glass rounded-xl p-3">Run Reem Team Cash cribs, Reem Team Cash tournaments, and Cash Crown tournaments.</div>
             <div className="rt-glass rounded-xl p-3">Track outcomes and wallet movement from one account dashboard.</div>
             <div className="rt-glass rounded-xl p-3">Redeem satellite tickets for Cash Crown tournaments without converting Reem Team Cash to USD.</div>
           </div>

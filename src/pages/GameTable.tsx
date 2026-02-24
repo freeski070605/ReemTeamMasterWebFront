@@ -10,7 +10,6 @@ import { toast } from "react-toastify";
 
 import { PlayingCard as CardComponent } from "../components/ui/Card";
 import PlayerAvatar from "../components/game/PlayerAvatar";
-import Pot from "../components/game/Pot";
 import TurnTimer from "../components/game/TurnTimer";
 import GameActions from "../components/game/GameActions";
 import { Button } from "../components/ui/Button";
@@ -772,8 +771,8 @@ const GameTable: React.FC = () => {
       }).format(amount);
     }
 
-    if (amount === null) return "0 RTC";
-    return `${Math.max(0, Math.floor(amount)).toLocaleString("en-US")} RTC`;
+    if (amount === null) return "0 Reem Team Cash";
+    return `${Math.max(0, Math.floor(amount)).toLocaleString("en-US")} Reem Team Cash`;
   };
   const roundReasonLabel =
     gameState.roundEndedBy === "REGULAR"
@@ -1068,7 +1067,7 @@ const GameTable: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded-full border border-white/10 backdrop-blur-sm">
                     <span className="uppercase tracking-widest text-[9px] text-white/60">
-                      {walletCurrency === "usd" ? "USD Balance" : "RTC Balance"}
+                      {walletCurrency === "usd" ? "USD Balance" : "Reem Team Cash Balance"}
                     </span>
                     <span className="font-bold">
                       {balanceLoading ? "..." : balanceError ? "Error" : formatBalance(balance)}
@@ -1170,7 +1169,6 @@ const GameTable: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <Pot amount={gameState.pot} />
                   <div
                     className="relative w-8 h-12 sm:w-10 sm:h-14"
                     onClick={() => {

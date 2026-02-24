@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Coins, Crown, DollarSign, Users } from 'lucide-react';
+import { Coins, Users } from 'lucide-react';
 import client from '../api/client';
 import { Table } from '../types/game';
 import { Button } from '../components/ui/Button';
@@ -46,22 +46,32 @@ const TableSelect: React.FC = () => {
     void fetchTables();
   }, []);
 
+  const rtcTables = useMemo(
+    () => tables.filter((table) => table.mode !== 'USD_CONTEST'),
+    [tables]
+  );
+
+  const cashCrownTables = useMemo(
+    () => tables.filter((table) => table.mode === 'USD_CONTEST'),
+    [tables]
+  );
+
   const groupedByStake = useMemo(() => {
     const byStake = new Map<number, Table[]>();
-    for (const table of tables) {
+    for (const table of rtcTables) {
       const list = byStake.get(table.stake) ?? [];
       list.push(table);
       byStake.set(table.stake, list);
     }
     return Array.from(byStake.entries()).sort(([a], [b]) => a - b);
-  }, [tables]);
+  }, [rtcTables]);
 
   const metrics = useMemo(() => {
-    const active = tables.filter((table) => table.status === 'in-game').length;
-    const usd = tables.filter((table) => table.mode === 'USD_CONTEST').length;
-    const rtc = tables.filter((table) => table.mode !== 'USD_CONTEST').length;
+    const active = rtcTables.filter((table) => table.status === 'in-game').length;
+    const usd = cashCrownTables.length;
+    const rtc = rtcTables.length;
     return { active, usd, rtc };
-  }, [tables]);
+  }, [cashCrownTables.length, rtcTables]);
 
   const handleJoinClick = (table: Table) => {
     if (table.mode === 'USD_CONTEST') {
@@ -94,10 +104,10 @@ const TableSelect: React.FC = () => {
     <div className="space-y-6">
       <header className="rt-panel-strong rounded-3xl p-7">
         <div className="text-xs uppercase tracking-[0.2em] text-white/50">Crib Lobby (Recommended Start)</div>
-        <h1 className="mt-2 text-4xl rt-page-title font-semibold">Play Free Reem Team Cash Cribs</h1>
+        <h1 className="mt-2 text-4xl rt-page-title font-semibold">Play Reem Team Cash Cribs</h1>
         <p className="mt-2 text-white/65">
-          Cribs are free Reem Team Cash (RTC) games and are the main experience right now. Cash Crowns are
-          tournaments and open through the Cash Crown Tournament Lobby.
+          Cribs run on Reem Team Cash and are the main experience right now. Cash Crowns are real-cash tournaments
+          and open through the Cash Crown Tournament Lobby.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button onClick={() => void fetchTables()}>Reload Cribs</Button>
@@ -110,15 +120,15 @@ const TableSelect: React.FC = () => {
       <section className="grid gap-4 sm:grid-cols-3">
         <div className="rt-glass rounded-2xl p-4">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Live Cribs</div>
-          <div className="mt-2 text-3xl rt-page-title">{tables.length}</div>
+          <div className="mt-2 text-3xl rt-page-title">{metrics.rtc}</div>
         </div>
         <div className="rt-glass rounded-2xl p-4">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Hands Live</div>
           <div className="mt-2 text-3xl rt-page-title">{metrics.active}</div>
         </div>
         <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Reem Team Cash / Crown Tournaments</div>
-          <div className="mt-2 text-3xl rt-page-title">{metrics.rtc} / {metrics.usd}</div>
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Cash Crown Tournaments Live</div>
+          <div className="mt-2 text-3xl rt-page-title">{metrics.usd}</div>
         </div>
       </section>
 
@@ -126,13 +136,12 @@ const TableSelect: React.FC = () => {
         {groupedByStake.map(([stake, stakeTables]) => (
           <div key={stake}>
             <div className="flex items-center gap-3 mb-4">
-              <Crown className="w-5 h-5 text-amber-300" />
-              <h2 className="text-2xl rt-page-title">{getStakeTierHeading(stake)}</h2>
+              <Coins className="w-5 h-5 text-amber-300" />
+              <h2 className="text-2xl rt-page-title">{getStakeTierHeading(stake, 'FREE_RTC_TABLE')}</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
               {stakeTables.map((table) => {
-                const isUsdTable = table.mode === 'USD_CONTEST';
-                const isDisabled = !isUsdTable && table.currentPlayerCount >= table.maxPlayers;
+                const isDisabled = table.currentPlayerCount >= table.maxPlayers;
                 const tableName = getTableDisplayName(table);
                 const stakeDisplay = getStakeDisplay(table.stake, table.mode);
 
@@ -156,7 +165,7 @@ const TableSelect: React.FC = () => {
                     </div>
 
                     <div className="mt-4 flex items-baseline text-amber-300">
-                      {isUsdTable ? <DollarSign className="w-5 h-5 mr-1" /> : <Coins className="w-5 h-5 mr-1" />}
+                      <Coins className="w-5 h-5 mr-1" />
                       <span className="text-3xl rt-page-title">{stakeDisplay.amount}</span>
                       <span className="ml-2 text-sm text-white/60">{stakeDisplay.unit}</span>
                     </div>
@@ -168,24 +177,13 @@ const TableSelect: React.FC = () => {
                       {table.currentPlayerCount}/{table.maxPlayers} seats
                     </div>
 
-                    {isUsdTable && (
-                      <div className="mt-4 rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs text-amber-100">
-                        Cash Crown tournaments are contest-locked. Buy in or redeem from the Cash Crown Tournament
-                        Lobby.
-                      </div>
-                    )}
-
                     <Button
                       className="mt-5 w-full"
                       disabled={isDisabled}
                       variant={isDisabled ? 'secondary' : 'primary'}
                       onClick={() => handleJoinClick(table)}
                     >
-                      {isUsdTable
-                        ? 'Go to Crown Tournaments'
-                        : table.currentPlayerCount >= table.maxPlayers
-                          ? 'Crib Full'
-                          : 'Join Free Crib'}
+                      {table.currentPlayerCount >= table.maxPlayers ? 'Crib Full' : 'Enter Crib'}
                     </Button>
                   </article>
                 );
@@ -195,7 +193,7 @@ const TableSelect: React.FC = () => {
         ))}
       </section>
 
-      {tables.length === 0 && !loading && (
+      {rtcTables.length === 0 && !loading && (
         <div className="rt-panel-strong rounded-2xl p-8 text-center text-white/55">
           No cribs are live right now.
         </div>
@@ -208,7 +206,7 @@ const TableSelect: React.FC = () => {
           onConfirm={handleConfirmJoin}
           title={`Pull up to ${getTableDisplayName(selectedTable)}?`}
         >
-          <p>Start a free Reem Team Cash crib at {getStakeTierHeading(selectedTable.stake)}.</p>
+          <p>Start a Reem Team Cash crib at {getStakeTierHeading(selectedTable.stake, selectedTable.mode)}.</p>
         </Modal>
       )}
     </div>

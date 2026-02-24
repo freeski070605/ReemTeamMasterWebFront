@@ -219,12 +219,12 @@ const ContestLobby: React.FC = () => {
         <div className="text-xs uppercase tracking-[0.2em] text-white/50">Cash Crown Tournament Lobby</div>
         <h1 className="mt-2 text-4xl rt-page-title font-semibold">Join Cash Crown Tournaments</h1>
         <p className="mt-2 text-white/65">
-          Cash Crowns are tournament play. For free Reem Team Cash games, start in Cribs. Buy in with USD or redeem
+          Cash Crowns are tournament play. For Reem Team Cash games, start in Cribs. Buy in with USD or redeem
           a satellite ticket here.
         </p>
         <div className="mt-5">
           <Button variant="secondary" onClick={() => navigate('/tables')}>
-            Back to Free Cribs
+            Back to Cribs
           </Button>
         </div>
       </header>

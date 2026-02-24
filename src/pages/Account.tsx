@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/authStore';
 import { createCheckout } from '../api/wallet';
+import { getRtcBundles, purchaseRtcBundle, RtcPurchaseBundle } from '../api/rtc';
 import BalanceDisplay from '../components/wallet/BalanceDisplay';
 import TransactionHistory from '../components/wallet/TransactionHistory';
 import PayoutForm from '../components/wallet/PayoutForm';
@@ -11,6 +12,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { DEFAULT_AVATAR_PATHS } from '../constants/avatars';
 import { resolveAvatarUrl } from '../utils/avatar';
+import { useWalletBalance } from '../hooks/useWalletBalance';
 
 const QUICK_DEPOSIT_AMOUNTS = [25, 50, 100, 250];
 
@@ -20,6 +22,16 @@ const Account: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [depositBusy, setDepositBusy] = useState(false);
   const [customDeposit, setCustomDeposit] = useState('');
+  const [rtcBundles, setRtcBundles] = useState<RtcPurchaseBundle[]>([]);
+  const [rtcBundlesLoading, setRtcBundlesLoading] = useState(true);
+  const [rtcBundlesError, setRtcBundlesError] = useState<string | null>(null);
+  const [purchasingBundleId, setPurchasingBundleId] = useState<string | null>(null);
+  const {
+    balance: rtcBalance,
+    loading: rtcBalanceLoading,
+    error: rtcBalanceError,
+    refresh: refreshRtcBalance,
+  } = useWalletBalance({ currency: 'rtc', refreshIntervalMs: 15000 });
 
   useEffect(() => {
     const paymentStatus = searchParams.get('paymentStatus');
@@ -83,6 +95,48 @@ const Account: React.FC = () => {
     void handleDeposit(amount);
   };
 
+  const fetchRtcBundles = useCallback(async () => {
+    try {
+      setRtcBundlesLoading(true);
+      setRtcBundlesError(null);
+      const bundles = await getRtcBundles();
+      setRtcBundles(bundles);
+    } catch (error: any) {
+      setRtcBundles([]);
+      setRtcBundlesError(error?.response?.data?.message || 'Failed to load Reem Team Cash bundles.');
+    } finally {
+      setRtcBundlesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchRtcBundles();
+  }, [fetchRtcBundles]);
+
+  const handleRtcPurchase = async (bundleId: string) => {
+    setPurchasingBundleId(bundleId);
+    try {
+      const paymentReferenceId = `rtc-ui-${Date.now()}`;
+      const response = await purchaseRtcBundle(bundleId, paymentReferenceId);
+      toast.success(
+        `${response.bundle.rtcAmount.toLocaleString()} Reem Team Cash credited to your wallet.`
+      );
+      await refreshRtcBalance();
+      window.dispatchEvent(new Event('wallet-balance-refresh'));
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Could not complete Reem Team Cash purchase.');
+    } finally {
+      setPurchasingBundleId(null);
+    }
+  };
+
+  const formatRtcBalance = (amount: number | null): string => {
+    if (amount === null) {
+      return '0';
+    }
+    return Math.max(0, Math.floor(amount)).toLocaleString('en-US');
+  };
+
   return (
     <div className="space-y-6">
       <header className="rt-panel-strong rounded-3xl p-7">
@@ -96,6 +150,46 @@ const Account: React.FC = () => {
       <section className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-6">
         <div className="space-y-6">
           <BalanceDisplay label="USD Wallet Balance" />
+          <div className="rt-panel-strong rounded-2xl p-6">
+            <div className="text-xs uppercase tracking-[0.2em] text-white/50">Reem Team Cash Wallet</div>
+            <h2 className="mt-2 text-2xl rt-page-title">Buy Reem Team Cash</h2>
+            <div className="mt-3 text-4xl font-semibold text-white rt-page-title">
+              {rtcBalanceLoading ? '...' : formatRtcBalance(rtcBalance)}
+            </div>
+            <p className="mt-2 text-xs text-white/55">
+              Balance used for crib games and Reem Team Cash tournaments.
+            </p>
+            {rtcBalanceError && (
+              <p className="mt-3 text-sm text-red-300">{rtcBalanceError}</p>
+            )}
+            {rtcBundlesError && (
+              <p className="mt-3 text-sm text-red-300">{rtcBundlesError}</p>
+            )}
+            {rtcBundlesLoading ? (
+              <p className="mt-4 text-sm text-white/60">Loading bundles...</p>
+            ) : (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {rtcBundles.map((bundle) => (
+                  <Button
+                    key={bundle.id}
+                    variant="secondary"
+                    isLoading={purchasingBundleId === bundle.id}
+                    disabled={!!purchasingBundleId}
+                    className="h-auto flex-col items-start py-3"
+                    onClick={() => void handleRtcPurchase(bundle.id)}
+                  >
+                    <span className="text-sm">${bundle.usdPrice.toFixed(2)}</span>
+                    <span className="mt-1 text-xs text-white/75">
+                      {bundle.rtcAmount.toLocaleString()} Reem Team Cash
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            )}
+            <p className="mt-4 text-xs text-white/50">
+              Cash Crown tournaments use USD buy-ins. Reem Team Cash is used for crib and RTC lanes.
+            </p>
+          </div>
           <div className="rt-panel-strong rounded-2xl p-6">
             <div className="text-xs uppercase tracking-[0.2em] text-white/50">Deposit Wallet</div>
             <h2 className="mt-2 text-2xl rt-page-title">Top Up Balance</h2>

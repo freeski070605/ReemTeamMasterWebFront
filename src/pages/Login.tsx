@@ -30,7 +30,7 @@ const Login: React.FC = () => {
           </div>
           <h1 className="mt-5 rt-page-title text-4xl font-semibold">Welcome Back</h1>
           <p className="mt-3 text-white/70">
-            Jump back into free Reem Team Cash cribs, Cash Crown tournaments, and wallet management with one sign-in.
+            Jump back into Reem Team Cash cribs, Cash Crown tournaments, and wallet management with one sign-in.
           </p>
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <div className="rt-glass rounded-2xl p-4">
