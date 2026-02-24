@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameStore } from "../store/gameStore";
 import { useAuthStore } from "../store/authStore";
@@ -55,6 +55,11 @@ const GameTable: React.FC = () => {
   const [useLargeScreenTableSizing, setUseLargeScreenTableSizing] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [showTurnCompleteFeedback, setShowTurnCompleteFeedback] = useState(false);
+  const [showGuidanceBanner, setShowGuidanceBanner] = useState(false);
+  const [showGuidanceHelper, setShowGuidanceHelper] = useState(false);
+  const [guidanceOverrideText, setGuidanceOverrideText] = useState<string | null>(null);
+  const [guidanceOverrideHelper, setGuidanceOverrideHelper] = useState<string | null>(null);
+  const [activityTick, setActivityTick] = useState(0);
   const prevTurnStateRef = useRef<{ isMyTurn: boolean; hasTakenAction: boolean }>({
     isMyTurn: false,
     hasTakenAction: false,
@@ -62,6 +67,12 @@ const GameTable: React.FC = () => {
   const lastAnimatedRoundKeyRef = useRef<string | null>(null);
   const hasInitializedLastActionRef = useRef(false);
   const lastObservedActionTimestampRef = useRef<number | null>(null);
+  const guidanceBannerTimeoutRef = useRef<number | null>(null);
+  const guidanceHelperTimeoutRef = useRef<number | null>(null);
+  const idleGuidanceTimeoutRef = useRef<number | null>(null);
+  const myTurnStartCountRef = useRef(0);
+  const wasMyTurnRef = useRef(false);
+  const previousTurnStepRef = useRef<"waiting" | "draw" | "discard">("waiting");
   const maxPlayers = 4;
   const walletCurrency = gameState?.mode === "USD_CONTEST" ? "usd" : "rtc";
   const {
@@ -71,6 +82,52 @@ const GameTable: React.FC = () => {
     refresh: refreshBalance,
   } = useWalletBalance({ refreshIntervalMs: 15000, currency: walletCurrency });
   const contestId = searchParams.get("contestId") ?? undefined;
+
+  const clearGuidanceTimers = useCallback(() => {
+    if (guidanceBannerTimeoutRef.current !== null) {
+      window.clearTimeout(guidanceBannerTimeoutRef.current);
+      guidanceBannerTimeoutRef.current = null;
+    }
+    if (guidanceHelperTimeoutRef.current !== null) {
+      window.clearTimeout(guidanceHelperTimeoutRef.current);
+      guidanceHelperTimeoutRef.current = null;
+    }
+  }, []);
+
+  const triggerGuidance = useCallback(
+    (options?: {
+      bannerText?: string | null;
+      helperText?: string | null;
+      bannerDurationMs?: number;
+      helperDurationMs?: number;
+    }) => {
+      const bannerDurationMs = options?.bannerDurationMs ?? (isTouchDevice ? 2600 : 3600);
+      const helperDurationMs =
+        options?.helperDurationMs ?? (isTouchDevice ? 1400 : bannerDurationMs);
+
+      setGuidanceOverrideText(options?.bannerText ?? null);
+      setGuidanceOverrideHelper(options?.helperText ?? null);
+      setShowGuidanceBanner(true);
+      setShowGuidanceHelper(true);
+
+      clearGuidanceTimers();
+
+      guidanceBannerTimeoutRef.current = window.setTimeout(() => {
+        setShowGuidanceBanner(false);
+        setGuidanceOverrideText(null);
+      }, bannerDurationMs);
+
+      guidanceHelperTimeoutRef.current = window.setTimeout(() => {
+        setShowGuidanceHelper(false);
+        setGuidanceOverrideHelper(null);
+      }, helperDurationMs);
+    },
+    [clearGuidanceTimers, isTouchDevice]
+  );
+
+  const markActionActivity = useCallback(() => {
+    setActivityTick((tick) => tick + 1);
+  }, []);
 
   useEffect(() => {
     if (tableId && user) {
@@ -146,6 +203,16 @@ const GameTable: React.FC = () => {
       coarsePointerQuery.removeEventListener("change", updateTouchState);
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      clearGuidanceTimers();
+      if (idleGuidanceTimeoutRef.current !== null) {
+        window.clearTimeout(idleGuidanceTimeoutRef.current);
+        idleGuidanceTimeoutRef.current = null;
+      }
+    };
+  }, [clearGuidanceTimers]);
 
   useEffect(() => {
     const updateTableMaxWidth = () => {
@@ -376,6 +443,71 @@ const GameTable: React.FC = () => {
     }
   }, [isMyTurn, hasCurrentPlayer, hasTakenActionThisTurn, gameState?.turn]);
 
+  const currentTurnStep: "waiting" | "draw" | "discard" = !isMyTurn
+    ? "waiting"
+    : hasTakenActionThisTurn
+      ? "discard"
+      : "draw";
+
+  useEffect(() => {
+    if (!gameState || gameState.status !== "in-progress") {
+      wasMyTurnRef.current = false;
+      previousTurnStepRef.current = "waiting";
+      return;
+    }
+
+    if (isMyTurn && !wasMyTurnRef.current) {
+      myTurnStartCountRef.current += 1;
+      if (myTurnStartCountRef.current <= 2) {
+        triggerGuidance();
+      }
+    }
+
+    if (
+      isMyTurn &&
+      wasMyTurnRef.current &&
+      previousTurnStepRef.current !== currentTurnStep
+    ) {
+      triggerGuidance();
+    }
+
+    if (!isMyTurn && wasMyTurnRef.current) {
+      clearGuidanceTimers();
+      setShowGuidanceBanner(false);
+      setShowGuidanceHelper(false);
+      setGuidanceOverrideText(null);
+      setGuidanceOverrideHelper(null);
+    }
+
+    wasMyTurnRef.current = isMyTurn;
+    previousTurnStepRef.current = currentTurnStep;
+  }, [clearGuidanceTimers, currentTurnStep, gameState, isMyTurn, triggerGuidance]);
+
+  useEffect(() => {
+    if (idleGuidanceTimeoutRef.current !== null) {
+      window.clearTimeout(idleGuidanceTimeoutRef.current);
+      idleGuidanceTimeoutRef.current = null;
+    }
+
+    if (!isMyTurn || gameState?.status !== "in-progress" || showDealAnimation) {
+      return;
+    }
+
+    idleGuidanceTimeoutRef.current = window.setTimeout(() => {
+      triggerGuidance({
+        bannerDurationMs: isTouchDevice ? 2200 : 3000,
+        helperDurationMs: isTouchDevice ? 1200 : 2600,
+      });
+    }, 4500);
+
+    return () => {
+      if (idleGuidanceTimeoutRef.current !== null) {
+        window.clearTimeout(idleGuidanceTimeoutRef.current);
+        idleGuidanceTimeoutRef.current = null;
+      }
+    };
+  }, [activityTick, gameState?.status, isMyTurn, isTouchDevice, showDealAnimation, triggerGuidance]);
+
   if (!isConnected || !gameState || !user) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-900">
@@ -391,6 +523,7 @@ const GameTable: React.FC = () => {
     restrictedDiscardCardId !== null && getCardId(card) === restrictedDiscardCardId;
 
   const toggleCardSelection = (card: CardType) => {
+    markActionActivity();
     if (selectedCards.some((c) => c.rank === card.rank && c.suit === card.suit)) {
       setSelectedCards(
         selectedCards.filter((c) => c.rank !== card.rank || c.suit !== card.suit)
@@ -405,13 +538,23 @@ const GameTable: React.FC = () => {
   };
 
   const discardSelectedCard = (): boolean => {
+    markActionActivity();
+
     if (selectedCards.length !== 1) {
       toast.error("Select exactly one card to discard.");
+      triggerGuidance({
+        bannerText: "Select exactly 1 card to discard",
+        helperText: "Then tap Discard.",
+      });
       return false;
     }
 
     if (isRestrictedDiscardCard(selectedCards[0])) {
       toast.error("Cannot discard this card this turn.");
+      triggerGuidance({
+        bannerText: "Cannot discard this card this turn.",
+        helperText: "Select another card, then tap Discard.",
+      });
       return false;
     }
 
@@ -426,19 +569,41 @@ const GameTable: React.FC = () => {
   };
 
   const handleDeckClick = () => {
-    if (isMyTurn && !currentPlayer?.hasTakenActionThisTurn) {
-      if (tableId && user) {
-        drawCard(tableId, user._id, "deck");
-      }
+    markActionActivity();
+
+    if (!isMyTurn) {
+      triggerGuidance({ bannerText: "Wait for your turn." });
+      return;
+    }
+
+    if (currentPlayer?.hasTakenActionThisTurn) {
+      triggerGuidance({
+        bannerText: "Step 2/2: Discard",
+        helperText: "Select 1 card, then tap Discard.",
+      });
+      return;
+    }
+
+    if (tableId && user) {
+      drawCard(tableId, user._id, "deck");
     }
   };
 
   const handleDiscardPileClick = () => {
-    if (!isMyTurn) return;
+    markActionActivity();
+
+    if (!isMyTurn) {
+      triggerGuidance({ bannerText: "Wait for your turn." });
+      return;
+    }
 
     if (!currentPlayer?.hasTakenActionThisTurn) {
       if (gameState.discardPile.length === 0) {
         toast.error("Discard pile is empty!");
+        triggerGuidance({
+          bannerText: "Discard pile is empty.",
+          helperText: "Draw from deck instead.",
+        });
         return;
       }
       if (tableId && user) {
@@ -450,6 +615,7 @@ const GameTable: React.FC = () => {
   };
 
   const handleFlickDiscard = (card: CardType, info: PanInfo) => {
+    markActionActivity();
     const isDiscardStep = isMyTurn && !!currentPlayer?.hasTakenActionThisTurn;
     if (!isTouchDevice || !isDiscardStep || selectedCards.length !== 1) return;
     if (selectedCards[0].rank !== card.rank || selectedCards[0].suit !== card.suit) return;
@@ -462,8 +628,13 @@ const GameTable: React.FC = () => {
   };
 
   const handleSpread = () => {
+    markActionActivity();
+
     if (selectedCards.length < 3) {
       toast.error("A spread must have at least 3 cards.");
+      triggerGuidance({
+        bannerText: "Need 3+ cards selected",
+      });
       return;
     }
     if (tableId && user) {
@@ -473,8 +644,13 @@ const GameTable: React.FC = () => {
   };
 
   const handleHitClick = () => {
+    markActionActivity();
+
     if (selectedCards.length !== 1) {
       toast.error("Select one card to hit with.");
+      triggerGuidance({
+        bannerText: "Select exactly 1 card for Hit",
+      });
       return;
     }
     setIsHitMode(true);
@@ -482,6 +658,8 @@ const GameTable: React.FC = () => {
   };
 
   const executeHit = (targetPlayerId: string, targetSpreadIndex: number) => {
+    markActionActivity();
+
     if (selectedCards.length !== 1) return;
     if (tableId && user) {
       hit(tableId, user._id, selectedCards[0], targetPlayerId, targetSpreadIndex);
@@ -491,6 +669,8 @@ const GameTable: React.FC = () => {
   };
 
   const handleDrop = () => {
+    markActionActivity();
+
     if (tableId && user) {
       drop(tableId, user._id);
     }
@@ -646,7 +826,6 @@ const GameTable: React.FC = () => {
   const canDrawFromDiscard =
     isDrawStep && gameState.discardPile.length > 0 && !hideCardsForPresentation;
   const canTapDiscardPileToFinishTurn = isDiscardStep && !hideCardsForPresentation;
-  const canClickDiscardPile = canDrawFromDiscard || canTapDiscardPileToFinishTurn;
   const deckPrimaryHighlightClass = canDrawFromDeck
     ? "cursor-pointer hover:scale-105 ring-2 ring-cyan-300/90 shadow-[0_0_22px_rgba(56,189,248,0.45)] animate-pulse"
     : "cursor-not-allowed opacity-90";
@@ -683,6 +862,10 @@ const GameTable: React.FC = () => {
         : "Tap discard pile to finish turn."
       : "Select exactly 1 card to discard"
     : null;
+  const guidanceBannerText = guidanceOverrideText ?? contextBannerText;
+  const guidanceHelperText = guidanceOverrideHelper ?? discardHelperText;
+  const shouldShowGuidanceBanner = showGuidanceBanner && !!guidanceBannerText;
+  const shouldShowGuidanceHelper = showGuidanceHelper && !!guidanceHelperText;
 
   const canDrop = !!(
     isMyTurn &&
@@ -982,9 +1165,7 @@ const GameTable: React.FC = () => {
                           backgroundSize: "cover",
                           backgroundPosition: "center",
                         }}
-                        onClick={() => {
-                          if (canDrawFromDeck) handleDeckClick();
-                        }}
+                        onClick={handleDeckClick}
                       >
                       </div>
                     )}
@@ -993,7 +1174,7 @@ const GameTable: React.FC = () => {
                   <div
                     className="relative w-8 h-12 sm:w-10 sm:h-14"
                     onClick={() => {
-                      if (!hideCardsForPresentation && canClickDiscardPile) handleDiscardPileClick();
+                      if (!hideCardsForPresentation) handleDiscardPileClick();
                     }}
                   >
                     {!hideCardsForPresentation && gameState.discardPile.length > 0 ? (
@@ -1033,28 +1214,26 @@ const GameTable: React.FC = () => {
                   </div>
 
                   <div className="flex-1 flex flex-col items-center">
-                    <div className="mb-1 w-full max-w-[520px] rounded-lg border border-sky-300/30 bg-black/45 px-3 py-1.5 text-center text-[11px] font-medium text-sky-100 shadow-[0_0_18px_rgba(56,189,248,0.18)]">
-                      {contextBannerText}
-                    </div>
-                    {discardHelperText ? (
+                    {shouldShowGuidanceBanner ? (
+                      <div className="mb-1 w-full max-w-[520px] rounded-lg border border-sky-300/30 bg-black/45 px-3 py-1.5 text-center text-[11px] font-medium text-sky-100 shadow-[0_0_18px_rgba(56,189,248,0.18)] pointer-events-none select-none">
+                        {guidanceBannerText}
+                      </div>
+                    ) : null}
+                    {shouldShowGuidanceHelper ? (
                       <div
-                        className={`mb-1 text-[10px] font-semibold ${
+                        className={`mb-1 text-[10px] font-semibold pointer-events-none select-none ${
                           selectedIllegalDiscardCard ? "text-rose-300" : "text-emerald-200"
                         }`}
                       >
-                        {discardHelperText}
+                        {guidanceHelperText}
                         {canUseFlickDiscard ? " Or flick selected card toward discard pile." : ""}
                       </div>
-                    ) : (
-                      <div className="mb-1 h-4" aria-hidden />
-                    )}
+                    ) : null}
                     {showTurnCompleteFeedback ? (
-                      <div className="mb-1 rounded-full border border-emerald-300/60 bg-emerald-500/18 px-3 py-0.5 text-[10px] font-semibold text-emerald-100">
+                      <div className="mb-1 rounded-full border border-emerald-300/60 bg-emerald-500/18 px-3 py-0.5 text-[10px] font-semibold text-emerald-100 pointer-events-none select-none">
                         Turn complete - next player
                       </div>
-                    ) : (
-                      <div className="mb-1 h-5" aria-hidden />
-                    )}
+                    ) : null}
 
                     <div className="hand relative h-24 w-full max-w-[700px] pointer-events-auto">
                       <AnimatePresence>
