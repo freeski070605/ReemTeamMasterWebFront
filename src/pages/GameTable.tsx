@@ -53,7 +53,6 @@ const GameTable: React.FC = () => {
   const [tableMaxWidthPx, setTableMaxWidthPx] = useState(860);
   const [useLargeScreenTableSizing, setUseLargeScreenTableSizing] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
-  const [showTurnCompleteFeedback, setShowTurnCompleteFeedback] = useState(false);
   const [showGuidanceBanner, setShowGuidanceBanner] = useState(false);
   const [showGuidanceHelper, setShowGuidanceHelper] = useState(false);
   const [guidanceOverrideText, setGuidanceOverrideText] = useState<string | null>(null);
@@ -394,25 +393,14 @@ const GameTable: React.FC = () => {
 
   useEffect(() => {
     if (!hasInitializedLastActionRef.current) return;
-    const action = gameState?.lastAction;
-    const actionTimestamp = action?.timestamp ?? null;
+    const actionTimestamp = gameState?.lastAction?.timestamp ?? null;
 
     if (actionTimestamp === null || actionTimestamp === lastObservedActionTimestampRef.current) {
       return;
     }
 
     lastObservedActionTimestampRef.current = actionTimestamp;
-
-    if (action?.type === "discardCard" && action.payload?.userId === user?._id) {
-      setShowTurnCompleteFeedback(true);
-      const timeoutId = window.setTimeout(() => {
-        setShowTurnCompleteFeedback(false);
-      }, 1600);
-      return () => window.clearTimeout(timeoutId);
-    }
-
-    return undefined;
-  }, [gameState?.lastAction, user?._id]);
+  }, [gameState?.lastAction?.timestamp]);
 
   useEffect(() => {
     if (!isMyTurn || !hasCurrentPlayer) {
@@ -1091,11 +1079,11 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              <div className="absolute left-1/2 top-[18%] z-30 -translate-x-1/2 pointer-events-none">
-                <div className="rounded-xl border border-cyan-200/60 bg-black/75 px-4 py-2 text-center shadow-[0_0_30px_rgba(34,211,238,0.25)] backdrop-blur-sm">
-                  <div className="text-[12px] font-semibold text-cyan-100">{turnStepChipText}</div>
+              <div className="absolute right-3 top-14 z-30 pointer-events-none">
+                <div className="max-w-[220px] rounded-lg border border-cyan-200/60 bg-black/72 px-3 py-1.5 text-right shadow-[0_0_18px_rgba(34,211,238,0.2)] backdrop-blur-sm">
+                  <div className="text-[11px] font-semibold text-cyan-100">{turnStepChipText}</div>
                   {isMyTurn ? (
-                    <div className="mt-0.5 text-[10px] font-medium text-cyan-200/90">
+                    <div className="mt-0.5 text-[9px] font-medium text-cyan-200/90">
                       {isDiscardStep ? "Tap the glowing discard pile to finish." : "Tap a glowing pile to draw."}
                     </div>
                   ) : null}
@@ -1246,76 +1234,71 @@ const GameTable: React.FC = () => {
                         {canUseFlickDiscard ? " Or flick selected card toward discard pile." : ""}
                       </div>
                     ) : null}
-                    {showTurnCompleteFeedback ? (
-                      <div className="mb-1 rounded-full border border-emerald-300/60 bg-emerald-500/18 px-3 py-0.5 text-[10px] font-semibold text-emerald-100 pointer-events-none select-none">
-                        Turn complete - next player
+                    <div className="w-full flex flex-col items-center -translate-x-4 translate-y-2">
+                      <div className="hand relative h-28 w-full max-w-[760px] pointer-events-auto">
+                        <AnimatePresence>
+                          <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
+                            {visibleHand.map((card) => {
+                              const isSelectedCard = selectedCards.some(
+                                (c) => c.rank === card.rank && c.suit === card.suit
+                              );
+                              const isIllegalDiscardSelection =
+                                isSelectedCard && isDiscardStep && isRestrictedDiscardCard(card);
+                              const enableFlickDrag =
+                                canUseFlickDiscard && isSelectedCard && !isIllegalDiscardSelection;
+
+                              return (
+                                <motion.div
+                                  key={`${card.rank}-${card.suit}`}
+                                  className="card"
+                                  initial={{ y: 30, opacity: 0 }}
+                                  animate={{ y: 0, opacity: 1 }}
+                                  exit={{ y: -20, opacity: 0 }}
+                                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                                >
+                                  <CardComponent
+                                    suit={card.suit}
+                                    rank={card.rank}
+                                    isSelected={isSelectedCard}
+                                    onClick={() => toggleCardSelection(card)}
+                                    className="w-11 h-16 sm:w-12 sm:h-[4.5rem]"
+                                    badgeText={
+                                      isIllegalDiscardSelection
+                                        ? "Cannot discard this card this turn."
+                                        : undefined
+                                    }
+                                    badgeTone="danger"
+                                    dragEnabled={enableFlickDrag}
+                                    onDragEnd={(_, info) => handleFlickDiscard(card, info)}
+                                  />
+                                </motion.div>
+                              );
+                            })}
+                          </div>
+                        </AnimatePresence>
                       </div>
-                    ) : null}
-
-                    <div className="hand relative h-28 w-full max-w-[760px] pointer-events-auto">
-                      <AnimatePresence>
-                        <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
-                          {visibleHand.map((card) => {
-                            const isSelectedCard = selectedCards.some(
-                              (c) => c.rank === card.rank && c.suit === card.suit
-                            );
-                            const isIllegalDiscardSelection =
-                              isSelectedCard && isDiscardStep && isRestrictedDiscardCard(card);
-                            const enableFlickDrag =
-                              canUseFlickDiscard && isSelectedCard && !isIllegalDiscardSelection;
-
-                            return (
-                              <motion.div
-                                key={`${card.rank}-${card.suit}`}
-                                className="card"
-                                initial={{ y: 30, opacity: 0 }}
-                                animate={{ y: 0, opacity: 1 }}
-                                exit={{ y: -20, opacity: 0 }}
-                                transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                              >
-                                <CardComponent
-                                  suit={card.suit}
-                                  rank={card.rank}
-                                  isSelected={isSelectedCard}
-                                  onClick={() => toggleCardSelection(card)}
-                                  className="w-11 h-16 sm:w-12 sm:h-[4.5rem]"
-                                  badgeText={
-                                    isIllegalDiscardSelection
-                                      ? "Cannot discard this card this turn."
-                                      : undefined
-                                  }
-                                  badgeTone="danger"
-                                  dragEnabled={enableFlickDrag}
-                                  onDragEnd={(_, info) => handleFlickDiscard(card, info)}
-                                />
-                              </motion.div>
-                            );
-                          })}
+                      {isMyTurn && !hideCardsForPresentation && (
+                        <div className="actions flex gap-1.5 mt-1 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs">
+                          <GameActions
+                            drop={{
+                              enabled: canDrop,
+                              reason: canDrop ? undefined : dropDisabledReason,
+                            }}
+                            spread={{
+                              enabled: canSpread,
+                              reason: canSpread ? undefined : spreadDisabledReason,
+                            }}
+                            hit={{
+                              enabled: canHit,
+                              reason: canHit ? undefined : hitDisabledReason,
+                            }}
+                            onDrop={handleDrop}
+                            onSpread={handleSpread}
+                            onHit={handleHitClick}
+                          />
                         </div>
-                      </AnimatePresence>
+                      )}
                     </div>
-
-                    {isMyTurn && !hideCardsForPresentation && (
-                      <div className="actions flex gap-1.5 mt-1 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs">
-                        <GameActions
-                          drop={{
-                            enabled: canDrop,
-                            reason: canDrop ? undefined : dropDisabledReason,
-                          }}
-                          spread={{
-                            enabled: canSpread,
-                            reason: canSpread ? undefined : spreadDisabledReason,
-                          }}
-                          hit={{
-                            enabled: canHit,
-                            reason: canHit ? undefined : hitDisabledReason,
-                          }}
-                          onDrop={handleDrop}
-                          onSpread={handleSpread}
-                          onHit={handleHitClick}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
