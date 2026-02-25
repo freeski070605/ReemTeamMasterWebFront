@@ -59,10 +59,6 @@ const GameTable: React.FC = () => {
   const [guidanceOverrideText, setGuidanceOverrideText] = useState<string | null>(null);
   const [guidanceOverrideHelper, setGuidanceOverrideHelper] = useState<string | null>(null);
   const [activityTick, setActivityTick] = useState(0);
-  const prevTurnStateRef = useRef<{ isMyTurn: boolean; hasTakenAction: boolean }>({
-    isMyTurn: false,
-    hasTakenAction: false,
-  });
   const lastAnimatedRoundKeyRef = useRef<string | null>(null);
   const hasInitializedLastActionRef = useRef(false);
   const lastObservedActionTimestampRef = useRef<number | null>(null);
@@ -389,17 +385,6 @@ const GameTable: React.FC = () => {
   );
   const hasCurrentPlayer = !!currentPlayer;
   const hasTakenActionThisTurn = !!currentPlayer?.hasTakenActionThisTurn;
-  useEffect(() => {
-    if (!currentPlayer) return;
-    const prev = prevTurnStateRef.current;
-    if (isMyTurn && !currentPlayer.hasTakenActionThisTurn && (!prev.isMyTurn || prev.hasTakenAction)) {
-      toast.info("Your turn: draw from the deck or discard pile.");
-    }
-    prevTurnStateRef.current = {
-      isMyTurn,
-      hasTakenAction: currentPlayer.hasTakenActionThisTurn,
-    };
-  }, [isMyTurn, currentPlayer]);
 
   useEffect(() => {
     if (!gameState || hasInitializedLastActionRef.current) return;
@@ -799,10 +784,39 @@ const GameTable: React.FC = () => {
     : gameState.players.find((player) => player.userId === gameState.roundWinnerId);
   const settlementLabel =
     gameState.roundSettlementStatus === "settled"
-      ? "Settled"
+      ? "Settled - player W/L shown below"
       : gameState.roundSettlementStatus === "failed"
         ? "Settlement Failed"
         : "Settlement Pending";
+  const getRoundNetForPlayer = (playerId: string): number | null => {
+    const payout = gameState.payouts?.[playerId];
+    if (payout === undefined) return null;
+
+    // In FREE_RTC_TABLE, payout for winners is gross (includes their ante); show net W/L.
+    if (!gameState.mode || gameState.mode === "FREE_RTC_TABLE") {
+      const ante = gameState.lockedAntes?.[playerId] ?? gameState.baseStake;
+      if (playerId === gameState.roundWinnerId) {
+        return payout - ante;
+      }
+    }
+
+    return payout;
+  };
+  const formatRoundDelta = (amount: number | null) => {
+    if (amount === null) return "--";
+    if (walletCurrency === "usd") {
+      const absoluteFormatted = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(Math.abs(amount));
+      const sign = amount > 0 ? "+" : amount < 0 ? "-" : "";
+      return `${sign}${absoluteFormatted}`;
+    }
+    const sign = amount > 0 ? "+" : amount < 0 ? "-" : "";
+    return `${sign}${Math.abs(Math.trunc(amount)).toLocaleString("en-US")} RTC`;
+  };
   const formatPlacementWinType = (winType?: string) => {
     if (!winType || winType === "LOSS") return "Loss";
     if (winType === "AUTO_TRIPLE") return "Auto Triple";
@@ -1077,9 +1091,14 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              <div className="absolute top-[62px] left-1/2 z-20 -translate-x-1/2">
-                <div className="rounded-full border border-amber-300/50 bg-black/65 px-3 py-1 text-[11px] font-semibold text-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.25)] backdrop-blur-sm">
-                  {turnStepChipText}
+              <div className="absolute left-1/2 top-[18%] z-30 -translate-x-1/2 pointer-events-none">
+                <div className="rounded-xl border border-cyan-200/60 bg-black/75 px-4 py-2 text-center shadow-[0_0_30px_rgba(34,211,238,0.25)] backdrop-blur-sm">
+                  <div className="text-[12px] font-semibold text-cyan-100">{turnStepChipText}</div>
+                  {isMyTurn ? (
+                    <div className="mt-0.5 text-[10px] font-medium text-cyan-200/90">
+                      {isDiscardStep ? "Tap the glowing discard pile to finish." : "Tap a glowing pile to draw."}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
@@ -1340,20 +1359,22 @@ const GameTable: React.FC = () => {
             </div>
             {gameState.handScores && (
               <div className="mt-2 max-h-[42vh] overflow-auto rounded-lg border border-white/10 bg-black/35">
-                <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-white/50 grid grid-cols-[1.3fr_0.4fr_0.8fr_0.5fr] gap-2">
+                <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-white/50 grid grid-cols-[1.25fr_0.4fr_0.75fr_0.55fr_0.7fr] gap-2">
                   <span>Player</span>
                   <span>Rank</span>
                   <span>Result</span>
                   <span>Score</span>
+                  <span>W/L</span>
                 </div>
                 <div className="divide-y divide-white/10">
                   {rankedRoundPlayers.map((player) => {
                     const placement = placementByUserId.get(player.userId);
                     const isWinner = placement?.rank === 1 || player.userId === gameState.roundWinnerId;
+                    const roundNet = getRoundNetForPlayer(player.userId);
                     return (
                     <div
                       key={player.userId}
-                      className={`px-2 py-1.5 grid grid-cols-[1.3fr_0.4fr_0.8fr_0.5fr] gap-2 items-center text-xs ${isWinner ? "bg-green-500/10" : ""}`}
+                      className={`px-2 py-1.5 grid grid-cols-[1.25fr_0.4fr_0.75fr_0.55fr_0.7fr] gap-2 items-center text-xs ${isWinner ? "bg-green-500/10" : ""}`}
                     >
                       <div className="truncate text-white">{player.username}</div>
                       <div className="font-mono text-white/80">{placement?.rank ?? "-"}</div>
@@ -1361,6 +1382,19 @@ const GameTable: React.FC = () => {
                         {formatPlacementWinType(placement?.winType)}
                       </div>
                       <div className="font-mono text-white/80">{gameState.handScores?.[player.userId] ?? "-"}</div>
+                      <div
+                        className={`font-mono ${
+                          roundNet === null
+                            ? "text-white/40"
+                            : roundNet > 0
+                              ? "text-emerald-300"
+                              : roundNet < 0
+                                ? "text-rose-300"
+                                : "text-white/80"
+                        }`}
+                      >
+                        {formatRoundDelta(roundNet)}
+                      </div>
                     </div>
                   );
                   })}

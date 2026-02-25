@@ -48,6 +48,47 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const socket = io(BACKEND_URL);
     let lastRoundEndTimestamp: number | null = null;
     let activeRoundEndToastId: string | number | null = null;
+    const formatRoundDeltaAmount = (amount: number, currency: 'USD' | 'RTC') => {
+      const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
+      const absoluteAmount = Math.abs(amount);
+
+      if (currency === 'USD') {
+        return `${sign}$${absoluteAmount.toFixed(2)}`;
+      }
+
+      return `${sign}${Math.trunc(absoluteAmount).toLocaleString('en-US')} RTC`;
+    };
+    const buildRoundDeltaMessage = (state: IGameState): string | null => {
+      if (!state.payouts) {
+        return null;
+      }
+
+      const currency: 'USD' | 'RTC' = state.mode === 'USD_CONTEST' ? 'USD' : 'RTC';
+      const parts = state.players
+        .filter((player) => !player.isAI)
+        .map((player) => {
+          const rawPayout = state.payouts?.[player.userId];
+          if (rawPayout === undefined) return null;
+
+          let net = rawPayout;
+          if (
+            (!state.mode || state.mode === 'FREE_RTC_TABLE') &&
+            player.userId === state.roundWinnerId
+          ) {
+            const ante = state.lockedAntes?.[player.userId] ?? state.baseStake;
+            net = rawPayout - ante;
+          }
+
+          return `${player.username} ${formatRoundDeltaAmount(net, currency)}`;
+        })
+        .filter((entry): entry is string => !!entry);
+
+      if (parts.length === 0) {
+        return null;
+      }
+
+      return `W/L: ${parts.join(' | ')}`;
+    };
 
     socket.on('connect', () => {
       console.log('Connected to game server');
@@ -83,6 +124,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
                toast.info(`${winner?.username} wins on lowest hand.`);
           } else if (gameState.roundEndedBy === 'DECK_EMPTY') {
               toast.info(`Deck empty. ${winner?.username} wins on lowest hand.`);
+          }
+          const deltaMessage = buildRoundDeltaMessage(gameState);
+          if (deltaMessage) {
+            toast.info(deltaMessage);
           }
           if (activeRoundEndToastId !== null) {
             toast.dismiss(activeRoundEndToastId);
