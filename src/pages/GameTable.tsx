@@ -50,8 +50,6 @@ const GameTable: React.FC = () => {
   const [dealingCardIndex, setDealingCardIndex] = useState(0);
   const [roundCountdownSeconds, setRoundCountdownSeconds] = useState<number | null>(null);
   const [playerBalances, setPlayerBalances] = useState<Record<string, number>>({});
-  const [tableMaxWidthPx, setTableMaxWidthPx] = useState(860);
-  const [useLargeScreenTableSizing, setUseLargeScreenTableSizing] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [showTurnCompleteFeedback, setShowTurnCompleteFeedback] = useState(false);
   const [showGuidanceBanner, setShowGuidanceBanner] = useState(false);
@@ -208,22 +206,6 @@ const GameTable: React.FC = () => {
       }
     };
   }, [clearGuidanceTimers]);
-
-  useEffect(() => {
-    const updateTableMaxWidth = () => {
-      const maxByViewport = window.innerWidth * 0.96;
-      const maxByHeight = window.innerHeight * 0.92 * (16 / 9);
-      const maxByTV = 1800;
-      setTableMaxWidthPx(Math.floor(Math.min(maxByViewport, maxByHeight, maxByTV)));
-      setUseLargeScreenTableSizing(window.innerWidth > 1024);
-    };
-
-    updateTableMaxWidth();
-    window.addEventListener("resize", updateTableMaxWidth);
-    return () => {
-      window.removeEventListener("resize", updateTableMaxWidth);
-    };
-  }, []);
 
   useEffect(() => {
     if (gameState?.status !== "round-end") {
@@ -494,7 +476,7 @@ const GameTable: React.FC = () => {
 
   if (!isConnected || !gameState || !user) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-gray-900">
+      <div className="flex h-full w-full flex-col items-center justify-center bg-gray-900">
         <Loader />
         <p className="mt-4 text-gray-400">Connecting to table...</p>
       </div>
@@ -1029,7 +1011,9 @@ const GameTable: React.FC = () => {
   };
 
   return (
-    <div className="relative h-screen overflow-hidden">
+    <div className="game-fullscreen-root text-gray-100">
+      <div className="game-fullscreen-content">
+        <div className="relative h-full w-full overflow-hidden">
       <div className="absolute inset-0 z-0" aria-hidden>
         <div
           className="absolute inset-0"
@@ -1042,7 +1026,7 @@ const GameTable: React.FC = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_20%,rgba(255,199,74,0.22),transparent_55%)]" />
       </div>
 
-      <div className="relative z-10 h-full flex flex-col">
+      <div className="relative z-10 flex h-full flex-col">
         {isMobilePortrait && (
           <div className="absolute inset-0 z-40 bg-black/90 backdrop-blur-sm flex items-center justify-center px-6 text-center">
             <div className="max-w-sm">
@@ -1054,11 +1038,17 @@ const GameTable: React.FC = () => {
           </div>
         )}
 
-        <div className={`game-wrapper flex-1 relative overflow-hidden touch-manipulation pb-6 ${isMobilePortrait ? "pointer-events-none" : ""}`}>
-          <div className="table-area relative w-full h-full flex items-center justify-center">
+        <div
+          className={`game-wrapper relative flex-1 overflow-hidden touch-manipulation ${isMobilePortrait ? "pointer-events-none" : ""}`}
+          style={{
+            paddingBottom: "max(8px, var(--safe-area-bottom))",
+            paddingLeft: "var(--safe-area-left)",
+            paddingRight: "var(--safe-area-right)",
+          }}
+        >
+          <div className="table-area relative h-full w-full overflow-hidden">
             <div
-              className={`table relative aspect-[16/9] rounded-[28px] border-[12px] shadow-2xl overflow-hidden bg-black/20 ${useLargeScreenTableSizing ? "w-full" : "w-[96vw] max-w-[860px]"} ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
-              style={useLargeScreenTableSizing ? { maxWidth: `${tableMaxWidthPx}px` } : undefined}
+              className={`table absolute inset-0 h-full w-full overflow-hidden bg-black/20 ${isReem ? 'ring-2 ring-yellow-400 animate-pulse' : ''}`}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.06),transparent_60%)]" />
               <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-2">
@@ -1404,6 +1394,8 @@ const GameTable: React.FC = () => {
             <div className="mt-2 text-[11px] text-white/60">Cards stay visible until the next clockwise deal starts.</div>
           </div>
         )}
+      </div>
+        </div>
       </div>
     </div>
   );
