@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { Button } from '../ui/Button';
@@ -33,40 +33,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     navigate('/login');
   };
 
-  useEffect(() => {
-    const rootEl = document.documentElement;
-    const bodyEl = document.body;
-
-    const setAppHeight = () => {
-      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-      rootEl.style.setProperty('--app-height', `${Math.round(viewportHeight)}px`);
-    };
-
-    if (isGameRoute) {
-      rootEl.classList.add('game-route-active');
-      bodyEl.classList.add('game-route-active');
-      setAppHeight();
-      window.addEventListener('resize', setAppHeight, { passive: true });
-      window.addEventListener('orientationchange', setAppHeight, { passive: true });
-      window.visualViewport?.addEventListener('resize', setAppHeight);
-    } else {
-      rootEl.classList.remove('game-route-active');
-      bodyEl.classList.remove('game-route-active');
-      rootEl.style.removeProperty('--app-height');
-    }
-
-    return () => {
-      window.removeEventListener('resize', setAppHeight);
-      window.removeEventListener('orientationchange', setAppHeight);
-      window.visualViewport?.removeEventListener('resize', setAppHeight);
-      rootEl.classList.remove('game-route-active');
-      bodyEl.classList.remove('game-route-active');
-      rootEl.style.removeProperty('--app-height');
-    };
-  }, [isGameRoute]);
-
   if (isGameRoute) {
-    return <div className="h-full w-full bg-black text-gray-100">{children}</div>;
+    return <div className="min-h-screen bg-[#0f0f10] text-gray-100">{children}</div>;
   }
 
   return (
