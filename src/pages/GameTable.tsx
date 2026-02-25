@@ -940,7 +940,7 @@ const GameTable: React.FC = () => {
     if (count <= 0) {
       return <div className="text-xs text-white/40">No cards</div>;
     }
-    const cardClass = size === "md" ? "w-20 h-28" : "w-16 h-24";
+    const cardClass = size === "md" ? "w-11 h-16" : "w-9 h-14";
     return (
       <div className="relative">
         <CardComponent
@@ -1018,7 +1018,7 @@ const GameTable: React.FC = () => {
                   key={cIdx}
                   suit={card.suit}
                   rank={card.rank}
-                  className="w-14 h-20 sm:w-16 sm:h-24 text-[9px]"
+                  className="w-8 h-12 sm:w-9 sm:h-14 text-[9px]"
                 />
               ))}
             </div>
@@ -1212,7 +1212,7 @@ const GameTable: React.FC = () => {
                 <TurnTimer timeLeft={15} maxTime={30} />
               </div>
 
-              <div className="seat absolute w-[96%] max-w-[820px] h-[248px] bottom-2 left-1/2 -translate-x-1/2 pointer-events-auto">
+              <div className="seat absolute w-[96%] max-w-[820px] h-[176px] bottom-2 left-1/2 -translate-x-1/2 pointer-events-auto">
                 <div className="flex items-end gap-2 w-full h-full">
                   <div className={`mb-6 px-2 py-2 rounded-lg border ${isMyTurn ? "border-yellow-400/80 bg-yellow-400/10" : "border-white/10 bg-black/30"} min-w-[132px]`}>
                     <div className="flex items-center gap-2">
@@ -1252,7 +1252,7 @@ const GameTable: React.FC = () => {
                       </div>
                     ) : null}
 
-                    <div className="hand relative h-36 w-full max-w-[820px] pointer-events-auto">
+                    <div className="hand relative h-28 w-full max-w-[760px] pointer-events-auto">
                       <AnimatePresence>
                         <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
                           {visibleHand.map((card) => {
@@ -1278,7 +1278,7 @@ const GameTable: React.FC = () => {
                                   rank={card.rank}
                                   isSelected={isSelectedCard}
                                   onClick={() => toggleCardSelection(card)}
-                                  className="w-20 h-28 sm:w-[5.5rem] sm:h-32"
+                                  className="w-11 h-16 sm:w-12 sm:h-[4.5rem]"
                                   badgeText={
                                     isIllegalDiscardSelection
                                       ? "Cannot discard this card this turn."
