@@ -134,7 +134,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           }
           const isContinuousMode = !gameState.mode || gameState.mode === 'FREE_RTC_TABLE';
           if (isContinuousMode) {
-            activeRoundEndToastId = toast.info("Next round starts in 30 seconds.", { autoClose: 30000 });
+            activeRoundEndToastId = toast.info("Next round starts in 30 seconds.", { autoClose: 1000 });
           } else {
             activeRoundEndToastId = toast.info("Match complete. Return to the lobby to start another session.", {
               autoClose: 5000,
