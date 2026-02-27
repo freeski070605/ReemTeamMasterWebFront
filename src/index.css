@@ -146,6 +146,16 @@ a {
   backdrop-filter: blur(4px);
 }
 
+.active-seat {
+  opacity: 1;
+  filter: brightness(1);
+}
+
+.inactive-seat {
+  opacity: 0.6;
+  filter: brightness(0.84);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .account-reveal,
   .account-aura {

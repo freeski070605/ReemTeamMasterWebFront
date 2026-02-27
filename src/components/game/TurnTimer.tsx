@@ -1,18 +1,97 @@
-import React from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 interface TurnTimerProps {
-  timeLeft: number;
-  maxTime: number;
+  duration: number;
+  timeRemaining: number;
+  isActive: boolean;
+  size?: number;
+  strokeWidth?: number;
+  className?: string;
 }
 
-const TurnTimer: React.FC<TurnTimerProps> = ({ timeLeft, maxTime }) => {
-  const percentage = (timeLeft / maxTime) * 100;
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const TurnTimer: React.FC<TurnTimerProps> = ({
+  duration,
+  timeRemaining,
+  isActive,
+  size = 56,
+  strokeWidth = 4,
+  className,
+}) => {
+  const safeDuration = Math.max(1, duration);
+  const [localRemaining, setLocalRemaining] = useState(Math.max(0, timeRemaining));
+  const expiresAtRef = useRef(Date.now() + Math.max(0, timeRemaining));
+  const frameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const remaining = Math.max(0, timeRemaining);
+    setLocalRemaining(remaining);
+    expiresAtRef.current = Date.now() + remaining;
+  }, [timeRemaining, duration, isActive]);
+
+  useEffect(() => {
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+
+    if (!isActive) {
+      return;
+    }
+
+    const tick = () => {
+      const next = Math.max(0, expiresAtRef.current - Date.now());
+      setLocalRemaining(next);
+      if (next > 0) {
+        frameRef.current = requestAnimationFrame(tick);
+      }
+    };
+
+    frameRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
+  }, [isActive]);
+
+  const radius = useMemo(() => (size - strokeWidth) / 2, [size, strokeWidth]);
+  const circumference = useMemo(() => 2 * Math.PI * radius, [radius]);
+  const progress = clamp(localRemaining / safeDuration, 0, 1);
+  const dashOffset = circumference * (1 - progress);
+
   return (
-    <div className="w-full h-4 bg-gray-700 rounded-full overflow-hidden">
-      <div
-        className="h-full bg-green-500 transition-all duration-100"
-        style={{ width: `${percentage}%` }}
-      ></div>
+    <div
+      className={`pointer-events-none absolute inset-0 flex items-center justify-center ${
+        className ?? ""
+      }`}
+      aria-hidden
+    >
+      <svg width={size} height={size} className="overflow-visible">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="transparent"
+          stroke="rgba(255,255,255,0.18)"
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="transparent"
+          stroke={isActive ? "rgba(250, 204, 21, 0.96)" : "rgba(255,255,255,0.22)"}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          className={isActive ? "transition-[stroke] duration-300" : ""}
+        />
+      </svg>
     </div>
   );
 };

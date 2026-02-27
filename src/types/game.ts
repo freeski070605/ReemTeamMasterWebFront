@@ -22,6 +22,8 @@ export interface Player {
   hasSpreadThisTurn: boolean;
   numberOfSpreadsThisTurn: number;
   hasTakenActionThisTurn: boolean;
+  hasDrawnThisTurn: boolean;
+  hasDiscardedThisTurn: boolean;
   currentBuyIn: number;
   restrictedDiscardCard?: string | null;
 }
@@ -36,6 +38,9 @@ export interface IGameState {
   discardPile: Card[];
   turn: number;
   currentPlayerIndex: number;
+  turnStartTime: number;
+  turnDurationMs: number;
+  turnExpiresAt: number;
   lastAction: { type: string; payload: any; timestamp: number } | null;
   status: 'waiting' | 'starting' | 'in-progress' | 'round-end' | 'game-end';
   baseStake: number;

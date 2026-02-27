@@ -123,6 +123,18 @@ const GameTable: React.FC = () => {
     setActivityTick((tick) => tick + 1);
   }, []);
 
+  const showActionToast = useCallback(
+    (message: string, tone: "error" | "info" = "info") => {
+      const options = { position: "top-center" as const, autoClose: 2000, hideProgressBar: true };
+      if (tone === "error") {
+        toast.error(message, options);
+        return;
+      }
+      toast.info(message, options);
+    },
+    []
+  );
+
   useEffect(() => {
     if (tableId && user) {
       connect(tableId, user._id, user.username, user.avatarUrl, contestId);
@@ -382,8 +394,11 @@ const GameTable: React.FC = () => {
     user &&
     gameState.players[gameState.currentPlayerIndex]?.userId === user._id
   );
+  const turnDurationMs = gameState?.turnDurationMs ?? 20_000;
+  const turnTimeRemainingMs = Math.max(0, (gameState?.turnExpiresAt ?? Date.now()) - Date.now());
   const hasCurrentPlayer = !!currentPlayer;
-  const hasTakenActionThisTurn = !!currentPlayer?.hasTakenActionThisTurn;
+  const hasDrawnThisTurn = !!currentPlayer?.hasDrawnThisTurn;
+  const hasDiscardedThisTurn = !!currentPlayer?.hasDiscardedThisTurn;
 
   useEffect(() => {
     if (!gameState || hasInitializedLastActionRef.current) return;
@@ -409,15 +424,15 @@ const GameTable: React.FC = () => {
       return;
     }
 
-    if (!hasTakenActionThisTurn) {
+    if (!hasDrawnThisTurn || hasDiscardedThisTurn) {
       setSelectedCards([]);
       setIsHitMode(false);
     }
-  }, [isMyTurn, hasCurrentPlayer, hasTakenActionThisTurn, gameState?.turn]);
+  }, [isMyTurn, hasCurrentPlayer, hasDrawnThisTurn, hasDiscardedThisTurn, gameState?.turn]);
 
   const currentTurnStep: "waiting" | "draw" | "discard" = !isMyTurn
     ? "waiting"
-    : hasTakenActionThisTurn
+    : hasDrawnThisTurn
       ? "discard"
       : "draw";
 
@@ -513,7 +528,7 @@ const GameTable: React.FC = () => {
     markActionActivity();
 
     if (selectedCards.length !== 1) {
-      toast.error("Select exactly one card to discard.");
+      showActionToast("Select exactly one card to discard.", "error");
       triggerGuidance({
         bannerText: "Select exactly 1 card to discard",
         helperText: "Then tap Discard.",
@@ -522,7 +537,7 @@ const GameTable: React.FC = () => {
     }
 
     if (isRestrictedDiscardCard(selectedCards[0])) {
-      toast.error("Cannot discard this card this turn.");
+      showActionToast("Cannot discard this card this turn.", "error");
       triggerGuidance({
         bannerText: "Cannot discard this card this turn.",
         helperText: "Select another card, then tap Discard.",
@@ -548,9 +563,9 @@ const GameTable: React.FC = () => {
       return;
     }
 
-    if (currentPlayer?.hasTakenActionThisTurn) {
+    if (currentPlayer?.hasDrawnThisTurn) {
       triggerGuidance({
-        bannerText: "Step 2/2: Discard",
+        bannerText: "Discard to finish your turn.",
         helperText: "Select 1 card, then tap Discard.",
       });
       return;
@@ -569,9 +584,9 @@ const GameTable: React.FC = () => {
       return;
     }
 
-    if (!currentPlayer?.hasTakenActionThisTurn) {
+    if (!currentPlayer?.hasDrawnThisTurn) {
       if (gameState.discardPile.length === 0) {
-        toast.error("Discard pile is empty!");
+        showActionToast("Discard pile is empty.", "error");
         triggerGuidance({
           bannerText: "Discard pile is empty.",
           helperText: "Draw from deck instead.",
@@ -588,7 +603,7 @@ const GameTable: React.FC = () => {
 
   const handleFlickDiscard = (card: CardType, info: PanInfo) => {
     markActionActivity();
-    const isDiscardStep = isMyTurn && !!currentPlayer?.hasTakenActionThisTurn;
+    const isDiscardStep = isMyTurn && !!currentPlayer?.hasDrawnThisTurn;
     if (!isTouchDevice || !isDiscardStep || selectedCards.length !== 1) return;
     if (selectedCards[0].rank !== card.rank || selectedCards[0].suit !== card.suit) return;
 
@@ -603,9 +618,9 @@ const GameTable: React.FC = () => {
     markActionActivity();
 
     if (selectedCards.length < 3) {
-      toast.error("A spread must have at least 3 cards.");
+      showActionToast("Select at least 3 cards for a spread.", "error");
       triggerGuidance({
-        bannerText: "Need 3+ cards selected",
+        bannerText: "Select at least 3 cards.",
       });
       return;
     }
@@ -619,14 +634,14 @@ const GameTable: React.FC = () => {
     markActionActivity();
 
     if (selectedCards.length !== 1) {
-      toast.error("Select one card to hit with.");
+      showActionToast("Select one card to hit with.", "error");
       triggerGuidance({
         bannerText: "Select exactly 1 card for Hit",
       });
       return;
     }
     setIsHitMode(true);
-    toast.info("Select a spread to hit.");
+    showActionToast("Select a spread to hit.");
   };
 
   const executeHit = (targetPlayerId: string, targetSpreadIndex: number) => {
@@ -747,6 +762,19 @@ const GameTable: React.FC = () => {
     if (amount === null) return "0 Reem Team Cash";
     return `${Math.max(0, Math.floor(amount)).toLocaleString("en-US")} Reem Team Cash`;
   };
+  const formatSeatBalance = (amount: number | null | undefined) => {
+    if (walletCurrency === "usd") {
+      if (amount === null || amount === undefined) return "$0.00";
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 2,
+      }).format(amount);
+    }
+
+    if (amount === null || amount === undefined) return "-- RTC";
+    return `${Math.max(0, Math.floor(amount)).toLocaleString("en-US")} RTC`;
+  };
   const roundReasonLabel =
     gameState.roundEndedBy === "REGULAR"
       ? "Drop / Hand Empty"
@@ -816,8 +844,10 @@ const GameTable: React.FC = () => {
 
   const activeTurnPlayer = gameState.players[gameState.currentPlayerIndex] ?? null;
   const activeTurnPlayerName = activeTurnPlayer?.username ?? "Player";
-  const isDrawStep = isMyTurn && !currentPlayer?.hasTakenActionThisTurn;
-  const isDiscardStep = isMyTurn && !!currentPlayer?.hasTakenActionThisTurn;
+  const activeTurnHasDrawn = !!activeTurnPlayer?.hasDrawnThisTurn;
+  const isDrawStep = isMyTurn && !currentPlayer?.hasDrawnThisTurn;
+  const isDiscardStep =
+    isMyTurn && !!currentPlayer?.hasDrawnThisTurn && !currentPlayer?.hasDiscardedThisTurn;
   const selectedIllegalDiscardCard =
     isDiscardStep &&
     selectedCards.length === 1 &&
@@ -839,12 +869,8 @@ const GameTable: React.FC = () => {
     isDiscardStep &&
     selectedCards.length === 1 &&
     !selectedIllegalDiscardCard;
-
-  const turnStepChipText = isMyTurn
-    ? `Your Turn - ${isDiscardStep ? "Step 2/2: Discard" : "Step 1/2: Draw"}`
-    : `${activeTurnPlayerName}'s Turn - ${
-        activeTurnPlayer?.hasTakenActionThisTurn ? "Step 2/2: Discard" : "Step 1/2: Draw"
-      }`;
+  const flowActorLabel = isMyTurn ? "Your Turn" : `${activeTurnPlayerName}'s Turn`;
+  const activeTurnStepLabel = activeTurnHasDrawn ? "Discard" : "Draw";
 
   const contextBannerText = isMyTurn
     ? isDiscardStep
@@ -870,42 +896,48 @@ const GameTable: React.FC = () => {
 
   const canDrop = !!(
     isMyTurn &&
-    !currentPlayer?.hasTakenActionThisTurn &&
+    !currentPlayer?.hasDrawnThisTurn &&
     !currentPlayer?.isHitLocked
   );
   const dropDisabledReason = !isMyTurn
-    ? "Wait for your turn"
-    : currentPlayer?.hasTakenActionThisTurn
-      ? "Drop blocked: already took an action"
+    ? "Wait for your turn."
+    : currentPlayer?.hasDrawnThisTurn
+      ? "Drop is only available before drawing."
       : currentPlayer?.isHitLocked
-        ? "Drop blocked: hit-locked."
+        ? "Drop is blocked while hit-locked."
         : undefined;
 
   const canSpread = !!(
     isMyTurn &&
-    currentPlayer?.hasTakenActionThisTurn &&
+    !!currentPlayer?.hasDrawnThisTurn &&
+    !currentPlayer?.hasDiscardedThisTurn &&
     selectedCards.length >= 3
   );
   const spreadDisabledReason = !isMyTurn
-    ? "Wait for your turn"
-    : !currentPlayer?.hasTakenActionThisTurn
-      ? "Draw first"
+    ? "Wait for your turn."
+    : !currentPlayer?.hasDrawnThisTurn
+      ? "Draw first."
+      : currentPlayer?.hasDiscardedThisTurn
+        ? "Turn already ended."
       : selectedCards.length >= 3
         ? undefined
-        : "Need 3+ cards selected";
+        : "Select at least 3 cards.";
 
   const canHit = !!(
     isMyTurn &&
-    currentPlayer?.hasTakenActionThisTurn &&
+    !!currentPlayer?.hasDrawnThisTurn &&
+    !currentPlayer?.hasDiscardedThisTurn &&
     selectedCards.length === 1
   );
   const hitDisabledReason = !isMyTurn
-    ? "Wait for your turn"
-    : !currentPlayer?.hasTakenActionThisTurn
-      ? "Draw first"
+    ? "Wait for your turn."
+    : !currentPlayer?.hasDrawnThisTurn
+      ? "Draw first."
+      : currentPlayer?.hasDiscardedThisTurn
+        ? "Turn already ended."
       : selectedCards.length === 1
         ? undefined
-        : "Select exactly 1 card";
+        : "Select exactly 1 card.";
 
   const getTurnStatus = (playerUserId: string, isSelfPanel = false): TurnStatusBadge => {
     if (!activeTurnPlayer || activeTurnPlayer.userId !== playerUserId) {
@@ -914,7 +946,7 @@ const GameTable: React.FC = () => {
     if (isSelfPanel && isHitMode) {
       return "HIT MODE";
     }
-    return activeTurnPlayer.hasTakenActionThisTurn ? "MUST DISCARD" : "DRAWING";
+    return activeTurnPlayer.hasDrawnThisTurn ? "MUST DISCARD" : "DRAWING";
   };
 
   const turnStatusClasses: Record<TurnStatusBadge, string> = {
@@ -952,13 +984,39 @@ const GameTable: React.FC = () => {
     if (!player) return null;
     const isActive = gameState.players[gameState.currentPlayerIndex]?.userId === player.userId;
     const turnStatus = getTurnStatus(player.userId);
+    const seatBalance = playerBalances[player.userId];
     return (
       <div className={`absolute z-20 pointer-events-none ${className}`}>
-        <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
+        <div
+          className={`${
+            isActive ? "active-seat" : "inactive-seat"
+          } relative flex items-center gap-2 transition-all duration-300 ${
+            align === "right" ? "flex-row-reverse text-right" : ""
+          }`}
+        >
+          {isActive ? (
+            <div className="absolute -inset-1 rounded-2xl bg-amber-300/15 blur-xl" aria-hidden />
+          ) : null}
           {renderOpponentHand(getVisibleCardCount(player.userId, player.hand.length), "sm")}
-          <div className={`px-2 py-1 rounded-lg border ${isActive ? "border-yellow-400/80 bg-yellow-400/10" : "border-white/10 bg-black/35"} min-w-[110px]`}>
+          <div
+            className={`relative px-2 py-1 rounded-lg border min-w-[118px] transition-all duration-300 ${
+              isActive
+                ? "border-yellow-400/80 bg-yellow-400/10 brightness-100 opacity-100"
+                : "border-white/10 bg-black/35 brightness-90 opacity-60"
+            }`}
+          >
             <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse" : ""}`}>
-              <PlayerAvatar player={{ name: player.username, avatarUrl: player.avatarUrl }} size="sm" />
+              <div className="relative">
+                <PlayerAvatar player={{ name: player.username, avatarUrl: player.avatarUrl }} size="sm" />
+                <TurnTimer
+                  duration={turnDurationMs}
+                  timeRemaining={isActive ? turnTimeRemainingMs : turnDurationMs}
+                  isActive={isActive}
+                  size={54}
+                  strokeWidth={3.5}
+                  className={isActive ? "animate-pulse" : ""}
+                />
+              </div>
               <div>
                 <div className={`mb-1 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold tracking-wide ${turnStatusClasses[turnStatus]}`}>
                   {turnStatus}
@@ -967,8 +1025,8 @@ const GameTable: React.FC = () => {
                 <div className="text-[10px] text-white/60 leading-tight">
                   Cards: {getVisibleCardCount(player.userId, player.hand.length)}
                 </div>
-                <div className="text-[10px] text-yellow-300 leading-tight">
-                  {playerBalances[player.userId] !== undefined ? formatBalance(playerBalances[player.userId]) : "--"}
+                <div className="text-[9px] text-yellow-300/95 leading-tight">
+                  {formatSeatBalance(seatBalance)}
                 </div>
               </div>
             </div>
@@ -996,20 +1054,44 @@ const GameTable: React.FC = () => {
       <div className={`absolute z-10 pointer-events-none ${className}`}>
         <div className="flex flex-wrap items-center justify-center gap-1.5">
           {player.spreads.map((spread, sIdx) => (
-            <div
+            <motion.div
               key={`${player.userId}-spread-${sIdx}`}
               className={`flex -space-x-5 ${isHitMode ? "cursor-pointer pointer-events-auto ring-2 ring-yellow-400 rounded-lg p-1 bg-yellow-400/10" : "pointer-events-none"}`}
               onClick={() => isHitMode && executeHit(player.userId, sIdx)}
+              initial={{
+                opacity: 0,
+                y: player.userId === user._id ? 68 : -28,
+                scale: 0.84,
+              }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 270, damping: 20, delay: sIdx * 0.06 }}
             >
               {spread.map((card, cIdx) => (
-                <CardComponent
+                <motion.div
                   key={cIdx}
-                  suit={card.suit}
-                  rank={card.rank}
-                  className="w-8 h-12 sm:w-9 sm:h-14 text-[9px]"
-                />
+                  initial={{
+                    opacity: 0,
+                    y: 20,
+                    x: (cIdx - (spread.length - 1) / 2) * 10,
+                    rotate: (cIdx - (spread.length - 1) / 2) * 5,
+                    scale: 0.86,
+                  }}
+                  animate={{ opacity: 1, y: 0, x: 0, rotate: 0, scale: 1 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 320,
+                    damping: 24,
+                    delay: 0.03 * cIdx,
+                  }}
+                >
+                  <CardComponent
+                    suit={card.suit}
+                    rank={card.rank}
+                    className="w-8 h-12 sm:w-9 sm:h-14 text-[9px]"
+                  />
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
@@ -1020,7 +1102,9 @@ const GameTable: React.FC = () => {
     <div className="relative h-screen min-h-[100dvh] overflow-hidden">
       <div className="absolute inset-0 z-0" aria-hidden>
         <div
-          className="absolute inset-0"
+          className={`absolute inset-0 transition-[filter,transform] duration-300 ${
+            isMyTurn ? "blur-[1px] scale-[1.01]" : "blur-0 scale-100"
+          }`}
           style={{
             backgroundImage: `linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.5)), url(${bgImage})`,
             backgroundSize: "cover",
@@ -1049,6 +1133,13 @@ const GameTable: React.FC = () => {
               style={useLargeScreenTableSizing ? { maxWidth: `${tableMaxWidthPx}px` } : undefined}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.06),transparent_60%)]" />
+              <div
+                className={`absolute inset-0 transition-opacity duration-300 ${
+                  isMyTurn
+                    ? "opacity-100 bg-[radial-gradient(circle_at_50%_54%,rgba(255,255,255,0.12),rgba(0,0,0,0.08)_46%,rgba(0,0,0,0.22)_100%)]"
+                    : "opacity-0"
+                }`}
+              />
               <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 bg-black/50 text-white rounded-full border border-white/10 px-2 py-1 backdrop-blur-sm min-w-0">
                   <div className="relative flex-shrink-0">
@@ -1080,11 +1171,38 @@ const GameTable: React.FC = () => {
               </div>
 
               <div className="absolute right-3 top-14 z-30 pointer-events-none">
-                <div className="max-w-[220px] rounded-lg border border-cyan-200/60 bg-black/72 px-3 py-1.5 text-right shadow-[0_0_18px_rgba(34,211,238,0.2)] backdrop-blur-sm">
-                  <div className="text-[11px] font-semibold text-cyan-100">{turnStepChipText}</div>
+                <div className="max-w-[240px] rounded-lg border border-cyan-200/60 bg-black/72 px-3 py-2 text-right shadow-[0_0_18px_rgba(34,211,238,0.2)] backdrop-blur-sm">
+                  <div className="text-[10px] font-semibold text-cyan-100">{flowActorLabel}</div>
+                  <div className="mt-1 flex items-center justify-end gap-2 text-[10px] uppercase tracking-wide">
+                    <span
+                      className={`transition-all ${
+                        activeTurnStepLabel === "Draw"
+                          ? "text-cyan-100 drop-shadow-[0_0_10px_rgba(34,211,238,0.65)]"
+                          : "text-cyan-200/60"
+                      }`}
+                    >
+                      Draw
+                    </span>
+                    <div className="relative h-[2px] w-16 rounded-full bg-cyan-100/20">
+                      <div
+                        className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
+                          activeTurnStepLabel === "Draw" ? "w-1/3 bg-cyan-300" : "w-full bg-emerald-300"
+                        }`}
+                      />
+                    </div>
+                    <span
+                      className={`transition-all ${
+                        activeTurnStepLabel === "Discard"
+                          ? "text-emerald-100 drop-shadow-[0_0_10px_rgba(52,211,153,0.68)]"
+                          : "text-cyan-200/60"
+                      }`}
+                    >
+                      Discard
+                    </span>
+                  </div>
                   {isMyTurn ? (
-                    <div className="mt-0.5 text-[9px] font-medium text-cyan-200/90">
-                      {isDiscardStep ? "Tap the glowing discard pile to finish." : "Tap a glowing pile to draw."}
+                    <div className="mt-1 text-[9px] font-medium text-cyan-200/90">
+                      {isDiscardStep ? "Select 1 card, then tap Discard." : "Draw from deck or discard pile."}
                     </div>
                   ) : null}
                 </div>
@@ -1160,7 +1278,11 @@ const GameTable: React.FC = () => {
                 </div>
               )}
 
-              <div className="center-pile absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
+              <div
+                className={`center-pile absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 transition-all duration-300 ${
+                  isMyTurn ? "brightness-110 scale-[1.03]" : "brightness-100 scale-100"
+                }`}
+              >
                 <div className="flex items-center gap-4">
                   <div className="relative w-8 h-12 sm:w-10 sm:h-14">
                     {!hideCardsForPresentation && gameState.deck.length > 0 && (
@@ -1197,22 +1319,42 @@ const GameTable: React.FC = () => {
                     ) : null}
                   </div>
                 </div>
-                <TurnTimer timeLeft={15} maxTime={30} />
               </div>
 
               <div className="seat absolute w-[96%] max-w-[820px] h-[176px] bottom-2 left-1/2 -translate-x-1/2 pointer-events-auto">
                 <div className="flex items-end gap-2 w-full h-full">
-                  <div className={`mb-6 px-2 py-2 rounded-lg border ${isMyTurn ? "border-yellow-400/80 bg-yellow-400/10" : "border-white/10 bg-black/30"} min-w-[132px]`}>
+                  <div
+                    className={`${
+                      isMyTurn ? "active-seat" : "inactive-seat"
+                    } relative mb-6 px-2 py-2 rounded-lg border min-w-[140px] transition-all duration-300 ${
+                      isMyTurn
+                        ? "border-yellow-400/80 bg-yellow-400/10 brightness-100 opacity-100"
+                        : "border-white/10 bg-black/30 brightness-90 opacity-60"
+                    }`}
+                  >
+                    {isMyTurn ? (
+                      <div className="absolute -inset-1 rounded-2xl bg-amber-300/15 blur-xl" aria-hidden />
+                    ) : null}
                     <div className="flex items-center gap-2">
-                      <PlayerAvatar player={{ name: user.username, avatarUrl: user.avatarUrl }} size="sm" />
+                      <div className="relative">
+                        <PlayerAvatar player={{ name: user.username, avatarUrl: user.avatarUrl }} size="sm" />
+                        <TurnTimer
+                          duration={turnDurationMs}
+                          timeRemaining={isMyTurn ? turnTimeRemainingMs : turnDurationMs}
+                          isActive={isMyTurn}
+                          size={54}
+                          strokeWidth={3.5}
+                          className={isMyTurn ? "animate-pulse" : ""}
+                        />
+                      </div>
                       <div>
                         <div className={`mb-1 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold tracking-wide ${turnStatusClasses[myTurnStatus]}`}>
                           {myTurnStatus}
                         </div>
                         <div className="text-[11px] text-white font-semibold leading-tight">{user.username}</div>
                         <div className="text-[10px] text-white/60 leading-tight">Cards: {visibleHand.length}</div>
-                        <div className="text-[10px] text-yellow-300 leading-tight">
-                          {balanceLoading ? "..." : formatBalance(balance)}
+                        <div className="text-[9px] text-yellow-300/95 leading-tight">
+                          {balanceLoading ? "..." : formatSeatBalance(balance)}
                         </div>
                       </div>
                     </div>
@@ -1252,9 +1394,15 @@ const GameTable: React.FC = () => {
                                   key={`${card.rank}-${card.suit}`}
                                   className="card"
                                   initial={{ y: 30, opacity: 0 }}
-                                  animate={{ y: 0, opacity: 1 }}
+                                  animate={{
+                                    y: isSelectedCard ? -10 : 0,
+                                    scale: isSelectedCard ? 1.04 : 1,
+                                    opacity: 1,
+                                  }}
                                   exit={{ y: -20, opacity: 0 }}
                                   transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                                  whileHover={isMyTurn ? { y: isSelectedCard ? -12 : -6, scale: 1.03 } : undefined}
+                                  whileTap={isMyTurn ? { scale: 0.98 } : undefined}
                                 >
                                   <CardComponent
                                     suit={card.suit}
@@ -1283,14 +1431,17 @@ const GameTable: React.FC = () => {
                             drop={{
                               enabled: canDrop,
                               reason: canDrop ? undefined : dropDisabledReason,
+                              isPrimary: canDrop && isDrawStep,
                             }}
                             spread={{
                               enabled: canSpread,
                               reason: canSpread ? undefined : spreadDisabledReason,
+                              isPrimary: canSpread,
                             }}
                             hit={{
                               enabled: canHit,
                               reason: canHit ? undefined : hitDisabledReason,
+                              isPrimary: canHit,
                             }}
                             onDrop={handleDrop}
                             onSpread={handleSpread}

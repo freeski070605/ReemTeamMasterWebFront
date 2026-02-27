@@ -164,6 +164,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({ error: data.message });
     });
 
+    socket.on("turnExpired", (data: { message?: string }) => {
+      toast.info(data.message ?? "Turn expired.", {
+        position: "top-center",
+        autoClose: 2000,
+      });
+    });
+
     socket.on('ackLeaveRequest', () => {
       toast.info("You will be removed from the table at the end of the round.");
     });
