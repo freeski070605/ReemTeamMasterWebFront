@@ -397,7 +397,7 @@ const GameTable: React.FC = () => {
   const turnDurationMs = gameState?.turnDurationMs ?? 20_000;
   const turnTimeRemainingMs = Math.max(0, (gameState?.turnExpiresAt ?? Date.now()) - Date.now());
   const hasCurrentPlayer = !!currentPlayer;
-  const hasDrawnThisTurn = !!currentPlayer?.hasDrawnThisTurn;
+  const hasDrawnThisTurn = !!(currentPlayer?.hasDrawnThisTurn ?? currentPlayer?.hasTakenActionThisTurn);
   const hasDiscardedThisTurn = !!currentPlayer?.hasDiscardedThisTurn;
 
   useEffect(() => {
@@ -563,7 +563,7 @@ const GameTable: React.FC = () => {
       return;
     }
 
-    if (currentPlayer?.hasDrawnThisTurn) {
+    if (hasDrawnThisTurn) {
       triggerGuidance({
         bannerText: "Discard to finish your turn.",
         helperText: "Select 1 card, then tap Discard.",
@@ -584,7 +584,7 @@ const GameTable: React.FC = () => {
       return;
     }
 
-    if (!currentPlayer?.hasDrawnThisTurn) {
+    if (!hasDrawnThisTurn) {
       if (gameState.discardPile.length === 0) {
         showActionToast("Discard pile is empty.", "error");
         triggerGuidance({
@@ -603,7 +603,7 @@ const GameTable: React.FC = () => {
 
   const handleFlickDiscard = (card: CardType, info: PanInfo) => {
     markActionActivity();
-    const isDiscardStep = isMyTurn && !!currentPlayer?.hasDrawnThisTurn;
+    const isDiscardStep = isMyTurn && hasDrawnThisTurn;
     if (!isTouchDevice || !isDiscardStep || selectedCards.length !== 1) return;
     if (selectedCards[0].rank !== card.rank || selectedCards[0].suit !== card.suit) return;
 
@@ -844,10 +844,12 @@ const GameTable: React.FC = () => {
 
   const activeTurnPlayer = gameState.players[gameState.currentPlayerIndex] ?? null;
   const activeTurnPlayerName = activeTurnPlayer?.username ?? "Player";
-  const activeTurnHasDrawn = !!activeTurnPlayer?.hasDrawnThisTurn;
-  const isDrawStep = isMyTurn && !currentPlayer?.hasDrawnThisTurn;
+  const activeTurnHasDrawn = !!(
+    activeTurnPlayer?.hasDrawnThisTurn ?? activeTurnPlayer?.hasTakenActionThisTurn
+  );
+  const isDrawStep = isMyTurn && !hasDrawnThisTurn;
   const isDiscardStep =
-    isMyTurn && !!currentPlayer?.hasDrawnThisTurn && !currentPlayer?.hasDiscardedThisTurn;
+    isMyTurn && hasDrawnThisTurn && !hasDiscardedThisTurn;
   const selectedIllegalDiscardCard =
     isDiscardStep &&
     selectedCards.length === 1 &&
@@ -896,12 +898,12 @@ const GameTable: React.FC = () => {
 
   const canDrop = !!(
     isMyTurn &&
-    !currentPlayer?.hasDrawnThisTurn &&
+    !hasDrawnThisTurn &&
     !currentPlayer?.isHitLocked
   );
   const dropDisabledReason = !isMyTurn
     ? "Wait for your turn."
-    : currentPlayer?.hasDrawnThisTurn
+    : hasDrawnThisTurn
       ? "Drop is only available before drawing."
       : currentPlayer?.isHitLocked
         ? "Drop is blocked while hit-locked."
@@ -909,15 +911,15 @@ const GameTable: React.FC = () => {
 
   const canSpread = !!(
     isMyTurn &&
-    !!currentPlayer?.hasDrawnThisTurn &&
-    !currentPlayer?.hasDiscardedThisTurn &&
+    hasDrawnThisTurn &&
+    !hasDiscardedThisTurn &&
     selectedCards.length >= 3
   );
   const spreadDisabledReason = !isMyTurn
     ? "Wait for your turn."
-    : !currentPlayer?.hasDrawnThisTurn
+    : !hasDrawnThisTurn
       ? "Draw first."
-      : currentPlayer?.hasDiscardedThisTurn
+      : hasDiscardedThisTurn
         ? "Turn already ended."
       : selectedCards.length >= 3
         ? undefined
@@ -925,15 +927,15 @@ const GameTable: React.FC = () => {
 
   const canHit = !!(
     isMyTurn &&
-    !!currentPlayer?.hasDrawnThisTurn &&
-    !currentPlayer?.hasDiscardedThisTurn &&
+    hasDrawnThisTurn &&
+    !hasDiscardedThisTurn &&
     selectedCards.length === 1
   );
   const hitDisabledReason = !isMyTurn
     ? "Wait for your turn."
-    : !currentPlayer?.hasDrawnThisTurn
+    : !hasDrawnThisTurn
       ? "Draw first."
-      : currentPlayer?.hasDiscardedThisTurn
+      : hasDiscardedThisTurn
         ? "Turn already ended."
       : selectedCards.length === 1
         ? undefined
