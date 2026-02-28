@@ -1365,7 +1365,7 @@ const GameTable: React.FC = () => {
                         {canUseFlickDiscard ? " Or flick selected card toward discard pile." : ""}
                       </div>
                     ) : null}
-                    <div className="w-full flex flex-col items-center -translate-x-8 translate-y-6">
+                    <div className="w-full flex flex-col items-center -translate-x-10 translate-y-6">
                       <div className="hand relative h-28 w-full max-w-[760px] pointer-events-auto">
                         <AnimatePresence>
                           <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
@@ -1415,7 +1415,7 @@ const GameTable: React.FC = () => {
                         </AnimatePresence>
                       </div>
                       {isMyTurn && !hideCardsForPresentation && (
-                        <div className="actions flex gap-1.5 mt-1 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs">
+                        <div className="actions flex gap-1.5 mt-0 -translate-y-1 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs">
                           <GameActions
                             drop={{
                               enabled: canDrop,
