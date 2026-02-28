@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { Button } from '../ui/Button';
 import NavbarBalance from '../wallet/NavbarBalance';
+import InstallPromptBanner from '../pwa/InstallPromptBanner';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout, isAuthenticated } = useAuthStore();
@@ -178,6 +179,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </header>
 
       <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+      <InstallPromptBanner />
 
       <footer className="mt-12 border-t border-white/10 bg-[#0b0d11]/85 py-6 text-center text-xs text-white/50">
         <div className="mx-auto max-w-7xl px-4">
