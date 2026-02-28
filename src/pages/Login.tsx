@@ -74,6 +74,11 @@ const Login: React.FC = () => {
               required
               placeholder="Your password"
             />
+            <div className="text-right -mt-1">
+              <Link to="/forgot-password" className="text-xs text-amber-300 hover:text-amber-200">
+                Forgot password?
+              </Link>
+            </div>
             <Button type="submit" className="w-full" isLoading={isLoading}>
               Sign In
             </Button>
