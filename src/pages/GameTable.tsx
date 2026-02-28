@@ -72,7 +72,6 @@ const GameTable: React.FC = () => {
   const {
     balance,
     loading: balanceLoading,
-    error: balanceError,
     refresh: refreshBalance,
   } = useWalletBalance({ refreshIntervalMs: 15000, currency: walletCurrency });
   const contestId = searchParams.get("contestId") ?? undefined;
@@ -750,18 +749,6 @@ const GameTable: React.FC = () => {
   const isReadyForNextRound = !!user && readyPlayerIds.has(user._id);
   const readyCount = readyPlayerIds.size;
   const totalRoundPlayers = gameState.players.length;
-  const formatBalance = (amount: number | null) => {
-    if (walletCurrency === "usd") {
-      if (amount === null) return "$0.00";
-      return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-      }).format(amount);
-    }
-
-    if (amount === null) return "0 Reem Team Cash";
-    return `${Math.max(0, Math.floor(amount)).toLocaleString("en-US")} Reem Team Cash`;
-  };
   const formatSeatBalance = (amount: number | null | undefined) => {
     if (walletCurrency === "usd") {
       if (amount === null || amount === undefined) return "$0.00";
@@ -1162,10 +1149,10 @@ const GameTable: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded-full border border-white/10 backdrop-blur-sm">
                     <span className="uppercase tracking-widest text-[9px] text-white/60">
-                      {walletCurrency === "usd" ? "USD Balance" : "Reem Team Cash Balance"}
+                      Table Pot
                     </span>
                     <span className="font-bold">
-                      {balanceLoading ? "..." : balanceError ? "Error" : formatBalance(balance)}
+                      {formatSeatBalance(gameState.pot)}
                     </span>
                   </div>
                   <Button variant="danger" size="sm" onClick={handleLeaveTable}>Leave</Button>
