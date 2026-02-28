@@ -1204,7 +1204,7 @@ const GameTable: React.FC = () => {
               {renderSpreadZone(topPlayer, "Top Spread", "left-1/2 top-[28%] -translate-x-1/2 w-[34%] max-w-[300px]")}
               {renderSpreadZone(leftPlayer, "Left Spread", "left-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]")}
               {renderSpreadZone(rightPlayer, "Right Spread", "right-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]")}
-              {renderSpreadZone(currentPlayer ?? null, "Your Spread", "left-1/2 bottom-[33%] -translate-x-1/2 w-[30%] max-w-[260px]")}
+              {renderSpreadZone(currentPlayer ?? null, "Your Spread", "left-1/2 bottom-[30%] -translate-x-1/2 w-[30%] max-w-[260px]")}
 
               {showDealAnimation && (
                 <div className="absolute inset-0 z-30 pointer-events-none">
@@ -1365,7 +1365,7 @@ const GameTable: React.FC = () => {
                         {canUseFlickDiscard ? " Or flick selected card toward discard pile." : ""}
                       </div>
                     ) : null}
-                    <div className="w-full flex flex-col items-center -translate-x-4 translate-y-2">
+                    <div className="w-full flex flex-col items-center -translate-x-8 translate-y-6">
                       <div className="hand relative h-28 w-full max-w-[760px] pointer-events-auto">
                         <AnimatePresence>
                           <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
