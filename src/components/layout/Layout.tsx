@@ -9,6 +9,20 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const safeAreaInsetStyle = useMemo(
+    () => ({
+      paddingLeft: "var(--safe-area-left)",
+      paddingRight: "var(--safe-area-right)",
+      paddingBottom: "var(--safe-area-bottom)",
+    }),
+    []
+  );
+  const safeAreaTopStyle = useMemo(
+    () => ({
+      paddingTop: "var(--safe-area-top)",
+    }),
+    []
+  );
   const logoSrc = '/assets/logo.png';
   const isGameRoute = location.pathname.startsWith('/game/');
 
@@ -38,7 +52,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   }
 
   return (
-    <div className="relative min-h-screen text-gray-100">
+    <div className="relative min-h-screen text-gray-100" style={safeAreaInsetStyle}>
       <div
         className="pointer-events-none fixed inset-0 -z-10"
         style={{
@@ -51,7 +65,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       />
       <div className="pointer-events-none fixed inset-0 -z-10 opacity-30 bg-[radial-gradient(circle_at_1px_1px,#ffffff_1px,transparent_0)] [background-size:30px_30px]" />
 
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0c0f14]/86 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0c0f14]/86 backdrop-blur-xl" style={safeAreaTopStyle}>
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-4">
             <Link to="/" className="flex items-center gap-3">

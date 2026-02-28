@@ -4,6 +4,11 @@
 @tailwind utilities;
 
 :root {
+  --app-height: 100vh;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
   --rt-bg-0: #08090b;
   --rt-bg-1: #101216;
   --rt-bg-2: #171a1f;
@@ -16,8 +21,20 @@
   --rt-muted: #a6b0c0;
 }
 
+@supports (height: 100dvh) {
+  :root {
+    --app-height: 100dvh;
+  }
+}
+
 * {
   box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
 }
 
 body {
@@ -30,11 +47,11 @@ body {
     radial-gradient(980px 540px at 92% 8%, rgba(255, 138, 38, 0.14), transparent 60%),
     linear-gradient(180deg, var(--rt-bg-0) 0%, var(--rt-bg-1) 48%, var(--rt-bg-0) 100%);
   color: var(--rt-muted);
-  min-height: 100vh;
+  min-height: var(--app-height);
 }
 
 #root {
-  min-height: 100vh;
+  min-height: var(--app-height);
 }
 
 a {

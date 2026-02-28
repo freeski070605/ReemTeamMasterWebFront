@@ -18,6 +18,22 @@ import backCardImage from "../assets/cards/back.png";
 
 type TurnStatusBadge = "DRAWING" | "MUST DISCARD" | "HIT MODE" | "WAITING";
 
+const getViewportSize = () => ({
+  width: window.visualViewport?.width ?? window.innerWidth,
+  height: window.visualViewport?.height ?? window.innerHeight,
+});
+
+const readSafeAreaInset = (token: "--safe-area-top" | "--safe-area-right" | "--safe-area-bottom" | "--safe-area-left") => {
+  const rawValue = getComputedStyle(document.documentElement).getPropertyValue(token);
+  const parsed = Number.parseFloat(rawValue);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const syncAppHeight = () => {
+  const viewport = getViewportSize();
+  document.documentElement.style.setProperty("--app-height", `${Math.round(viewport.height)}px`);
+};
+
 const GameTable: React.FC = () => {
   const { tableId } = useParams<{ tableId: string }>();
   const [searchParams] = useSearchParams();
@@ -210,6 +226,19 @@ const GameTable: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    syncAppHeight();
+    window.addEventListener("resize", syncAppHeight, { passive: true });
+    window.addEventListener("orientationchange", syncAppHeight, { passive: true });
+    window.visualViewport?.addEventListener("resize", syncAppHeight);
+
+    return () => {
+      window.removeEventListener("resize", syncAppHeight);
+      window.removeEventListener("orientationchange", syncAppHeight);
+      window.visualViewport?.removeEventListener("resize", syncAppHeight);
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       clearGuidanceTimers();
       if (idleGuidanceTimeoutRef.current !== null) {
@@ -221,17 +250,28 @@ const GameTable: React.FC = () => {
 
   useEffect(() => {
     const updateTableMaxWidth = () => {
-      const maxByViewport = window.innerWidth * 0.96;
-      const maxByHeight = window.innerHeight * 0.92 * (16 / 9);
+      const viewport = getViewportSize();
+      const safeAreaTop = readSafeAreaInset("--safe-area-top");
+      const safeAreaRight = readSafeAreaInset("--safe-area-right");
+      const safeAreaBottom = readSafeAreaInset("--safe-area-bottom");
+      const safeAreaLeft = readSafeAreaInset("--safe-area-left");
+      const usableWidth = Math.max(0, viewport.width - safeAreaLeft - safeAreaRight);
+      const usableHeight = Math.max(0, viewport.height - safeAreaTop - safeAreaBottom);
+      const maxByViewport = usableWidth * 0.96;
+      const maxByHeight = usableHeight * 0.92 * (16 / 9);
       const maxByTV = 1800;
       setTableMaxWidthPx(Math.floor(Math.min(maxByViewport, maxByHeight, maxByTV)));
-      setUseLargeScreenTableSizing(window.innerWidth > 1024);
+      setUseLargeScreenTableSizing(usableWidth > 1024);
     };
 
     updateTableMaxWidth();
     window.addEventListener("resize", updateTableMaxWidth);
+    window.addEventListener("orientationchange", updateTableMaxWidth, { passive: true });
+    window.visualViewport?.addEventListener("resize", updateTableMaxWidth);
     return () => {
       window.removeEventListener("resize", updateTableMaxWidth);
+      window.removeEventListener("orientationchange", updateTableMaxWidth);
+      window.visualViewport?.removeEventListener("resize", updateTableMaxWidth);
     };
   }, []);
 
@@ -1088,7 +1128,7 @@ const GameTable: React.FC = () => {
   };
 
   return (
-    <div className="relative h-screen min-h-[100dvh] overflow-hidden">
+    <div className="relative overflow-hidden" style={{ height: "var(--app-height)" }}>
       <div className="absolute inset-0 z-0" aria-hidden>
         <div
           className={`absolute inset-0 transition-[filter,transform] duration-300 ${
@@ -1103,7 +1143,15 @@ const GameTable: React.FC = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_20%,rgba(255,199,74,0.22),transparent_55%)]" />
       </div>
 
-      <div className="relative z-10 h-full flex flex-col">
+      <div
+        className="relative z-10 h-full flex flex-col"
+        style={{
+          paddingTop: "var(--safe-area-top)",
+          paddingRight: "var(--safe-area-right)",
+          paddingBottom: "var(--safe-area-bottom)",
+          paddingLeft: "var(--safe-area-left)",
+        }}
+      >
         {isMobilePortrait && (
           <div className="absolute inset-0 z-40 bg-black/90 backdrop-blur-sm flex items-center justify-center px-6 text-center">
             <div className="max-w-sm">
