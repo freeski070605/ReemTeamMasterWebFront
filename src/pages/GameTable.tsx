@@ -68,6 +68,7 @@ const GameTable: React.FC = () => {
   const [playerBalances, setPlayerBalances] = useState<Record<string, number>>({});
   const [tableMaxWidthPx, setTableMaxWidthPx] = useState(860);
   const [useLargeScreenTableSizing, setUseLargeScreenTableSizing] = useState(false);
+  const [isCompactLandscape, setIsCompactLandscape] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [showGuidanceBanner, setShowGuidanceBanner] = useState(false);
   const [showGuidanceHelper, setShowGuidanceHelper] = useState(false);
@@ -257,11 +258,16 @@ const GameTable: React.FC = () => {
       const safeAreaLeft = readSafeAreaInset("--safe-area-left");
       const usableWidth = Math.max(0, viewport.width - safeAreaLeft - safeAreaRight);
       const usableHeight = Math.max(0, viewport.height - safeAreaTop - safeAreaBottom);
+      const isLandscape = usableWidth > usableHeight;
+      const compactLandscape = isLandscape && usableHeight <= 520;
+      const veryShortLandscape = isLandscape && usableHeight <= 430;
+      const tableHeightRatio = veryShortLandscape ? 0.8 : compactLandscape ? 0.85 : 0.92;
       const maxByViewport = usableWidth * 0.96;
-      const maxByHeight = usableHeight * 0.92 * (16 / 9);
+      const maxByHeight = usableHeight * tableHeightRatio * (16 / 9);
       const maxByTV = 1800;
       setTableMaxWidthPx(Math.floor(Math.min(maxByViewport, maxByHeight, maxByTV)));
       setUseLargeScreenTableSizing(usableWidth > 1024);
+      setIsCompactLandscape(compactLandscape);
     };
 
     updateTableMaxWidth();
@@ -1148,7 +1154,7 @@ const GameTable: React.FC = () => {
         style={{
           paddingTop: "var(--safe-area-top)",
           paddingRight: "var(--safe-area-right)",
-          paddingBottom: "var(--safe-area-bottom)",
+          paddingBottom: "calc(var(--safe-area-bottom) + 8px)",
           paddingLeft: "var(--safe-area-left)",
         }}
       >
@@ -1358,12 +1364,18 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              <div className="seat absolute w-[96%] max-w-[820px] h-[176px] bottom-2 left-1/2 -translate-x-1/2 pointer-events-auto">
+              <div
+                className={`seat absolute w-[96%] max-w-[820px] left-1/2 -translate-x-1/2 pointer-events-auto ${
+                  isCompactLandscape ? "h-[146px] bottom-1" : "h-[176px] bottom-2"
+                }`}
+              >
                 <div className="flex items-end gap-2 w-full h-full">
                   <div
                     className={`${
                       isMyTurn ? "active-seat" : "inactive-seat"
-                    } relative mb-6 px-2 py-2 rounded-lg border min-w-[140px] transition-all duration-300 ${
+                    } relative px-2 py-2 rounded-lg border min-w-[140px] transition-all duration-300 ${
+                      isCompactLandscape ? "mb-2" : "mb-6"
+                    } ${
                       isMyTurn
                         ? "border-yellow-400/80 bg-yellow-400/10 brightness-100 opacity-100"
                         : "border-white/10 bg-black/30 brightness-90 opacity-60"
@@ -1413,8 +1425,12 @@ const GameTable: React.FC = () => {
                         {canUseFlickDiscard ? " Or flick selected card toward discard pile." : ""}
                       </div>
                     ) : null}
-                    <div className="w-full flex flex-col items-center -translate-x-12 translate-y-6">
-                      <div className="hand relative h-28 w-full max-w-[760px] pointer-events-auto">
+                    <div
+                      className={`w-full flex flex-col items-center ${
+                        isCompactLandscape ? "-translate-x-8 translate-y-1" : "-translate-x-12 translate-y-6"
+                      }`}
+                    >
+                      <div className={`hand relative w-full max-w-[760px] pointer-events-auto ${isCompactLandscape ? "h-24" : "h-28"}`}>
                         <AnimatePresence>
                           <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
                             {visibleHand.map((card) => {
@@ -1446,7 +1462,7 @@ const GameTable: React.FC = () => {
                                     rank={card.rank}
                                     isSelected={isSelectedCard}
                                     onClick={() => toggleCardSelection(card)}
-                                    className="w-11 h-16 sm:w-12 sm:h-[4.5rem]"
+                                    className={isCompactLandscape ? "w-10 h-14 sm:w-11 sm:h-16" : "w-11 h-16 sm:w-12 sm:h-[4.5rem]"}
                                     badgeText={
                                       isIllegalDiscardSelection
                                         ? "Cannot discard this card this turn."
@@ -1463,7 +1479,11 @@ const GameTable: React.FC = () => {
                         </AnimatePresence>
                       </div>
                       {isMyTurn && !hideCardsForPresentation && (
-                        <div className="actions flex gap-1.5 mt-0 -translate-y-3 sm:-translate-y-1 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs">
+                        <div
+                          className={`actions flex gap-1.5 mt-0 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs ${
+                            isCompactLandscape ? "translate-y-0" : "-translate-y-3 sm:-translate-y-1"
+                          }`}
+                        >
                           <GameActions
                             drop={{
                               enabled: canDrop,
