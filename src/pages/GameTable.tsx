@@ -67,7 +67,6 @@ const GameTable: React.FC = () => {
   const [roundCountdownSeconds, setRoundCountdownSeconds] = useState<number | null>(null);
   const [playerBalances, setPlayerBalances] = useState<Record<string, number>>({});
   const [tableMaxWidthPx, setTableMaxWidthPx] = useState(860);
-  const [useLargeScreenTableSizing, setUseLargeScreenTableSizing] = useState(false);
   const [isCompactLandscape, setIsCompactLandscape] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [showGuidanceBanner, setShowGuidanceBanner] = useState(false);
@@ -266,7 +265,6 @@ const GameTable: React.FC = () => {
       const maxByHeight = usableHeight * tableHeightRatio * (16 / 9);
       const maxByTV = 1800;
       setTableMaxWidthPx(Math.floor(Math.min(maxByViewport, maxByHeight, maxByTV)));
-      setUseLargeScreenTableSizing(usableWidth > 1024);
       setIsCompactLandscape(compactLandscape);
     };
 
@@ -1172,8 +1170,8 @@ const GameTable: React.FC = () => {
         <div className={`game-wrapper flex-1 relative overflow-hidden touch-manipulation pb-6 ${isMobilePortrait ? "pointer-events-none" : ""}`}>
           <div className="table-area relative w-full h-full flex items-center justify-center">
             <div
-              className={`table relative aspect-[16/9] rounded-[28px] border-[12px] shadow-2xl overflow-hidden bg-black/20 ${useLargeScreenTableSizing ? "w-full" : "w-[96vw] max-w-[860px]"} ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
-              style={useLargeScreenTableSizing ? { maxWidth: `${tableMaxWidthPx}px` } : undefined}
+              className={`table relative aspect-[16/9] rounded-[28px] border-[12px] shadow-2xl overflow-hidden bg-black/20 w-[96vw] ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
+              style={{ maxWidth: `${tableMaxWidthPx}px` }}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.06),transparent_60%)]" />
               <div
