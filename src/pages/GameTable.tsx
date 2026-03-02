@@ -260,7 +260,7 @@ const GameTable: React.FC = () => {
       const isLandscape = usableWidth > usableHeight;
       const compactLandscape = isLandscape && usableHeight <= 520;
       const veryShortLandscape = isLandscape && usableHeight <= 430;
-      const tableHeightRatio = veryShortLandscape ? 0.74 : compactLandscape ? 0.79 : isLandscape ? 0.88 : 0.92;
+      const tableHeightRatio = veryShortLandscape ? 0.9 : compactLandscape ? 0.94 : isLandscape ? 0.96 : 0.92;
       const maxByViewport = usableWidth * 0.96;
       const maxByHeight = usableHeight * tableHeightRatio * (16 / 9);
       const maxByTV = 1800;
@@ -1169,7 +1169,7 @@ const GameTable: React.FC = () => {
 
         <div
           className={`game-wrapper flex-1 relative overflow-hidden touch-manipulation ${
-            isCompactLandscape ? "pb-1" : "pb-6"
+            isCompactLandscape ? "pb-2" : "pb-6"
           } ${isMobilePortrait ? "pointer-events-none" : ""}`}
         >
           <div className="table-area relative w-full h-full flex items-center justify-center">
@@ -1368,7 +1368,7 @@ const GameTable: React.FC = () => {
 
               <div
                 className={`seat absolute w-[96%] max-w-[820px] left-1/2 -translate-x-1/2 pointer-events-auto ${
-                  isCompactLandscape ? "h-[156px] bottom-1" : "h-[176px] bottom-2"
+                  isCompactLandscape ? "h-[168px] bottom-1" : "h-[176px] bottom-2"
                 }`}
               >
                 <div className="flex items-end gap-2 w-full h-full">
@@ -1376,7 +1376,7 @@ const GameTable: React.FC = () => {
                     className={`${
                       isMyTurn ? "active-seat" : "inactive-seat"
                     } relative px-2 py-2 rounded-lg border min-w-[140px] transition-all duration-300 ${
-                      isCompactLandscape ? "mb-3" : "mb-6"
+                      isCompactLandscape ? "mb-4" : "mb-6"
                     } ${
                       isMyTurn
                         ? "border-yellow-400/80 bg-yellow-400/10 brightness-100 opacity-100"
@@ -1429,10 +1429,10 @@ const GameTable: React.FC = () => {
                     ) : null}
                     <div
                       className={`w-full flex flex-col items-center ${
-                        isCompactLandscape ? "-translate-x-8 translate-y-2" : "-translate-x-12 translate-y-6"
+                        isCompactLandscape ? "-translate-x-8 translate-y-4" : "-translate-x-12 translate-y-6"
                       }`}
                     >
-                      <div className={`hand relative w-full max-w-[760px] pointer-events-auto ${isCompactLandscape ? "h-26" : "h-28"}`}>
+                      <div className="hand relative h-28 w-full max-w-[760px] pointer-events-auto">
                         <AnimatePresence>
                           <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
                             {visibleHand.map((card) => {
@@ -1464,7 +1464,7 @@ const GameTable: React.FC = () => {
                                     rank={card.rank}
                                     isSelected={isSelectedCard}
                                     onClick={() => toggleCardSelection(card)}
-                                    className={isCompactLandscape ? "w-10 h-14 sm:w-11 sm:h-16" : "w-11 h-16 sm:w-12 sm:h-[4.5rem]"}
+                                    className="w-11 h-16 sm:w-12 sm:h-[4.5rem]"
                                     badgeText={
                                       isIllegalDiscardSelection
                                         ? "Cannot discard this card this turn."
@@ -1483,7 +1483,7 @@ const GameTable: React.FC = () => {
                       {isMyTurn && !hideCardsForPresentation && (
                         <div
                           className={`actions flex gap-1.5 mt-0 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs ${
-                            isCompactLandscape ? "-translate-y-1" : "-translate-y-3 sm:-translate-y-1"
+                            isCompactLandscape ? "mt-1 translate-y-0" : "-translate-y-3 sm:-translate-y-1"
                           }`}
                         >
                           <GameActions
