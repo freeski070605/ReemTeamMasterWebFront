@@ -68,8 +68,6 @@ const GameTable: React.FC = () => {
   const [playerBalances, setPlayerBalances] = useState<Record<string, number>>({});
   const [tableMaxWidthPx, setTableMaxWidthPx] = useState(860);
   const [isCompactLandscape, setIsCompactLandscape] = useState(false);
-  const [bottomUiScale, setBottomUiScale] = useState(1);
-  const [bottomUiOffsetPx, setBottomUiOffsetPx] = useState(0);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [showGuidanceBanner, setShowGuidanceBanner] = useState(false);
   const [showGuidanceHelper, setShowGuidanceHelper] = useState(false);
@@ -262,32 +260,12 @@ const GameTable: React.FC = () => {
       const isLandscape = usableWidth > usableHeight;
       const compactLandscape = isLandscape && usableHeight <= 520;
       const veryShortLandscape = isLandscape && usableHeight <= 430;
-      const tableHeightRatio = veryShortLandscape ? 0.8 : compactLandscape ? 0.85 : 0.92;
+      const tableHeightRatio = veryShortLandscape ? 0.74 : compactLandscape ? 0.79 : isLandscape ? 0.88 : 0.92;
       const maxByViewport = usableWidth * 0.96;
       const maxByHeight = usableHeight * tableHeightRatio * (16 / 9);
       const maxByTV = 1800;
       setTableMaxWidthPx(Math.floor(Math.min(maxByViewport, maxByHeight, maxByTV)));
       setIsCompactLandscape(compactLandscape);
-
-      let nextBottomUiScale = 1;
-      let nextBottomUiOffsetPx = 0;
-      if (isLandscape) {
-        if (usableHeight <= 370) {
-          nextBottomUiScale = 0.78;
-        } else if (usableHeight <= 400) {
-          nextBottomUiScale = 0.86;
-        } else if (usableHeight <= 440) {
-          nextBottomUiScale = 0.92;
-        } else if (usableHeight <= 500) {
-          nextBottomUiScale = 0.97;
-        }
-
-        if (usableHeight < 470) {
-          nextBottomUiOffsetPx = Math.min(56, Math.round((470 - usableHeight) * 0.6));
-        }
-      }
-      setBottomUiScale(nextBottomUiScale);
-      setBottomUiOffsetPx(nextBottomUiOffsetPx);
     };
 
     updateTableMaxWidth();
@@ -1189,7 +1167,11 @@ const GameTable: React.FC = () => {
           </div>
         )}
 
-        <div className={`game-wrapper flex-1 relative overflow-hidden touch-manipulation pb-6 ${isMobilePortrait ? "pointer-events-none" : ""}`}>
+        <div
+          className={`game-wrapper flex-1 relative overflow-hidden touch-manipulation ${
+            isCompactLandscape ? "pb-1" : "pb-6"
+          } ${isMobilePortrait ? "pointer-events-none" : ""}`}
+        >
           <div className="table-area relative w-full h-full flex items-center justify-center">
             <div
               className={`table relative aspect-[16/9] rounded-[28px] border-[12px] shadow-2xl overflow-hidden bg-black/20 w-[96vw] ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
@@ -1385,20 +1367,16 @@ const GameTable: React.FC = () => {
               </div>
 
               <div
-                className={`seat absolute w-[96%] max-w-[820px] left-1/2 pointer-events-auto ${
-                  isCompactLandscape ? "h-[146px] bottom-1" : "h-[176px] bottom-2"
+                className={`seat absolute w-[96%] max-w-[820px] left-1/2 -translate-x-1/2 pointer-events-auto ${
+                  isCompactLandscape ? "h-[156px] bottom-1" : "h-[176px] bottom-2"
                 }`}
-                style={{
-                  transform: `translateX(-50%) translateY(-${bottomUiOffsetPx}px) scale(${bottomUiScale})`,
-                  transformOrigin: "bottom center",
-                }}
               >
                 <div className="flex items-end gap-2 w-full h-full">
                   <div
                     className={`${
                       isMyTurn ? "active-seat" : "inactive-seat"
                     } relative px-2 py-2 rounded-lg border min-w-[140px] transition-all duration-300 ${
-                      isCompactLandscape ? "mb-2" : "mb-6"
+                      isCompactLandscape ? "mb-3" : "mb-6"
                     } ${
                       isMyTurn
                         ? "border-yellow-400/80 bg-yellow-400/10 brightness-100 opacity-100"
@@ -1451,10 +1429,10 @@ const GameTable: React.FC = () => {
                     ) : null}
                     <div
                       className={`w-full flex flex-col items-center ${
-                        isCompactLandscape ? "-translate-x-8 -translate-y-1" : "-translate-x-12 translate-y-6"
+                        isCompactLandscape ? "-translate-x-8 translate-y-2" : "-translate-x-12 translate-y-6"
                       }`}
                     >
-                      <div className={`hand relative w-full max-w-[760px] pointer-events-auto ${isCompactLandscape ? "h-24" : "h-28"}`}>
+                      <div className={`hand relative w-full max-w-[760px] pointer-events-auto ${isCompactLandscape ? "h-26" : "h-28"}`}>
                         <AnimatePresence>
                           <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
                             {visibleHand.map((card) => {
@@ -1505,7 +1483,7 @@ const GameTable: React.FC = () => {
                       {isMyTurn && !hideCardsForPresentation && (
                         <div
                           className={`actions flex gap-1.5 mt-0 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs ${
-                            isCompactLandscape ? "translate-y-0" : "-translate-y-3 sm:-translate-y-1"
+                            isCompactLandscape ? "-translate-y-1" : "-translate-y-3 sm:-translate-y-1"
                           }`}
                         >
                           <GameActions
