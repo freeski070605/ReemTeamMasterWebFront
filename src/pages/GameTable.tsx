@@ -68,6 +68,8 @@ const GameTable: React.FC = () => {
   const [playerBalances, setPlayerBalances] = useState<Record<string, number>>({});
   const [tableMaxWidthPx, setTableMaxWidthPx] = useState(860);
   const [isCompactLandscape, setIsCompactLandscape] = useState(false);
+  const [bottomUiScale, setBottomUiScale] = useState(1);
+  const [bottomUiOffsetPx, setBottomUiOffsetPx] = useState(0);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [showGuidanceBanner, setShowGuidanceBanner] = useState(false);
   const [showGuidanceHelper, setShowGuidanceHelper] = useState(false);
@@ -266,6 +268,26 @@ const GameTable: React.FC = () => {
       const maxByTV = 1800;
       setTableMaxWidthPx(Math.floor(Math.min(maxByViewport, maxByHeight, maxByTV)));
       setIsCompactLandscape(compactLandscape);
+
+      let nextBottomUiScale = 1;
+      let nextBottomUiOffsetPx = 0;
+      if (isLandscape) {
+        if (usableHeight <= 370) {
+          nextBottomUiScale = 0.78;
+        } else if (usableHeight <= 400) {
+          nextBottomUiScale = 0.86;
+        } else if (usableHeight <= 440) {
+          nextBottomUiScale = 0.92;
+        } else if (usableHeight <= 500) {
+          nextBottomUiScale = 0.97;
+        }
+
+        if (usableHeight < 470) {
+          nextBottomUiOffsetPx = Math.min(56, Math.round((470 - usableHeight) * 0.6));
+        }
+      }
+      setBottomUiScale(nextBottomUiScale);
+      setBottomUiOffsetPx(nextBottomUiOffsetPx);
     };
 
     updateTableMaxWidth();
@@ -1363,9 +1385,13 @@ const GameTable: React.FC = () => {
               </div>
 
               <div
-                className={`seat absolute w-[96%] max-w-[820px] left-1/2 -translate-x-1/2 pointer-events-auto ${
+                className={`seat absolute w-[96%] max-w-[820px] left-1/2 pointer-events-auto ${
                   isCompactLandscape ? "h-[146px] bottom-1" : "h-[176px] bottom-2"
                 }`}
+                style={{
+                  transform: `translateX(-50%) translateY(-${bottomUiOffsetPx}px) scale(${bottomUiScale})`,
+                  transformOrigin: "bottom center",
+                }}
               >
                 <div className="flex items-end gap-2 w-full h-full">
                   <div
@@ -1425,7 +1451,7 @@ const GameTable: React.FC = () => {
                     ) : null}
                     <div
                       className={`w-full flex flex-col items-center ${
-                        isCompactLandscape ? "-translate-x-8 translate-y-1" : "-translate-x-12 translate-y-6"
+                        isCompactLandscape ? "-translate-x-8 -translate-y-1" : "-translate-x-12 translate-y-6"
                       }`}
                     >
                       <div className={`hand relative w-full max-w-[760px] pointer-events-auto ${isCompactLandscape ? "h-24" : "h-28"}`}>
