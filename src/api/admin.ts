@@ -39,12 +39,18 @@ export interface AdminWithdrawal {
   transactionId?: string;
 }
 
-export interface AdminLiveTable {
+export type AdminTableStatusFilter = 'all' | 'in-game' | 'waiting';
+
+export interface AdminTable {
   tableId: string;
   name: string;
   mode: string;
   stake: number;
-  status: string;
+  status: 'waiting' | 'in-game';
+  minPlayers: number;
+  maxPlayers: number;
+  currentPlayerCount: number;
+  currentMatchId?: string | null;
   activeContestId?: string | null;
   playersSeated: Array<{
     userId: string;
@@ -60,6 +66,13 @@ export interface AdminLiveTable {
     turnExpiresAt?: number | null;
     turnTimeRemainingMs?: number | null;
   } | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AdminWalletSearchResult {
+  user: AdminUser;
+  wallet: AdminWallet;
 }
 
 export interface AdminAuditRecord {
@@ -139,7 +152,11 @@ export const adminApi = {
     const { data } = await client.get<{ user: AdminUser; wallet: AdminWallet; transactions: any[] }>(`/admin/wallets/${userId}`);
     return data;
   },
-  adjustWallet: async (payload: { userId: string; amount: number; reason: string }) => {
+  searchWallets: async (q: string) => {
+    const { data } = await client.get<{ results: AdminWalletSearchResult[] }>('/admin/wallets/search', { params: { q } });
+    return data.results || [];
+  },
+  adjustWallet: async (payload: { userId: string; amount: number; reason: string; currency: 'USD' | 'RTC' }) => {
     const { data } = await client.post('/admin/wallets/adjust', payload);
     return data;
   },
@@ -155,8 +172,12 @@ export const adminApi = {
     const { data } = await client.patch(`/admin/withdrawals/${id}/reject`);
     return data;
   },
+  getTables: async (status: AdminTableStatusFilter = 'all') => {
+    const { data } = await client.get<{ tables: AdminTable[] }>('/admin/tables', { params: { status } });
+    return data.tables || [];
+  },
   getLiveTables: async () => {
-    const { data } = await client.get<{ tables: AdminLiveTable[] }>('/admin/tables/live');
+    const { data } = await client.get<{ tables: AdminTable[] }>('/admin/tables/live');
     return data.tables || [];
   },
   resetTable: async (tableId: string) => {
@@ -183,4 +204,3 @@ export const adminApi = {
     return data.tournaments || [];
   },
 };
-

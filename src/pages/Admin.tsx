@@ -20,10 +20,12 @@ import { Input } from '../components/ui/Input';
 import {
   adminApi,
   AdminAuditRecord,
-  AdminLiveTable,
+  AdminTable,
+  AdminTableStatusFilter,
   AdminMetrics,
   AdminUser,
   AdminWallet,
+  AdminWalletSearchResult,
   AdminWithdrawal,
 } from '../api/admin';
 import { useAuthStore } from '../store/authStore';
@@ -48,6 +50,7 @@ interface UserProfilePayload {
 interface WalletAdjustDraft {
   amount: string;
   reason: string;
+  currency: 'USD' | 'RTC';
 }
 
 interface ConfirmState {
@@ -64,7 +67,7 @@ const SECTIONS: Array<{ id: AdminSection; label: string; icon: React.ReactNode }
   { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" /> },
   { id: 'wallets', label: 'Wallets', icon: <Wallet className="h-4 w-4" /> },
   { id: 'withdrawals', label: 'Withdrawals', icon: <BadgeDollarSign className="h-4 w-4" /> },
-  { id: 'tables', label: 'Live Tables', icon: <Table className="h-4 w-4" /> },
+  { id: 'tables', label: 'Tables', icon: <Table className="h-4 w-4" /> },
   { id: 'tournaments', label: 'Tournaments', icon: <Trophy className="h-4 w-4" /> },
   { id: 'metrics', label: 'System Metrics', icon: <Activity className="h-4 w-4" /> },
   { id: 'audits', label: 'Audit Logs', icon: <Shield className="h-4 w-4" /> },
@@ -118,6 +121,8 @@ const roleBadgeClass = (role: UserRole) => {
 };
 
 const statusChipClass = (status: string) => {
+  if (status === 'in-game' || status === 'in-progress') return 'bg-emerald-500/20 text-emerald-200';
+  if (status === 'waiting') return 'bg-sky-500/20 text-sky-200';
   if (status === 'pending') return 'bg-amber-500/20 text-amber-200';
   if (status === 'approved' || status === 'fulfilled') return 'bg-emerald-500/20 text-emerald-200';
   if (status === 'rejected') return 'bg-rose-500/20 text-rose-200';
@@ -197,8 +202,19 @@ const WalletAdjustModal: React.FC<{
             <h3 className="mt-2 text-2xl rt-page-title">Confirm Balance Change</h3>
             <p className="mt-2 text-sm text-white/70">User ID: {targetUserId || '--'}</p>
             <div className="mt-4 grid gap-3">
+              <div>
+                <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/60">Currency</label>
+                <select
+                  className="flex h-11 w-full rounded-xl border border-white/14 bg-black/35 px-3 py-2 text-sm text-white transition-colors focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-transparent"
+                  value={draft.currency}
+                  onChange={(event) => onChange({ ...draft, currency: event.target.value as 'USD' | 'RTC' })}
+                >
+                  <option value="USD">USD</option>
+                  <option value="RTC">RTC</option>
+                </select>
+              </div>
               <Input
-                label="Amount (+/- USD)"
+                label={`Amount (+/- ${draft.currency})`}
                 type="number"
                 value={draft.amount}
                 onChange={(event) => onChange({ ...draft, amount: event.target.value })}
@@ -238,15 +254,18 @@ const Admin: React.FC = () => {
   const [userQuery, setUserQuery] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<UserProfilePayload | null>(null);
 
+  const [walletLookupQuery, setWalletLookupQuery] = useState('');
   const [walletLookupUserId, setWalletLookupUserId] = useState('');
+  const [walletSearchResults, setWalletSearchResults] = useState<AdminWalletSearchResult[]>([]);
   const [walletProfile, setWalletProfile] = useState<UserProfilePayload | null>(null);
   const [walletAdjustOpen, setWalletAdjustOpen] = useState(false);
-  const [walletAdjustDraft, setWalletAdjustDraft] = useState<WalletAdjustDraft>({ amount: '', reason: '' });
+  const [walletAdjustDraft, setWalletAdjustDraft] = useState<WalletAdjustDraft>({ amount: '', reason: '', currency: 'USD' });
 
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
   const [withdrawalStatus, setWithdrawalStatus] = useState('pending');
 
-  const [liveTables, setLiveTables] = useState<AdminLiveTable[]>([]);
+  const [tables, setTables] = useState<AdminTable[]>([]);
+  const [tableStatusFilter, setTableStatusFilter] = useState<AdminTableStatusFilter>('all');
   const [matchLookupId, setMatchLookupId] = useState('');
   const [matchDetails, setMatchDetails] = useState<any>(null);
 
@@ -332,11 +351,24 @@ const Admin: React.FC = () => {
     try {
       const payload = await adminApi.getUser(id);
       setSelectedProfile(payload);
+      setWalletLookupQuery(payload.user.username || payload.user.email);
       setWalletLookupUserId(payload.user.id);
     } catch (error: any) {
       toast.error(getErrorMessage(error, 'Failed to load user profile.'));
     } finally {
       setSectionLoading('users', false);
+    }
+  }, []);
+
+  const searchWallets = useCallback(async (query: string) => {
+    setSectionLoading('wallets', true);
+    try {
+      const results = await adminApi.searchWallets(query.trim());
+      setWalletSearchResults(results);
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, 'Failed to search wallets.'));
+    } finally {
+      setSectionLoading('wallets', false);
     }
   }, []);
 
@@ -348,8 +380,11 @@ const Admin: React.FC = () => {
 
     setSectionLoading('wallets', true);
     try {
-      const payload = await adminApi.getWallet(userId.trim());
+      const safeUserId = userId.trim();
+      const payload = await adminApi.getWallet(safeUserId);
+      setWalletLookupUserId(safeUserId);
       setWalletProfile(payload);
+      setWalletLookupQuery(payload.user.username || payload.user.email);
     } catch (error: any) {
       toast.error(getErrorMessage(error, 'Failed to load wallet details.'));
     } finally {
@@ -369,13 +404,13 @@ const Admin: React.FC = () => {
     }
   }, []);
 
-  const loadLiveTables = useCallback(async () => {
+  const loadTables = useCallback(async (status: AdminTableStatusFilter = 'all') => {
     setSectionLoading('tables', true);
     try {
-      const list = await adminApi.getLiveTables();
-      setLiveTables(list);
+      const list = await adminApi.getTables(status);
+      setTables(list);
     } catch (error: any) {
-      toast.error(getErrorMessage(error, 'Failed to load live tables.'));
+      toast.error(getErrorMessage(error, 'Failed to load tables.'));
     } finally {
       setSectionLoading('tables', false);
     }
@@ -409,15 +444,20 @@ const Admin: React.FC = () => {
     void loadMetrics();
     void loadUsers('');
     void loadWithdrawals('pending');
-    void loadLiveTables();
+    void loadTables('all');
     void loadAudits(1, '', '');
     void loadTournaments();
-  }, [loadAudits, loadLiveTables, loadMetrics, loadTournaments, loadUsers, loadWithdrawals]);
+  }, [loadAudits, loadMetrics, loadTables, loadTournaments, loadUsers, loadWithdrawals]);
 
   const pendingWithdrawalAmount = useMemo(
     () => withdrawals.filter((item) => item.status === 'pending').reduce((sum, item) => sum + item.amount, 0),
     [withdrawals]
   );
+  const liveTableCount = useMemo(
+    () => tables.filter((table) => table.status === 'in-game').length,
+    [tables]
+  );
+  const waitingTableCount = tables.length - liveTableCount;
 
   const handleBanToggle = async (target: AdminUser) => {
     await adminApi.setBanState(target.id, !target.isBanned);
@@ -440,6 +480,7 @@ const Admin: React.FC = () => {
   const handleWalletAdjustment = async () => {
     const targetUserId = walletProfile?.user.id || walletLookupUserId;
     const amount = Number(walletAdjustDraft.amount);
+    const currency = walletAdjustDraft.currency;
     if (!targetUserId) {
       toast.error('Load a wallet before adjustment.');
       return;
@@ -455,10 +496,15 @@ const Admin: React.FC = () => {
 
     setActionPending(true);
     try {
-      await adminApi.adjustWallet({ userId: targetUserId, amount, reason: walletAdjustDraft.reason.trim() });
+      await adminApi.adjustWallet({
+        userId: targetUserId,
+        amount,
+        reason: walletAdjustDraft.reason.trim(),
+        currency,
+      });
       toast.success('Wallet adjusted successfully.');
       setWalletAdjustOpen(false);
-      setWalletAdjustDraft({ amount: '', reason: '' });
+      setWalletAdjustDraft({ amount: '', reason: '', currency: 'USD' });
       await Promise.all([loadWalletProfile(targetUserId), loadMetrics()]);
     } catch (error: any) {
       toast.error(getErrorMessage(error, 'Failed to adjust wallet.'));
@@ -485,14 +531,14 @@ const Admin: React.FC = () => {
     );
   };
 
-  const handleResetTable = (table: AdminLiveTable) => {
+  const handleResetTable = (table: AdminTable) => {
     openConfirm(
-      'Reset Live Table',
+      'Reset Table',
       `Reset ${table.name}? This clears seated players and active game state.`,
       async () => {
         await adminApi.resetTable(table.tableId);
         toast.success('Table reset completed.');
-        await Promise.all([loadLiveTables(), loadMetrics(), loadAudits(1, auditActionFilter, auditAdminFilter)]);
+        await Promise.all([loadTables(tableStatusFilter), loadMetrics(), loadAudits(1, auditActionFilter, auditAdminFilter)]);
       },
       { danger: true, confirmLabel: 'Reset Table' }
     );
@@ -720,32 +766,79 @@ const Admin: React.FC = () => {
     return (
       <section className="space-y-4">
         <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className="flex flex-col gap-3">
             <div>
               <h3 className="text-xl rt-page-title">Wallet Inspection</h3>
-              <p className="text-xs text-white/55">Load wallet and transaction history for a specific user.</p>
+              <p className="text-xs text-white/55">Search wallets by username/email, then adjust balances safely.</p>
             </div>
-            <div className="flex w-full max-w-lg gap-2">
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
               <Input
-                label="User ID"
+                label="Username or Email"
+                value={walletLookupQuery}
+                onChange={(event) => setWalletLookupQuery(event.target.value)}
+              />
+              <Button size="sm" onClick={() => void searchWallets(walletLookupQuery)} isLoading={loading.wallets}>
+                Search Wallets
+              </Button>
+            </div>
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <Input
+                label="Direct User ID (Optional)"
                 value={walletLookupUserId}
                 onChange={(event) => setWalletLookupUserId(event.target.value)}
               />
-              <div className="self-end pb-0.5">
-                <Button size="sm" onClick={() => void loadWalletProfile(walletLookupUserId)} isLoading={loading.wallets}>
-                  Load Wallet
-                </Button>
-              </div>
+              <Button size="sm" variant="secondary" onClick={() => void loadWalletProfile(walletLookupUserId)} isLoading={loading.wallets}>
+                Load by ID
+              </Button>
             </div>
           </div>
         </div>
 
+        {walletSearchResults.length > 0 && (
+          <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#0f1622]">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-white/10 text-xs uppercase tracking-[0.14em] text-white/50">
+                <tr>
+                  <th className="px-4 py-3">User</th>
+                  <th className="px-4 py-3">USD</th>
+                  <th className="px-4 py-3">RTC</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {walletSearchResults.map((item) => (
+                  <tr key={item.user.id}>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-white">{item.user.username}</div>
+                      <div className="text-xs text-white/55">{item.user.email}</div>
+                    </td>
+                    <td className="px-4 py-3 text-white/75">{formatCurrency(item.wallet.usdBalance)}</td>
+                    <td className="px-4 py-3 text-white/75">{item.wallet.rtcBalance}</td>
+                    <td className="px-4 py-3 text-right">
+                      <Button size="sm" variant="secondary" onClick={() => void loadWalletProfile(item.user.id)}>
+                        Load
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {!walletProfile ? (
           <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-6 text-sm text-white/60">
-            Search a user wallet to manage balances and transaction history.
+            Search and load a wallet to manage balances and transaction history.
           </div>
         ) : (
           <>
+            <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/50">Loaded Wallet</div>
+              <div className="mt-2 text-lg text-white">{walletProfile.user.username}</div>
+              <div className="text-xs text-white/55">{walletProfile.user.email}</div>
+              <div className="mt-2 text-xs text-white/50">User ID: {walletProfile.user.id}</div>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-3">
               <article className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
                 <div className="text-xs uppercase tracking-[0.18em] text-white/50">USD Balance</div>
@@ -902,42 +995,79 @@ const Admin: React.FC = () => {
         <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <h3 className="text-xl rt-page-title">Live Table Operations</h3>
-              <p className="text-xs text-white/55">Monitor seated players, pot size, and turn state.</p>
+              <h3 className="text-xl rt-page-title">Table Operations</h3>
+              <p className="text-xs text-white/55">View live and non-live tables and reset table runtime state.</p>
             </div>
-            <Button size="sm" variant="secondary" onClick={() => void loadLiveTables()} isLoading={loading.tables}>
-              Refresh Tables
-            </Button>
+            <div className="flex items-center gap-2">
+              <select
+                className="h-10 rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
+                value={tableStatusFilter}
+                onChange={(event) => {
+                  const status = event.target.value as AdminTableStatusFilter;
+                  setTableStatusFilter(status);
+                  void loadTables(status);
+                }}
+              >
+                <option value="all">all tables</option>
+                <option value="in-game">live only</option>
+                <option value="waiting">non-live only</option>
+              </select>
+              <Button size="sm" variant="secondary" onClick={() => void loadTables(tableStatusFilter)} isLoading={loading.tables}>
+                Refresh
+              </Button>
+            </div>
           </div>
         </div>
 
+        <div className="grid gap-4 md:grid-cols-3">
+          <article className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/50">Total Tables</div>
+            <div className="mt-2 text-2xl rt-page-title">{tables.length}</div>
+          </article>
+          <article className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/50">Live Tables</div>
+            <div className="mt-2 text-2xl rt-page-title">{liveTableCount}</div>
+          </article>
+          <article className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/50">Non-Live Tables</div>
+            <div className="mt-2 text-2xl rt-page-title">{waitingTableCount}</div>
+          </article>
+        </div>
+
         <div className="grid gap-4 lg:grid-cols-2">
-          {liveTables.map((table) => (
+          {tables.map((table) => (
             <article key={table.tableId} className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
               <div className="flex items-start justify-between">
                 <div>
                   <h4 className="text-lg rt-page-title">{table.name}</h4>
-                  <div className="text-xs text-white/55">{table.mode} • Stake {formatCurrency(table.stake)}</div>
+                  <div className="mt-1 flex items-center gap-2 text-xs">
+                    <span className={`rounded-full px-2 py-0.5 ${statusChipClass(table.status)}`}>{table.status}</span>
+                    <span className="text-white/55">{table.mode} | Stake {formatCurrency(table.stake)}</span>
+                  </div>
                 </div>
-                <Button size="sm" variant="danger" onClick={() => handleResetTable(table)}>
-                  Reset
-                </Button>
               </div>
               <div className="mt-4 grid gap-2 text-xs text-white/70">
-                <div>Players seated: {table.playersSeated.length}</div>
+                <div>Players seated: {table.currentPlayerCount}/{table.maxPlayers}</div>
+                <div>Min players: {table.minPlayers}</div>
                 <div>Current pot: {formatCurrency(table.currentPot)}</div>
                 <div>Turn: {table.turnState?.turn ?? '--'} ({table.turnState?.status || 'no game state'})</div>
                 <div>Current player: {table.turnState?.currentPlayerUsername || '--'}</div>
                 <div>Time remaining: {table.turnState?.turnTimeRemainingMs ? `${Math.ceil(table.turnState.turnTimeRemainingMs / 1000)}s` : '--'}</div>
+                <div>Updated: {formatDate(table.updatedAt)}</div>
               </div>
               <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/65">
                 {table.playersSeated.map((player) => player.username).join(', ') || 'No players listed'}
               </div>
+              <div className="mt-3 flex justify-end">
+                <Button size="sm" variant="danger" onClick={() => handleResetTable(table)}>
+                  Reset Table
+                </Button>
+              </div>
             </article>
           ))}
-          {liveTables.length === 0 && (
+          {tables.length === 0 && (
             <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-6 text-sm text-white/55">
-              No live tables found.
+              No tables found in this filter.
             </div>
           )}
         </div>
@@ -964,7 +1094,6 @@ const Admin: React.FC = () => {
       </section>
     );
   };
-
   const renderTournaments = () => {
     return (
       <section className="space-y-4">
@@ -1200,7 +1329,7 @@ const Admin: React.FC = () => {
                   if (activeSection === 'users') void loadUsers(userQuery);
                   if (activeSection === 'wallets') void loadWalletProfile(walletLookupUserId || walletProfile?.user.id || '');
                   if (activeSection === 'withdrawals') void loadWithdrawals(withdrawalStatus);
-                  if (activeSection === 'tables') void loadLiveTables();
+                  if (activeSection === 'tables') void loadTables(tableStatusFilter);
                   if (activeSection === 'tournaments') void loadTournaments();
                   if (activeSection === 'audits') void loadAudits(auditPage, auditActionFilter, auditAdminFilter);
                 }}
