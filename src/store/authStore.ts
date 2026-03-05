@@ -1,14 +1,32 @@
 import { create } from 'zustand';
 import client from '../api/client';
 import { toast } from 'react-toastify';
+import { UserRole, resolveUserRole } from '../types/roles';
 
 interface User {
   _id: string;
   username: string;
   email: string;
   avatarUrl?: string;
+  role: UserRole;
   isAdmin?: boolean;
 }
+
+const normalizeStoredUser = (value: any): User | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const role = resolveUserRole(value.role, !!value.isAdmin);
+  return {
+    _id: value._id,
+    username: value.username,
+    email: value.email,
+    avatarUrl: value.avatarUrl,
+    role,
+    isAdmin: role === 'admin' || role === 'superadmin',
+  };
+};
 
 interface AuthState {
   user: User | null;
@@ -26,8 +44,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   user: (() => {
     const stored = JSON.parse(localStorage.getItem('user') || 'null');
-    if (!stored) return null;
-    return { ...stored, isAdmin: !!stored.isAdmin };
+    return normalizeStoredUser(stored);
   })(),
   token: localStorage.getItem('token'),
   isAuthenticated: !!localStorage.getItem('token'),
@@ -37,14 +54,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await client.post('/auth/login', { email, password });
-      const { token, userId, username, email: userEmail, avatarUrl, isAdmin } = response.data;
+      const { token, userId, username, email: userEmail, avatarUrl, role, isAdmin } = response.data;
+      const resolvedRole = resolveUserRole(role, !!isAdmin);
       
       const user = {
         _id: userId,
         username: username || 'User',
         email: userEmail || email,
         avatarUrl,
-        isAdmin: !!isAdmin,
+        role: resolvedRole,
+        isAdmin: resolvedRole === 'admin' || resolvedRole === 'superadmin',
       };
       
       localStorage.setItem('token', token);
@@ -63,9 +82,17 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await client.post('/auth/register', { username, email, password });
-      const { token, userId, avatarUrl, isAdmin } = response.data;
+      const { token, userId, avatarUrl, role, isAdmin } = response.data;
+      const resolvedRole = resolveUserRole(role, !!isAdmin);
       
-      const user = { _id: userId, username, email, avatarUrl, isAdmin: !!isAdmin };
+      const user = {
+        _id: userId,
+        username,
+        email,
+        avatarUrl,
+        role: resolvedRole,
+        isAdmin: resolvedRole === 'admin' || resolvedRole === 'superadmin',
+      };
       
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -88,9 +115,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   checkAuth: () => {
     const token = localStorage.getItem('token');
-    const user = JSON.parse(localStorage.getItem('user') || 'null');
-    const normalizedUser = user ? { ...user, isAdmin: !!user.isAdmin } : null;
-    if (token && user) {
+    const stored = JSON.parse(localStorage.getItem('user') || 'null');
+    const normalizedUser = normalizeStoredUser(stored);
+    if (token && normalizedUser) {
         set({ token, user: normalizedUser, isAuthenticated: true });
     } else {
         set({ token: null, user: null, isAuthenticated: false });

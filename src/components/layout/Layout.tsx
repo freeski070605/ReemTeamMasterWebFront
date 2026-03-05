@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { Button } from '../ui/Button';
 import NavbarBalance from '../wallet/NavbarBalance';
 import InstallPromptBanner from '../pwa/InstallPromptBanner';
+import { hasAdminTabAccess } from '../../types/roles';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout, isAuthenticated } = useAuthStore();
@@ -34,12 +35,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         { to: '/contests', label: 'Cash Crown Tournaments' },
         { to: '/account', label: 'Account' },
       ];
-      if (user?.isAdmin) {
+      if (user?.role && hasAdminTabAccess(user.role)) {
         links.push({ to: '/admin', label: 'Admin' });
       }
       return links;
     },
-    [user?.isAdmin]
+    [user?.role]
   );
 
   const handleLogout = () => {

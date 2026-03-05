@@ -1,1092 +1,1234 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw, Search, Settings, Trophy, Wallet } from 'lucide-react';
+import {
+  Activity,
+  BadgeDollarSign,
+  ChevronLeft,
+  ChevronRight,
+  LayoutDashboard,
+  RefreshCw,
+  Search,
+  Shield,
+  Table,
+  Trophy,
+  Users,
+  Wallet,
+} from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'react-toastify';
-import client from '../api/client';
 import { Button } from '../components/ui/Button';
-import { Loader } from '../components/ui/Loader';
 import { Input } from '../components/ui/Input';
-import { Modal } from '../components/ui/Modal';
+import {
+  adminApi,
+  AdminAuditRecord,
+  AdminLiveTable,
+  AdminMetrics,
+  AdminUser,
+  AdminWallet,
+  AdminWithdrawal,
+} from '../api/admin';
+import { useAuthStore } from '../store/authStore';
+import { USER_ROLES, UserRole } from '../types/roles';
 
-type AdminTab = 'overview' | 'tables' | 'contests' | 'withdrawals';
-type GameMode = 'FREE_RTC_TABLE' | 'RTC_TOURNAMENT' | 'RTC_SATELLITE' | 'USD_CONTEST';
-type ContestStatus = 'draft' | 'open' | 'locked' | 'in-progress' | 'completed' | 'cancelled';
-type TableStatusFilter = 'all' | 'waiting' | 'in-game';
+type AdminSection =
+  | 'dashboard'
+  | 'users'
+  | 'wallets'
+  | 'withdrawals'
+  | 'tables'
+  | 'tournaments'
+  | 'metrics'
+  | 'audits';
 
-interface AdminOverview {
-  users: number;
-  admins: number;
-  wallets: number;
-  tables: number;
-  cashCrownTables: number;
-  contests: number;
-  activeContests: number;
-  pendingWithdrawals: number;
+interface UserProfilePayload {
+  user: AdminUser;
+  wallet: AdminWallet;
+  transactions: any[];
 }
 
-interface AdminTable {
-  _id: string;
-  name: string;
-  stake: number;
-  mode: GameMode;
-  minPlayers: number;
-  maxPlayers: number;
-  currentPlayerCount: number;
-  status: 'waiting' | 'in-game';
-  activeContestId?: string;
+interface WalletAdjustDraft {
+  amount: string;
+  reason: string;
 }
 
-interface AdminContest {
-  _id: string;
-  contestId: string;
-  entryFee: number;
-  playerCount: number;
-  prizePool: number;
-  platformFee: number;
-  status: ContestStatus;
-  participants: string[];
-  createdAt: string;
-  startedAt?: string;
-  endedAt?: string;
-}
-
-interface WithdrawalRequest {
-  _id: string;
-  userId: { username: string; email: string };
-  amount: number;
-  payoutMethod: string;
-  payoutAddress: string;
-  status: string;
-  requestedAt: string;
-}
-
-interface TableDraft {
-  name: string;
-  stake: string;
-  mode: GameMode;
-  minPlayers: string;
-  maxPlayers: string;
-  activeContestId: string;
-}
-
-interface ContestDraft {
-  entryFee: string;
-  playerCount: string;
-  platformFee: string;
-}
-
-interface ConfirmDialogState {
-  open: boolean;
+interface ConfirmState {
+  isOpen: boolean;
   title: string;
   message: string;
-  action: (() => Promise<void>) | null;
+  confirmLabel: string;
+  danger?: boolean;
+  onConfirm: (() => Promise<void>) | null;
 }
 
-const MODE_LABELS: Record<GameMode, string> = {
-  FREE_RTC_TABLE: 'Free RTC',
-  RTC_TOURNAMENT: 'RTC Tournament',
-  RTC_SATELLITE: 'RTC Satellite',
-  USD_CONTEST: 'Cash Crown',
+const SECTIONS: Array<{ id: AdminSection; label: string; icon: React.ReactNode }> = [
+  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
+  { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" /> },
+  { id: 'wallets', label: 'Wallets', icon: <Wallet className="h-4 w-4" /> },
+  { id: 'withdrawals', label: 'Withdrawals', icon: <BadgeDollarSign className="h-4 w-4" /> },
+  { id: 'tables', label: 'Live Tables', icon: <Table className="h-4 w-4" /> },
+  { id: 'tournaments', label: 'Tournaments', icon: <Trophy className="h-4 w-4" /> },
+  { id: 'metrics', label: 'System Metrics', icon: <Activity className="h-4 w-4" /> },
+  { id: 'audits', label: 'Audit Logs', icon: <Shield className="h-4 w-4" /> },
+];
+
+const INITIAL_LOADING: Record<AdminSection, boolean> = {
+  dashboard: false,
+  users: false,
+  wallets: false,
+  withdrawals: false,
+  tables: false,
+  tournaments: false,
+  metrics: false,
+  audits: false,
 };
 
-const statusOptions: ContestStatus[] = ['draft', 'open', 'locked', 'in-progress', 'cancelled', 'completed'];
+const getErrorMessage = (error: any, fallback: string) => error?.response?.data?.message || fallback;
 
-const tabCopy: Record<AdminTab, { title: string; description: string }> = {
-  overview: {
-    title: 'Control Overview',
-    description: 'Monitor platform health and cash operations at a glance.',
-  },
-  tables: {
-    title: 'Cash Crown Tables',
-    description: 'Create, configure, reset, and retire competition tables.',
-  },
-  contests: {
-    title: 'Cash Crown Contests',
-    description: 'Launch contest pools and control contest lifecycle status.',
-  },
-  withdrawals: {
-    title: 'Withdrawal Queue',
-    description: 'Review payout requests and approve or reject safely.',
-  },
+const formatCurrency = (value: number | null | undefined) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '--';
+  }
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+  }).format(value);
 };
 
-const quickTableTiers = [1, 5, 10, 25, 50];
-
-const statusBadgeClass: Record<ContestStatus, string> = {
-  draft: 'bg-white/10 text-white/75',
-  open: 'bg-emerald-500/20 text-emerald-200',
-  locked: 'bg-amber-500/20 text-amber-200',
-  'in-progress': 'bg-sky-500/20 text-sky-200',
-  completed: 'bg-violet-500/20 text-violet-200',
-  cancelled: 'bg-rose-500/20 text-rose-200',
+const formatDate = (value?: string | number | null) => {
+  if (!value) return '--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  return date.toLocaleString();
 };
 
-const getErrorMessage = (error: any, fallback: string): string => {
-  return error?.response?.data?.message || fallback;
+const roleBadgeClass = (role: UserRole) => {
+  switch (role) {
+    case 'superadmin':
+      return 'bg-red-500/20 text-red-200';
+    case 'admin':
+      return 'bg-orange-500/20 text-orange-200';
+    case 'finance':
+      return 'bg-emerald-500/20 text-emerald-200';
+    case 'moderator':
+      return 'bg-sky-500/20 text-sky-200';
+    default:
+      return 'bg-white/10 text-white/70';
+  }
 };
 
-const toTableDraft = (table: AdminTable): TableDraft => ({
-  name: table.name,
-  stake: String(table.stake),
-  mode: table.mode,
-  minPlayers: String(table.minPlayers),
-  maxPlayers: String(table.maxPlayers),
-  activeContestId: table.activeContestId ?? '',
-});
+const statusChipClass = (status: string) => {
+  if (status === 'pending') return 'bg-amber-500/20 text-amber-200';
+  if (status === 'approved' || status === 'fulfilled') return 'bg-emerald-500/20 text-emerald-200';
+  if (status === 'rejected') return 'bg-rose-500/20 text-rose-200';
+  return 'bg-white/10 text-white/70';
+};
 
-const defaultTableDraft = (): TableDraft => ({
-  name: '',
-  stake: '1',
-  mode: 'USD_CONTEST',
-  minPlayers: '2',
-  maxPlayers: '4',
-  activeContestId: '',
-});
+const ConfirmDialog: React.FC<{
+  state: ConfirmState;
+  pending: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}> = ({ state, pending, onClose, onConfirm }) => {
+  return (
+    <AnimatePresence>
+      {state.isOpen && (
+        <motion.div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="w-full max-w-lg rounded-2xl border border-white/15 bg-[#0d1118] p-6 shadow-[0_30px_70px_rgba(0,0,0,0.55)]"
+            initial={{ opacity: 0, y: 14, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.97 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            <div className="text-xs uppercase tracking-[0.18em] text-white/45">Confirmation</div>
+            <h3 className="mt-2 text-2xl rt-page-title">{state.title}</h3>
+            <p className="mt-3 text-sm text-white/70">{state.message}</p>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="secondary" onClick={onClose} disabled={pending}>
+                Cancel
+              </Button>
+              <Button
+                variant={state.danger ? 'danger' : 'primary'}
+                onClick={onConfirm}
+                isLoading={pending}
+              >
+                {state.confirmLabel}
+              </Button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
 
-const defaultContestDraft = (): ContestDraft => ({
-  entryFee: '5',
-  playerCount: '2',
-  platformFee: '0',
-});
-
-const toCurrency = (value: number): string => `$${value.toFixed(2)}`;
-
-const normalizeText = (value: string): string => value.trim().toLowerCase();
+const WalletAdjustModal: React.FC<{
+  open: boolean;
+  draft: WalletAdjustDraft;
+  onChange: (next: WalletAdjustDraft) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  pending: boolean;
+  targetUserId: string;
+}> = ({ open, draft, onChange, onClose, onSubmit, pending, targetUserId }) => {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[75] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="w-full max-w-xl rounded-2xl border border-white/15 bg-[#0d1118] p-6 shadow-[0_30px_70px_rgba(0,0,0,0.55)]"
+            initial={{ opacity: 0, y: 14, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.97 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            <div className="text-xs uppercase tracking-[0.18em] text-white/45">Wallet Adjustment</div>
+            <h3 className="mt-2 text-2xl rt-page-title">Confirm Balance Change</h3>
+            <p className="mt-2 text-sm text-white/70">User ID: {targetUserId || '--'}</p>
+            <div className="mt-4 grid gap-3">
+              <Input
+                label="Amount (+/- USD)"
+                type="number"
+                value={draft.amount}
+                onChange={(event) => onChange({ ...draft, amount: event.target.value })}
+              />
+              <Input
+                label="Reason"
+                value={draft.reason}
+                onChange={(event) => onChange({ ...draft, reason: event.target.value })}
+              />
+            </div>
+            <div className="mt-4 rounded-xl border border-amber-300/30 bg-amber-300/10 p-3 text-xs text-amber-100">
+              This action is audited with before/after state and operator identity.
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="secondary" onClick={onClose} disabled={pending}>
+                Cancel
+              </Button>
+              <Button onClick={onSubmit} isLoading={pending}>
+                Apply Adjustment
+              </Button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
 
 const Admin: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
-  const [overview, setOverview] = useState<AdminOverview | null>(null);
-  const [tables, setTables] = useState<AdminTable[]>([]);
-  const [contests, setContests] = useState<AdminContest[]>([]);
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fatalError, setFatalError] = useState('');
+  const { user } = useAuthStore();
+  const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
+  const [loading, setLoading] = useState<Record<AdminSection, boolean>>(INITIAL_LOADING);
+  const [actionPending, setActionPending] = useState(false);
 
-  const [tableDraft, setTableDraft] = useState<TableDraft>(defaultTableDraft());
-  const [contestDraft, setContestDraft] = useState<ContestDraft>(defaultContestDraft());
-  const [editingTableId, setEditingTableId] = useState<string | null>(null);
-  const [editingTableDraft, setEditingTableDraft] = useState<TableDraft>(defaultTableDraft());
-  const [contestStatusDraft, setContestStatusDraft] = useState<Record<string, ContestStatus>>({});
+  const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [userQuery, setUserQuery] = useState('');
+  const [selectedProfile, setSelectedProfile] = useState<UserProfilePayload | null>(null);
 
-  const [tableQuery, setTableQuery] = useState('');
-  const [tableStatusFilter, setTableStatusFilter] = useState<TableStatusFilter>('all');
-  const [contestQuery, setContestQuery] = useState('');
-  const [withdrawalQuery, setWithdrawalQuery] = useState('');
+  const [walletLookupUserId, setWalletLookupUserId] = useState('');
+  const [walletProfile, setWalletProfile] = useState<UserProfilePayload | null>(null);
+  const [walletAdjustOpen, setWalletAdjustOpen] = useState(false);
+  const [walletAdjustDraft, setWalletAdjustDraft] = useState<WalletAdjustDraft>({ amount: '', reason: '' });
 
-  const [tableActionId, setTableActionId] = useState<string | null>(null);
-  const [contestActionId, setContestActionId] = useState<string | null>(null);
-  const [processingWithdrawalId, setProcessingWithdrawalId] = useState<string | null>(null);
-  const [creatingTable, setCreatingTable] = useState(false);
-  const [creatingContest, setCreatingContest] = useState(false);
+  const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
+  const [withdrawalStatus, setWithdrawalStatus] = useState('pending');
 
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({
-    open: false,
+  const [liveTables, setLiveTables] = useState<AdminLiveTable[]>([]);
+  const [matchLookupId, setMatchLookupId] = useState('');
+  const [matchDetails, setMatchDetails] = useState<any>(null);
+
+  const [tournaments, setTournaments] = useState<any[]>([]);
+
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditActionFilter, setAuditActionFilter] = useState('');
+  const [auditAdminFilter, setAuditAdminFilter] = useState('');
+  const [auditResponse, setAuditResponse] = useState<{ records: AdminAuditRecord[]; total: number; page: number; limit: number } | null>(null);
+
+  const [confirmState, setConfirmState] = useState<ConfirmState>({
+    isOpen: false,
     title: '',
     message: '',
-    action: null,
+    confirmLabel: 'Confirm',
+    onConfirm: null,
   });
 
-  const fetchOverview = useCallback(async () => {
-    const response = await client.get<AdminOverview>('/admin/overview');
-    setOverview(response.data);
-  }, []);
+  const isSuperAdmin = user?.role === 'superadmin';
 
-  const fetchTables = useCallback(async () => {
-    const response = await client.get<AdminTable[]>('/admin/tables', {
-      params: { mode: 'USD_CONTEST' },
+  const setSectionLoading = (section: AdminSection, value: boolean) => {
+    setLoading((prev) => ({ ...prev, [section]: value }));
+  };
+
+  const openConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => Promise<void>,
+    options?: { danger?: boolean; confirmLabel?: string }
+  ) => {
+    setConfirmState({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+      danger: options?.danger,
+      confirmLabel: options?.confirmLabel || 'Confirm',
     });
-    const sorted = Array.isArray(response.data)
-      ? [...response.data].sort((a, b) => a.stake - b.stake || a.name.localeCompare(b.name))
-      : [];
-    setTables(sorted);
-  }, []);
+  };
 
-  const fetchContests = useCallback(async () => {
-    const response = await client.get<AdminContest[]>('/admin/contests');
-    const sorted = Array.isArray(response.data)
-      ? [...response.data].sort((a, b) => {
-          if (a.status !== b.status) return a.status.localeCompare(b.status);
-          return b.createdAt.localeCompare(a.createdAt);
-        })
-      : [];
-    setContests(sorted);
+  const closeConfirm = () => {
+    if (actionPending) return;
+    setConfirmState({ isOpen: false, title: '', message: '', confirmLabel: 'Confirm', onConfirm: null });
+  };
 
-    setContestStatusDraft((prev) => {
-      const next: Record<string, ContestStatus> = { ...prev };
-      for (const contest of sorted) {
-        next[contest.contestId] = prev[contest.contestId] ?? contest.status;
-      }
-      return next;
-    });
-  }, []);
-
-  const fetchWithdrawals = useCallback(async () => {
-    const response = await client.get<WithdrawalRequest[]>('/wallet/admin/withdrawals');
-    setWithdrawals(Array.isArray(response.data) ? response.data : []);
-  }, []);
-
-  const refreshAll = useCallback(async () => {
-    setLoading(true);
+  const runConfirmAction = async () => {
+    if (!confirmState.onConfirm) return;
+    setActionPending(true);
     try {
-      await Promise.all([fetchOverview(), fetchTables(), fetchContests(), fetchWithdrawals()]);
-      setFatalError('');
-    } catch (error: any) {
-      const message = getErrorMessage(error, 'Failed to load admin data.');
-      setFatalError(message);
-      toast.error(message);
+      await confirmState.onConfirm();
+      closeConfirm();
     } finally {
-      setLoading(false);
+      setActionPending(false);
     }
-  }, [fetchContests, fetchOverview, fetchTables, fetchWithdrawals]);
+  };
+
+  const loadMetrics = useCallback(async () => {
+    setSectionLoading('dashboard', true);
+    try {
+      const payload = await adminApi.getSystemMetrics();
+      setMetrics(payload);
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, 'Failed to load metrics.'));
+    } finally {
+      setSectionLoading('dashboard', false);
+    }
+  }, []);
+
+  const loadUsers = useCallback(async (query: string) => {
+    setSectionLoading('users', true);
+    try {
+      const list = await adminApi.searchUsers(query);
+      setUsers(list);
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, 'Failed to search users.'));
+    } finally {
+      setSectionLoading('users', false);
+    }
+  }, []);
+
+  const loadUserProfile = useCallback(async (id: string) => {
+    setSectionLoading('users', true);
+    try {
+      const payload = await adminApi.getUser(id);
+      setSelectedProfile(payload);
+      setWalletLookupUserId(payload.user.id);
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, 'Failed to load user profile.'));
+    } finally {
+      setSectionLoading('users', false);
+    }
+  }, []);
+
+  const loadWalletProfile = useCallback(async (userId: string) => {
+    if (!userId.trim()) {
+      toast.error('User ID is required.');
+      return;
+    }
+
+    setSectionLoading('wallets', true);
+    try {
+      const payload = await adminApi.getWallet(userId.trim());
+      setWalletProfile(payload);
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, 'Failed to load wallet details.'));
+    } finally {
+      setSectionLoading('wallets', false);
+    }
+  }, []);
+
+  const loadWithdrawals = useCallback(async (status: string) => {
+    setSectionLoading('withdrawals', true);
+    try {
+      const list = await adminApi.getWithdrawals(status);
+      setWithdrawals(list);
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, 'Failed to load withdrawals.'));
+    } finally {
+      setSectionLoading('withdrawals', false);
+    }
+  }, []);
+
+  const loadLiveTables = useCallback(async () => {
+    setSectionLoading('tables', true);
+    try {
+      const list = await adminApi.getLiveTables();
+      setLiveTables(list);
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, 'Failed to load live tables.'));
+    } finally {
+      setSectionLoading('tables', false);
+    }
+  }, []);
+
+  const loadTournaments = useCallback(async () => {
+    setSectionLoading('tournaments', true);
+    try {
+      const list = await adminApi.getTournaments();
+      setTournaments(list);
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, 'Failed to load tournaments.'));
+    } finally {
+      setSectionLoading('tournaments', false);
+    }
+  }, []);
+
+  const loadAudits = useCallback(async (page: number, action: string, adminUserId: string) => {
+    setSectionLoading('audits', true);
+    try {
+      const payload = await adminApi.getAudits({ page, limit: 12, action: action || undefined, adminUserId: adminUserId || undefined });
+      setAuditResponse(payload);
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, 'Failed to load audit logs.'));
+    } finally {
+      setSectionLoading('audits', false);
+    }
+  }, []);
 
   useEffect(() => {
-    void refreshAll();
-  }, [refreshAll]);
+    void loadMetrics();
+    void loadUsers('');
+    void loadWithdrawals('pending');
+    void loadLiveTables();
+    void loadAudits(1, '', '');
+    void loadTournaments();
+  }, [loadAudits, loadLiveTables, loadMetrics, loadTournaments, loadUsers, loadWithdrawals]);
 
-  const pendingWithdrawals = useMemo(
-    () => withdrawals.filter((item) => item.status?.toLowerCase() === 'pending'),
+  const pendingWithdrawalAmount = useMemo(
+    () => withdrawals.filter((item) => item.status === 'pending').reduce((sum, item) => sum + item.amount, 0),
     [withdrawals]
   );
 
-  const filteredTables = useMemo(() => {
-    const query = normalizeText(tableQuery);
-    return tables.filter((table) => {
-      const matchesStatus = tableStatusFilter === 'all' ? true : table.status === tableStatusFilter;
-      const haystack = `${table.name} ${table.activeContestId ?? ''} ${table.stake}`.toLowerCase();
-      const matchesQuery = query.length === 0 || haystack.includes(query);
-      return matchesStatus && matchesQuery;
-    });
-  }, [tableQuery, tableStatusFilter, tables]);
-
-  const filteredContests = useMemo(() => {
-    const query = normalizeText(contestQuery);
-    return contests.filter((contest) => {
-      if (query.length === 0) return true;
-      const haystack = `${contest.contestId} ${contest.status} ${contest.entryFee} ${contest.playerCount}`.toLowerCase();
-      return haystack.includes(query);
-    });
-  }, [contestQuery, contests]);
-
-  const filteredWithdrawals = useMemo(() => {
-    const query = normalizeText(withdrawalQuery);
-    return pendingWithdrawals.filter((item) => {
-      if (query.length === 0) return true;
-      const haystack = `${item.userId.username} ${item.userId.email} ${item.payoutMethod} ${item.amount}`.toLowerCase();
-      return haystack.includes(query);
-    });
-  }, [pendingWithdrawals, withdrawalQuery]);
-
-  const pendingWithdrawalAmount = useMemo(
-    () => filteredWithdrawals.reduce((sum, item) => sum + item.amount, 0),
-    [filteredWithdrawals]
-  );
-
-  const contestPreview = useMemo(() => {
-    const entryFee = Number(contestDraft.entryFee || 0);
-    const playerCount = Number(contestDraft.playerCount || 0);
-    const fee = Number(contestDraft.platformFee || 0);
-
-    const collected = Math.max(0, entryFee * playerCount);
-    const prizePool = Math.max(0, collected - fee);
-
-    return {
-      collected,
-      prizePool,
-      fee,
-    };
-  }, [contestDraft.entryFee, contestDraft.playerCount, contestDraft.platformFee]);
-
-  const openConfirmDialog = (title: string, message: string, action: () => Promise<void>) => {
-    setConfirmDialog({
-      open: true,
-      title,
-      message,
-      action,
-    });
+  const handleBanToggle = async (target: AdminUser) => {
+    await adminApi.setBanState(target.id, !target.isBanned);
+    toast.success(target.isBanned ? 'User unbanned.' : 'User banned.');
+    await Promise.all([loadUsers(userQuery), selectedProfile ? loadUserProfile(selectedProfile.user.id) : Promise.resolve(), loadMetrics()]);
   };
 
-  const closeConfirmDialog = () => {
-    setConfirmDialog({
-      open: false,
-      title: '',
-      message: '',
-      action: null,
-    });
+  const handleFreezeToggle = async (target: AdminUser) => {
+    await adminApi.setFreezeState(target.id, !target.isFrozen);
+    toast.success(target.isFrozen ? 'Account unfrozen.' : 'Account frozen.');
+    await Promise.all([loadUsers(userQuery), selectedProfile ? loadUserProfile(selectedProfile.user.id) : Promise.resolve(), loadMetrics()]);
   };
 
-  const runConfirmedAction = async () => {
-    const action = confirmDialog.action;
-    closeConfirmDialog();
-    if (!action) return;
-    await action();
+  const handleRoleChange = async (target: AdminUser, role: UserRole) => {
+    await adminApi.setUserRole(target.id, role);
+    toast.success('Role updated.');
+    await Promise.all([loadUsers(userQuery), selectedProfile ? loadUserProfile(selectedProfile.user.id) : Promise.resolve(), loadMetrics()]);
   };
 
-  const validateTableDraft = (draft: TableDraft): string | null => {
-    if (draft.name.trim().length < 3) return 'Table name must be at least 3 characters.';
-    const stake = Number(draft.stake);
-    const minPlayers = Number(draft.minPlayers);
-    const maxPlayers = Number(draft.maxPlayers);
-
-    if (!Number.isFinite(stake) || stake <= 0) return 'Stake must be greater than 0.';
-    if (!Number.isInteger(minPlayers) || minPlayers < 2 || minPlayers > 4) return 'Min players must be 2-4.';
-    if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 4) return 'Max players must be 2-4.';
-    if (minPlayers > maxPlayers) return 'Min players cannot exceed max players.';
-
-    return null;
-  };
-
-  const handleCreateTable = async () => {
-    const validation = validateTableDraft(tableDraft);
-    if (validation) {
-      toast.error(validation);
+  const handleWalletAdjustment = async () => {
+    const targetUserId = walletProfile?.user.id || walletLookupUserId;
+    const amount = Number(walletAdjustDraft.amount);
+    if (!targetUserId) {
+      toast.error('Load a wallet before adjustment.');
+      return;
+    }
+    if (!Number.isFinite(amount) || amount === 0) {
+      toast.error('Enter a non-zero numeric amount.');
+      return;
+    }
+    if (walletAdjustDraft.reason.trim().length < 3) {
+      toast.error('Reason must be at least 3 characters.');
       return;
     }
 
+    setActionPending(true);
     try {
-      setCreatingTable(true);
-      await client.post('/admin/tables', {
-        name: tableDraft.name.trim(),
-        stake: Number(tableDraft.stake),
-        mode: tableDraft.mode,
-        minPlayers: Number(tableDraft.minPlayers),
-        maxPlayers: Number(tableDraft.maxPlayers),
-        activeContestId: tableDraft.activeContestId.trim() || undefined,
-      });
-      toast.success('Cash Crown table created.');
-      setTableDraft(defaultTableDraft());
-      await Promise.all([fetchTables(), fetchOverview()]);
+      await adminApi.adjustWallet({ userId: targetUserId, amount, reason: walletAdjustDraft.reason.trim() });
+      toast.success('Wallet adjusted successfully.');
+      setWalletAdjustOpen(false);
+      setWalletAdjustDraft({ amount: '', reason: '' });
+      await Promise.all([loadWalletProfile(targetUserId), loadMetrics()]);
     } catch (error: any) {
-      toast.error(getErrorMessage(error, 'Failed to create table.'));
+      toast.error(getErrorMessage(error, 'Failed to adjust wallet.'));
     } finally {
-      setCreatingTable(false);
+      setActionPending(false);
     }
   };
 
-  const handleQuickCreateTierTable = async (stakeTier: number) => {
-    const baseName = `Cash Crown $${stakeTier}`;
-    const existingCount = tables.filter((table) => table.stake === stakeTier).length;
-    const suffix = existingCount > 0 ? ` #${existingCount + 1}` : '';
-
-    try {
-      setCreatingTable(true);
-      await client.post('/admin/tables', {
-        name: `${baseName}${suffix}`,
-        stake: stakeTier,
-        mode: 'USD_CONTEST',
-        minPlayers: 2,
-        maxPlayers: 4,
-      });
-      toast.success(`Created ${baseName}${suffix}.`);
-      await Promise.all([fetchTables(), fetchOverview()]);
-    } catch (error: any) {
-      toast.error(getErrorMessage(error, 'Failed to quick-create table.'));
-    } finally {
-      setCreatingTable(false);
-    }
-  };
-
-  const beginEditTable = (table: AdminTable) => {
-    setEditingTableId(table._id);
-    setEditingTableDraft(toTableDraft(table));
-  };
-
-  const handleUpdateTable = async (tableId: string) => {
-    const validation = validateTableDraft(editingTableDraft);
-    if (validation) {
-      toast.error(validation);
-      return;
-    }
-
-    try {
-      setTableActionId(tableId);
-      await client.put(`/admin/tables/${tableId}`, {
-        name: editingTableDraft.name.trim(),
-        stake: Number(editingTableDraft.stake),
-        mode: editingTableDraft.mode,
-        minPlayers: Number(editingTableDraft.minPlayers),
-        maxPlayers: Number(editingTableDraft.maxPlayers),
-        activeContestId: editingTableDraft.activeContestId.trim() || undefined,
-      });
-      toast.success('Table updated.');
-      setEditingTableId(null);
-      await Promise.all([fetchTables(), fetchOverview()]);
-    } catch (error: any) {
-      toast.error(getErrorMessage(error, 'Failed to update table.'));
-    } finally {
-      setTableActionId(null);
-    }
-  };
-
-  const handleResetTable = (table: AdminTable) => {
-    openConfirmDialog(
-      `Reset ${table.name}?`,
-      'This clears seated players and live state for this table.',
+  const handleWithdrawalAction = (item: AdminWithdrawal, action: 'approve' | 'reject') => {
+    openConfirm(
+      `${action === 'approve' ? 'Approve' : 'Reject'} Withdrawal`,
+      `${action === 'approve' ? 'Approve' : 'Reject'} ${formatCurrency(item.amount)} for ${item.username || item.userId}?`,
       async () => {
-        try {
-          setTableActionId(table._id);
-          await client.post(`/admin/tables/${table._id}/reset`, { keepContestBinding: true });
-          toast.success('Table reset complete.');
-          await Promise.all([fetchTables(), fetchOverview()]);
-        } catch (error: any) {
-          toast.error(getErrorMessage(error, 'Failed to reset table.'));
-        } finally {
-          setTableActionId(null);
+        if (action === 'approve') {
+          await adminApi.approveWithdrawal(item.id);
+          toast.success('Withdrawal approved.');
+        } else {
+          await adminApi.rejectWithdrawal(item.id);
+          toast.success('Withdrawal rejected.');
         }
-      }
+        await Promise.all([loadWithdrawals(withdrawalStatus), loadMetrics(), loadAudits(1, auditActionFilter, auditAdminFilter)]);
+      },
+      { danger: action === 'reject', confirmLabel: action === 'approve' ? 'Approve' : 'Reject' }
     );
   };
 
-  const handleDeleteTable = (table: AdminTable) => {
-    openConfirmDialog(
-      `Delete ${table.name}?`,
-      'This permanently removes the table configuration.',
+  const handleResetTable = (table: AdminLiveTable) => {
+    openConfirm(
+      'Reset Live Table',
+      `Reset ${table.name}? This clears seated players and active game state.`,
       async () => {
-        try {
-          setTableActionId(table._id);
-          await client.delete(`/admin/tables/${table._id}`, { params: { force: true } });
-          toast.success('Table deleted.');
-          await Promise.all([fetchTables(), fetchOverview()]);
-        } catch (error: any) {
-          toast.error(getErrorMessage(error, 'Failed to delete table.'));
-        } finally {
-          setTableActionId(null);
-        }
-      }
+        await adminApi.resetTable(table.tableId);
+        toast.success('Table reset completed.');
+        await Promise.all([loadLiveTables(), loadMetrics(), loadAudits(1, auditActionFilter, auditAdminFilter)]);
+      },
+      { danger: true, confirmLabel: 'Reset Table' }
     );
   };
 
-  const handleCreateContest = async () => {
-    const entryFee = Number(contestDraft.entryFee);
-    const playerCount = Number(contestDraft.playerCount);
-    const platformFee = Number(contestDraft.platformFee);
-
-    if (!Number.isFinite(entryFee) || entryFee <= 0) {
-      toast.error('Entry fee must be greater than 0.');
-      return;
-    }
-    if (!Number.isInteger(playerCount) || playerCount < 2 || playerCount > 4) {
-      toast.error('Player count must be between 2 and 4.');
-      return;
-    }
-    if (!Number.isFinite(platformFee) || platformFee < 0) {
-      toast.error('Platform fee must be 0 or greater.');
+  const lookupMatch = async () => {
+    if (!matchLookupId.trim()) {
+      toast.error('Enter a match id.');
       return;
     }
 
+    setSectionLoading('tables', true);
     try {
-      setCreatingContest(true);
-      await client.post('/admin/contests', {
-        entryFee,
-        playerCount,
-        platformFee,
-      });
-      toast.success('Cash Crown contest created.');
-      setContestDraft(defaultContestDraft());
-      await Promise.all([fetchContests(), fetchOverview()]);
+      const payload = await adminApi.getMatch(matchLookupId.trim());
+      setMatchDetails(payload);
+      toast.success('Match loaded.');
     } catch (error: any) {
-      toast.error(getErrorMessage(error, 'Failed to create contest.'));
+      toast.error(getErrorMessage(error, 'Unable to fetch match.'));
     } finally {
-      setCreatingContest(false);
+      setSectionLoading('tables', false);
     }
   };
 
-  const handleContestStatusUpdate = async (contestId: string) => {
-    const nextStatus = contestStatusDraft[contestId];
-    if (!nextStatus) return;
-
-    try {
-      setContestActionId(contestId);
-      await client.patch(`/admin/contests/${contestId}/status`, { status: nextStatus });
-      toast.success(`Contest moved to ${nextStatus}.`);
-      await Promise.all([fetchContests(), fetchOverview()]);
-    } catch (error: any) {
-      toast.error(getErrorMessage(error, 'Failed to update contest status.'));
-    } finally {
-      setContestActionId(null);
-    }
-  };
-
-  const handleProcessWithdrawal = (request: WithdrawalRequest, action: 'approve' | 'reject') => {
-    const verb = action === 'approve' ? 'Approve' : 'Reject';
-    openConfirmDialog(
-      `${verb} ${request.userId.username}'s withdrawal?`,
-      `${verb} ${toCurrency(request.amount)} via ${request.payoutMethod}.`,
-      async () => {
-        try {
-          setProcessingWithdrawalId(request._id);
-          await client.post(`/wallet/admin/withdrawals/${request._id}/process`, { action });
-          toast.success(`Withdrawal ${action}ed.`);
-          await Promise.all([fetchWithdrawals(), fetchOverview()]);
-        } catch (error: any) {
-          toast.error(getErrorMessage(error, 'Failed to process withdrawal.'));
-        } finally {
-          setProcessingWithdrawalId(null);
-        }
-      }
-    );
-  };
-
-  if (loading) return <Loader />;
-
-  if (fatalError) {
+  const renderDashboard = () => {
     return (
-      <div className="rt-panel-strong rounded-2xl p-8 text-center text-red-300">
-        {fatalError}
-      </div>
-    );
-  }
+      <section className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-2xl border border-white/10 bg-[#121926] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/50">Total Users</div>
+            <div className="mt-2 text-3xl rt-page-title">{metrics?.users.total ?? '--'}</div>
+          </article>
+          <article className="rounded-2xl border border-white/10 bg-[#121926] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/50">Privileged Users</div>
+            <div className="mt-2 text-3xl rt-page-title">{metrics?.users.privileged ?? '--'}</div>
+          </article>
+          <article className="rounded-2xl border border-white/10 bg-[#121926] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/50">Pending Withdrawals</div>
+            <div className="mt-2 text-3xl rt-page-title">{metrics?.operations.pendingWithdrawals ?? '--'}</div>
+          </article>
+          <article className="rounded-2xl border border-white/10 bg-[#121926] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/50">Active Tables</div>
+            <div className="mt-2 text-3xl rt-page-title">{metrics?.operations.activeTables ?? '--'}</div>
+          </article>
+        </div>
 
-  return (
-    <div className="space-y-6">
-      <header className="rt-panel-strong rounded-3xl p-7">
-        <div className="text-xs uppercase tracking-[0.2em] text-white/50">Admin Console</div>
-        <h1 className="mt-2 text-4xl rt-page-title font-semibold">{tabCopy[activeTab].title}</h1>
-        <p className="mt-2 text-white/65">{tabCopy[activeTab].description}</p>
-        <div className="mt-5 flex flex-wrap gap-2">
-          {(['overview', 'tables', 'contests', 'withdrawals'] as AdminTab[]).map((tab) => (
-            <Button
-              key={tab}
-              variant={activeTab === tab ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab === 'overview' ? 'Overview' : tab === 'tables' ? 'Tables' : tab === 'contests' ? 'Contests' : 'Withdrawals'}
-            </Button>
-          ))}
-          <Button size="sm" variant="secondary" onClick={() => void refreshAll()}>
-            <RefreshCw className="mr-1 h-4 w-4" />
-            Refresh
-          </Button>
-        </div>
-      </header>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <article className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <h3 className="text-xl rt-page-title">Financial Snapshot</h3>
+            <div className="mt-3 grid gap-3 text-sm text-white/75">
+              <div className="flex justify-between">
+                <span>Total USD Across Wallets</span>
+                <span>{formatCurrency(metrics?.wallets.totalUsdBalance)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total RTC Across Wallets</span>
+                <span>{metrics?.wallets.totalRtcBalance ?? '--'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Pending Queue Value</span>
+                <span>{formatCurrency(pendingWithdrawalAmount)}</span>
+              </div>
+            </div>
+          </article>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Cash Crown Tables</div>
-          <div className="mt-2 text-3xl rt-page-title">{overview?.cashCrownTables ?? 0}</div>
-        </div>
-        <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Contests Active</div>
-          <div className="mt-2 text-3xl rt-page-title">{overview?.activeContests ?? 0}</div>
-        </div>
-        <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Pending Withdrawals</div>
-          <div className="mt-2 text-3xl rt-page-title">{overview?.pendingWithdrawals ?? 0}</div>
-        </div>
-        <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Admins / Users</div>
-          <div className="mt-2 text-3xl rt-page-title">
-            {overview?.admins ?? 0} / {overview?.users ?? 0}
-          </div>
+          <article className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <h3 className="text-xl rt-page-title">Runtime</h3>
+            <div className="mt-3 grid gap-2 text-sm text-white/75">
+              <div className="flex justify-between">
+                <span>Server Uptime</span>
+                <span>{metrics?.runtime.uptimeSeconds ?? '--'}s</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Redis</span>
+                <span>{metrics?.runtime.redisConnected ? 'Connected' : 'Disconnected'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Node Version</span>
+                <span>{metrics?.runtime.nodeVersion ?? '--'}</span>
+              </div>
+            </div>
+          </article>
         </div>
       </section>
+    );
+  };
 
-      {activeTab === 'overview' && (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <div className="rt-panel-strong rounded-2xl p-5">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-white/50">
-              <Settings className="h-4 w-4" />
-              Accounts
+  const renderUsers = () => {
+    return (
+      <section className="space-y-4">
+        <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h3 className="text-xl rt-page-title">User Search</h3>
+              <p className="text-xs text-white/55">Search by username or email.</p>
             </div>
-            <div className="mt-3 space-y-1 text-white/75">
-              <div>Users: {overview?.users ?? 0}</div>
-              <div>Wallets: {overview?.wallets ?? 0}</div>
-              <div>Admins: {overview?.admins ?? 0}</div>
-            </div>
-          </div>
-          <div className="rt-panel-strong rounded-2xl p-5">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-white/50">
-              <Trophy className="h-4 w-4" />
-              Competition Operations
-            </div>
-            <div className="mt-3 space-y-1 text-white/75">
-              <div>All Tables: {overview?.tables ?? 0}</div>
-              <div>Cash Crown Tables: {overview?.cashCrownTables ?? 0}</div>
-              <div>Contests: {overview?.contests ?? 0}</div>
-              <div>Active Contests: {overview?.activeContests ?? 0}</div>
-            </div>
-          </div>
-          <div className="rt-panel-strong rounded-2xl p-5">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-white/50">
-              <Wallet className="h-4 w-4" />
-              Payout Queue
-            </div>
-            <div className="mt-3 space-y-1 text-white/75">
-              <div>Pending Requests: {pendingWithdrawals.length}</div>
-              <div>Pending Value: {toCurrency(pendingWithdrawalAmount)}</div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'tables' && (
-        <section className="space-y-5">
-          <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-            <div className="rt-panel-strong rounded-2xl p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <Plus className="h-5 w-5 text-amber-300" />
-                <h2 className="text-2xl rt-page-title">Create Table</h2>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Input
-                  label="Table Name"
-                  placeholder="Cash Crown Main"
-                  value={tableDraft.name}
-                  onChange={(event) => setTableDraft((prev) => ({ ...prev, name: event.target.value }))}
-                />
-                <Input
-                  label="Stake"
-                  type="number"
-                  min={1}
-                  value={tableDraft.stake}
-                  onChange={(event) => setTableDraft((prev) => ({ ...prev, stake: event.target.value }))}
-                />
-                <div>
-                  <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/60">Mode</label>
-                  <select
-                    className="h-11 w-full rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
-                    value={tableDraft.mode}
-                    onChange={(event) => setTableDraft((prev) => ({ ...prev, mode: event.target.value as GameMode }))}
-                  >
-                    {Object.keys(MODE_LABELS).map((mode) => (
-                      <option key={mode} value={mode}>
-                        {MODE_LABELS[mode as GameMode]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <Input
-                  label="Active Contest ID"
-                  placeholder="optional"
-                  value={tableDraft.activeContestId}
-                  onChange={(event) => setTableDraft((prev) => ({ ...prev, activeContestId: event.target.value }))}
-                />
-                <Input
-                  label="Min Players"
-                  type="number"
-                  min={2}
-                  max={4}
-                  value={tableDraft.minPlayers}
-                  onChange={(event) => setTableDraft((prev) => ({ ...prev, minPlayers: event.target.value }))}
-                />
-                <Input
-                  label="Max Players"
-                  type="number"
-                  min={2}
-                  max={4}
-                  value={tableDraft.maxPlayers}
-                  onChange={(event) => setTableDraft((prev) => ({ ...prev, maxPlayers: event.target.value }))}
-                />
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button isLoading={creatingTable} onClick={() => void handleCreateTable()}>
-                  Create Table
-                </Button>
-              </div>
-            </div>
-
-            <div className="rt-panel-strong rounded-2xl p-5">
-              <h3 className="text-xl rt-page-title">Quick Create</h3>
-              <p className="mt-1 text-sm text-white/60">One-click Cash Crown table setup by stake tier.</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {quickTableTiers.map((tier) => (
-                  <Button
-                    key={tier}
-                    size="sm"
-                    variant="secondary"
-                    isLoading={creatingTable}
-                    onClick={() => void handleQuickCreateTierTable(tier)}
-                  >
-                    ${tier} Tier
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="rt-panel-strong rounded-2xl p-5">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h3 className="text-xl rt-page-title">Managed Tables</h3>
-                <div className="text-sm text-white/60">{filteredTables.length} of {tables.length} tables shown</div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-[220px_160px]">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" />
-                  <input
-                    className="h-10 w-full rounded-xl border border-white/14 bg-black/35 pl-9 pr-3 text-sm text-white"
-                    placeholder="Search table"
-                    value={tableQuery}
-                    onChange={(event) => setTableQuery(event.target.value)}
-                  />
-                </div>
-                <select
-                  className="h-10 rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
-                  value={tableStatusFilter}
-                  onChange={(event) => setTableStatusFilter(event.target.value as TableStatusFilter)}
-                >
-                  <option value="all">All statuses</option>
-                  <option value="waiting">Waiting</option>
-                  <option value="in-game">In Game</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {filteredTables.length === 0 && (
-                <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
-                  No tables match your filters.
-                </div>
-              )}
-
-              {filteredTables.map((table) => {
-                const editing = editingTableId === table._id;
-                const busy = tableActionId === table._id;
-                const source = editing ? editingTableDraft : toTableDraft(table);
-                return (
-                  <article key={table._id} className="rounded-xl border border-white/10 bg-black/20 p-4">
-                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="text-lg font-semibold text-white">{table.name}</div>
-                        <div className="text-xs text-white/50">{MODE_LABELS[table.mode]} • {toCurrency(table.stake)} stake</div>
-                      </div>
-                      <span className={`rounded-full px-3 py-1 text-xs ${table.status === 'in-game' ? 'bg-amber-500/20 text-amber-200' : 'bg-emerald-500/20 text-emerald-200'}`}>
-                        {table.status === 'in-game' ? 'In Game' : 'Waiting'}
-                      </span>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <Input
-                        label="Name"
-                        value={source.name}
-                        disabled={!editing}
-                        onChange={(event) => setEditingTableDraft((prev) => ({ ...prev, name: event.target.value }))}
-                      />
-                      <Input
-                        label="Stake"
-                        type="number"
-                        min={1}
-                        value={source.stake}
-                        disabled={!editing}
-                        onChange={(event) => setEditingTableDraft((prev) => ({ ...prev, stake: event.target.value }))}
-                      />
-                      <div>
-                        <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/60">Mode</label>
-                        <select
-                          className="h-11 w-full rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white disabled:opacity-50"
-                          value={source.mode}
-                          disabled={!editing}
-                          onChange={(event) => setEditingTableDraft((prev) => ({ ...prev, mode: event.target.value as GameMode }))}
-                        >
-                          {Object.keys(MODE_LABELS).map((mode) => (
-                            <option key={mode} value={mode}>
-                              {MODE_LABELS[mode as GameMode]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <Input
-                        label="Contest ID"
-                        value={source.activeContestId}
-                        disabled={!editing}
-                        onChange={(event) => setEditingTableDraft((prev) => ({ ...prev, activeContestId: event.target.value }))}
-                      />
-                      <Input
-                        label="Min Players"
-                        type="number"
-                        min={2}
-                        max={4}
-                        value={source.minPlayers}
-                        disabled={!editing}
-                        onChange={(event) => setEditingTableDraft((prev) => ({ ...prev, minPlayers: event.target.value }))}
-                      />
-                      <Input
-                        label="Max Players"
-                        type="number"
-                        min={2}
-                        max={4}
-                        value={source.maxPlayers}
-                        disabled={!editing}
-                        onChange={(event) => setEditingTableDraft((prev) => ({ ...prev, maxPlayers: event.target.value }))}
-                      />
-                    </div>
-
-                    <div className="mt-2 text-xs text-white/55">Seated: {table.currentPlayerCount}/{table.maxPlayers}</div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {editing ? (
-                        <>
-                          <Button size="sm" isLoading={busy} onClick={() => void handleUpdateTable(table._id)}>
-                            Save Changes
-                          </Button>
-                          <Button size="sm" variant="secondary" disabled={busy} onClick={() => setEditingTableId(null)}>
-                            Cancel
-                          </Button>
-                        </>
-                      ) : (
-                        <Button size="sm" variant="secondary" disabled={busy} onClick={() => beginEditTable(table)}>
-                          Edit
-                        </Button>
-                      )}
-                      <Button size="sm" variant="secondary" disabled={busy} onClick={() => handleResetTable(table)}>
-                        Reset
-                      </Button>
-                      <Button size="sm" variant="danger" disabled={busy} onClick={() => handleDeleteTable(table)}>
-                        Delete
-                      </Button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'contests' && (
-        <section className="space-y-5">
-          <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-            <div className="rt-panel-strong rounded-2xl p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <Plus className="h-5 w-5 text-amber-300" />
-                <h2 className="text-2xl rt-page-title">Create Contest</h2>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Input
-                  label="Entry Fee"
-                  type="number"
-                  min={1}
-                  value={contestDraft.entryFee}
-                  onChange={(event) => setContestDraft((prev) => ({ ...prev, entryFee: event.target.value }))}
-                />
-                <Input
-                  label="Players"
-                  type="number"
-                  min={2}
-                  max={4}
-                  value={contestDraft.playerCount}
-                  onChange={(event) => setContestDraft((prev) => ({ ...prev, playerCount: event.target.value }))}
-                />
-                <Input
-                  label="Platform Fee"
-                  type="number"
-                  min={0}
-                  value={contestDraft.platformFee}
-                  onChange={(event) => setContestDraft((prev) => ({ ...prev, platformFee: event.target.value }))}
-                />
-              </div>
-              <div className="mt-4">
-                <Button isLoading={creatingContest} onClick={() => void handleCreateContest()}>
-                  Create Contest
-                </Button>
-              </div>
-            </div>
-
-            <div className="rt-panel-strong rounded-2xl p-5">
-              <h3 className="text-xl rt-page-title">Prize Preview</h3>
-              <div className="mt-3 space-y-2 text-sm text-white/75">
-                <div className="flex justify-between">
-                  <span>Total Collected</span>
-                  <span>{toCurrency(contestPreview.collected)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Platform Fee</span>
-                  <span>{toCurrency(contestPreview.fee)}</span>
-                </div>
-                <div className="flex justify-between border-t border-white/10 pt-2 font-semibold text-amber-200">
-                  <span>Estimated Prize Pool</span>
-                  <span>{toCurrency(contestPreview.prizePool)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rt-panel-strong rounded-2xl p-5">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h3 className="text-xl rt-page-title">Contests</h3>
-                <div className="text-sm text-white/60">{filteredContests.length} contests shown</div>
-              </div>
-              <div className="relative w-full max-w-[260px]">
+            <div className="flex w-full max-w-md items-center gap-2">
+              <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" />
                 <input
                   className="h-10 w-full rounded-xl border border-white/14 bg-black/35 pl-9 pr-3 text-sm text-white"
-                  placeholder="Search contest"
-                  value={contestQuery}
-                  onChange={(event) => setContestQuery(event.target.value)}
+                  placeholder="Find user"
+                  value={userQuery}
+                  onChange={(event) => setUserQuery(event.target.value)}
                 />
               </div>
-            </div>
-
-            <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-black/20">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b border-white/10 bg-white/5 text-white/60 text-xs uppercase tracking-wider">
-                    <th className="py-3 px-4">Contest</th>
-                    <th className="py-3 px-4">Entry / Pool</th>
-                    <th className="py-3 px-4">Seats</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4">Next Status</th>
-                    <th className="py-3 px-4 text-right">Apply</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/10">
-                  {filteredContests.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-10 text-center text-white/55">
-                        No contests match your search.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredContests.map((contest) => {
-                      const busy = contestActionId === contest.contestId;
-                      const selectedStatus = contestStatusDraft[contest.contestId] ?? contest.status;
-                      return (
-                        <tr key={contest._id} className="hover:bg-white/[0.03]">
-                          <td className="py-4 px-4">
-                            <div className="font-semibold text-white">{contest.contestId}</div>
-                            <div className="text-xs text-white/50">Created {new Date(contest.createdAt).toLocaleString()}</div>
-                          </td>
-                          <td className="py-4 px-4 text-white/75">
-                            <div>{toCurrency(contest.entryFee)} entry</div>
-                            <div className="text-xs text-white/50">Pool {toCurrency(contest.prizePool)} • Fee {toCurrency(contest.platformFee)}</div>
-                          </td>
-                          <td className="py-4 px-4 text-white/75">
-                            {contest.participants.length}/{contest.playerCount}
-                          </td>
-                          <td className="py-4 px-4">
-                            <span className={`rounded-full px-2.5 py-1 text-xs ${statusBadgeClass[contest.status]}`}>
-                              {contest.status}
-                            </span>
-                          </td>
-                          <td className="py-4 px-4">
-                            <select
-                              className="h-9 rounded-lg border border-white/14 bg-black/35 px-2 text-xs text-white"
-                              value={selectedStatus}
-                              onChange={(event) =>
-                                setContestStatusDraft((prev) => ({
-                                  ...prev,
-                                  [contest.contestId]: event.target.value as ContestStatus,
-                                }))
-                              }
-                              disabled={busy}
-                            >
-                              {statusOptions.map((status) => (
-                                <option key={status} value={status}>
-                                  {status}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="py-4 px-4 text-right">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={busy || selectedStatus === contest.status}
-                              onClick={() => void handleContestStatusUpdate(contest.contestId)}
-                            >
-                              Update
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+              <Button size="sm" onClick={() => void loadUsers(userQuery)} isLoading={loading.users}>
+                Search
+              </Button>
             </div>
           </div>
-        </section>
-      )}
+        </div>
 
-      {activeTab === 'withdrawals' && (
-        <section className="rt-panel-strong rounded-2xl p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-2xl rt-page-title">Pending Withdrawals</h2>
-              <div className="text-sm text-white/60">
-                {filteredWithdrawals.length} requests • {toCurrency(pendingWithdrawalAmount)} queued
-              </div>
-            </div>
-            <div className="relative w-full max-w-[260px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" />
-              <input
-                className="h-10 w-full rounded-xl border border-white/14 bg-black/35 pl-9 pr-3 text-sm text-white"
-                placeholder="Search requester"
-                value={withdrawalQuery}
-                onChange={(event) => setWithdrawalQuery(event.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-black/20">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-white/10 bg-white/5 text-white/60 text-xs uppercase tracking-wider">
-                  <th className="py-3 px-4">User</th>
-                  <th className="py-3 px-4">Amount</th>
-                  <th className="py-3 px-4">Method</th>
-                  <th className="py-3 px-4">Address</th>
-                  <th className="py-3 px-4">Requested</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+        <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+          <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#0f1622]">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-white/10 text-xs uppercase tracking-[0.14em] text-white/50">
+                <tr>
+                  <th className="px-4 py-3">User</th>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Flags</th>
+                  <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
-                {filteredWithdrawals.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-10 text-center text-white/55">
-                      No pending withdrawals match this filter.
+                {users.map((item) => (
+                  <tr key={item.id} className="hover:bg-white/[0.03]">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-white">{item.username}</div>
+                      <div className="text-xs text-white/55">{item.email}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full px-2.5 py-1 text-xs ${roleBadgeClass(item.role)}`}>{item.role}</span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-white/70">
+                      {item.isBanned ? 'Banned' : 'Active'} / {item.isFrozen ? 'Frozen' : 'Live'}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button size="sm" variant="secondary" onClick={() => void loadUserProfile(item.id)}>
+                        View
+                      </Button>
                     </td>
                   </tr>
-                ) : (
-                  filteredWithdrawals.map((req) => {
-                    const processing = processingWithdrawalId === req._id;
-                    return (
-                      <tr key={req._id} className="hover:bg-white/[0.03]">
-                        <td className="py-4 px-4">
-                          <div className="font-medium text-white">{req.userId.username}</div>
-                          <div className="text-xs text-white/50">{req.userId.email}</div>
-                        </td>
-                        <td className="py-4 px-4 font-semibold text-amber-200">{toCurrency(req.amount)}</td>
-                        <td className="py-4 px-4 text-white/75">{req.payoutMethod}</td>
-                        <td className="py-4 px-4 text-white/75 font-mono text-xs">{req.payoutAddress}</td>
-                        <td className="py-4 px-4 text-white/55 text-sm">{new Date(req.requestedAt).toLocaleString()}</td>
-                        <td className="py-4 px-4">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="danger"
-                              disabled={processing}
-                              onClick={() => handleProcessWithdrawal(req, 'reject')}
-                            >
-                              Reject
-                            </Button>
-                            <Button
-                              size="sm"
-                              disabled={processing}
-                              onClick={() => handleProcessWithdrawal(req, 'approve')}
-                            >
-                              Approve
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
+                ))}
+                {users.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-10 text-center text-white/50">
+                      No users found.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
           </div>
-        </section>
-      )}
 
-      <Modal
-        isOpen={confirmDialog.open}
-        title={confirmDialog.title}
-        onClose={closeConfirmDialog}
-        onConfirm={() => void runConfirmedAction()}
-      >
-        <p>{confirmDialog.message}</p>
-      </Modal>
+          <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <h3 className="text-xl rt-page-title">Profile Actions</h3>
+            {!selectedProfile ? (
+              <p className="mt-4 text-sm text-white/60">Select a user to view profile controls.</p>
+            ) : (
+              <div className="mt-4 space-y-3 text-sm">
+                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <div className="font-semibold text-white">{selectedProfile.user.username}</div>
+                  <div className="text-xs text-white/55">{selectedProfile.user.email}</div>
+                  <div className="mt-2 text-xs text-white/65">Wallet: {formatCurrency(selectedProfile.wallet.usdBalance)}</div>
+                </div>
+                <div className="grid gap-2">
+                  <Button
+                    variant={selectedProfile.user.isBanned ? 'secondary' : 'danger'}
+                    onClick={() =>
+                      openConfirm(
+                        selectedProfile.user.isBanned ? 'Unban User' : 'Ban User',
+                        `${selectedProfile.user.isBanned ? 'Restore' : 'Block'} ${selectedProfile.user.username}?`,
+                        () => handleBanToggle(selectedProfile.user),
+                        { danger: !selectedProfile.user.isBanned, confirmLabel: selectedProfile.user.isBanned ? 'Unban' : 'Ban' }
+                      )
+                    }
+                  >
+                    {selectedProfile.user.isBanned ? 'Unban' : 'Ban'} User
+                  </Button>
+                  <Button
+                    variant={selectedProfile.user.isFrozen ? 'secondary' : 'danger'}
+                    onClick={() =>
+                      openConfirm(
+                        selectedProfile.user.isFrozen ? 'Unfreeze User' : 'Freeze User',
+                        `${selectedProfile.user.isFrozen ? 'Unfreeze' : 'Freeze'} wallet/gameplay access for ${selectedProfile.user.username}?`,
+                        () => handleFreezeToggle(selectedProfile.user),
+                        { danger: !selectedProfile.user.isFrozen, confirmLabel: selectedProfile.user.isFrozen ? 'Unfreeze' : 'Freeze' }
+                      )
+                    }
+                  >
+                    {selectedProfile.user.isFrozen ? 'Unfreeze' : 'Freeze'} User
+                  </Button>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <div className="mb-2 text-xs uppercase tracking-[0.14em] text-white/50">Change Role</div>
+                  <select
+                    className="h-10 w-full rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
+                    value={selectedProfile.user.role}
+                    disabled={!isSuperAdmin}
+                    onChange={(event) => {
+                      const nextRole = event.target.value as UserRole;
+                      if (!isSuperAdmin) return;
+                      void handleRoleChange(selectedProfile.user, nextRole);
+                    }}
+                  >
+                    {USER_ROLES.map((role) => (
+                      <option key={role} value={role}>
+                        {role}
+                      </option>
+                    ))}
+                  </select>
+                  {!isSuperAdmin && <div className="mt-2 text-xs text-white/45">Only superadmin can change roles.</div>}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  };
+
+  const renderWallets = () => {
+    const activeWallet = walletProfile?.wallet;
+
+    return (
+      <section className="space-y-4">
+        <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h3 className="text-xl rt-page-title">Wallet Inspection</h3>
+              <p className="text-xs text-white/55">Load wallet and transaction history for a specific user.</p>
+            </div>
+            <div className="flex w-full max-w-lg gap-2">
+              <Input
+                label="User ID"
+                value={walletLookupUserId}
+                onChange={(event) => setWalletLookupUserId(event.target.value)}
+              />
+              <div className="self-end pb-0.5">
+                <Button size="sm" onClick={() => void loadWalletProfile(walletLookupUserId)} isLoading={loading.wallets}>
+                  Load Wallet
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {!walletProfile ? (
+          <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-6 text-sm text-white/60">
+            Search a user wallet to manage balances and transaction history.
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-4 md:grid-cols-3">
+              <article className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-white/50">USD Balance</div>
+                <div className="mt-2 text-2xl rt-page-title">{formatCurrency(activeWallet?.usdBalance)}</div>
+              </article>
+              <article className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-white/50">RTC Balance</div>
+                <div className="mt-2 text-2xl rt-page-title">{activeWallet?.rtcBalance ?? '--'}</div>
+              </article>
+              <article className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-white/50">Pending Withdrawals</div>
+                <div className="mt-2 text-2xl rt-page-title">{formatCurrency(activeWallet?.pendingWithdrawals)}</div>
+              </article>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl rt-page-title">Adjust Balance</h3>
+                  <p className="text-xs text-white/55">Requires reason and confirmation.</p>
+                </div>
+                <Button size="sm" onClick={() => setWalletAdjustOpen(true)}>
+                  Adjust Wallet
+                </Button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#0f1622]">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-white/10 text-xs uppercase tracking-[0.14em] text-white/50">
+                  <tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Amount</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {walletProfile.transactions?.map((txn: any) => (
+                    <tr key={txn._id}>
+                      <td className="px-4 py-3 text-white/70">{formatDate(txn.date || txn.createdAt)}</td>
+                      <td className="px-4 py-3 text-white">{txn.type}</td>
+                      <td className="px-4 py-3 text-white/80">{txn.currency === 'USD' ? formatCurrency(txn.amount) : txn.amount}</td>
+                      <td className="px-4 py-3 text-white/65">{txn.status}</td>
+                    </tr>
+                  ))}
+                  {(!walletProfile.transactions || walletProfile.transactions.length === 0) && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-10 text-center text-white/50">
+                        No transactions found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </section>
+    );
+  };
+
+  const renderWithdrawals = () => {
+    return (
+      <section className="space-y-4">
+        <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h3 className="text-xl rt-page-title">Withdrawal Queue</h3>
+              <p className="text-xs text-white/55">Review and process payout requests.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                className="h-10 rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
+                value={withdrawalStatus}
+                onChange={(event) => {
+                  const status = event.target.value;
+                  setWithdrawalStatus(status);
+                  void loadWithdrawals(status);
+                }}
+              >
+                <option value="pending">pending</option>
+                <option value="approved">approved</option>
+                <option value="rejected">rejected</option>
+                <option value="all">all</option>
+              </select>
+              <Button size="sm" variant="secondary" onClick={() => void loadWithdrawals(withdrawalStatus)} isLoading={loading.withdrawals}>
+                Refresh
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#0f1622]">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-white/10 text-xs uppercase tracking-[0.14em] text-white/50">
+              <tr>
+                <th className="px-4 py-3">User</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3">Method</th>
+                <th className="px-4 py-3">Payout</th>
+                <th className="px-4 py-3">Requested</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/10">
+              {withdrawals.map((item) => (
+                <tr key={item.id}>
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-white">{item.username || item.userId}</div>
+                    <div className="text-xs text-white/55">{item.email}</div>
+                  </td>
+                  <td className="px-4 py-3 font-medium text-amber-200">{formatCurrency(item.amount)}</td>
+                  <td className="px-4 py-3 text-white/70">{item.payoutMethod}</td>
+                  <td className="px-4 py-3 text-white/60">{item.payoutAddressMasked}</td>
+                  <td className="px-4 py-3 text-white/60">{formatDate(item.requestedAt)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2.5 py-1 text-xs ${statusChipClass(item.status)}`}>{item.status}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {item.status === 'pending' ? (
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="danger" onClick={() => handleWithdrawalAction(item, 'reject')}>
+                          Reject
+                        </Button>
+                        <Button size="sm" onClick={() => handleWithdrawalAction(item, 'approve')}>
+                          Approve
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-white/45">Processed</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {withdrawals.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-white/50">
+                    No withdrawals in this status.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    );
+  };
+
+  const renderTables = () => {
+    return (
+      <section className="space-y-4">
+        <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h3 className="text-xl rt-page-title">Live Table Operations</h3>
+              <p className="text-xs text-white/55">Monitor seated players, pot size, and turn state.</p>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => void loadLiveTables()} isLoading={loading.tables}>
+              Refresh Tables
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          {liveTables.map((table) => (
+            <article key={table.tableId} className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="text-lg rt-page-title">{table.name}</h4>
+                  <div className="text-xs text-white/55">{table.mode} • Stake {formatCurrency(table.stake)}</div>
+                </div>
+                <Button size="sm" variant="danger" onClick={() => handleResetTable(table)}>
+                  Reset
+                </Button>
+              </div>
+              <div className="mt-4 grid gap-2 text-xs text-white/70">
+                <div>Players seated: {table.playersSeated.length}</div>
+                <div>Current pot: {formatCurrency(table.currentPot)}</div>
+                <div>Turn: {table.turnState?.turn ?? '--'} ({table.turnState?.status || 'no game state'})</div>
+                <div>Current player: {table.turnState?.currentPlayerUsername || '--'}</div>
+                <div>Time remaining: {table.turnState?.turnTimeRemainingMs ? `${Math.ceil(table.turnState.turnTimeRemainingMs / 1000)}s` : '--'}</div>
+              </div>
+              <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/65">
+                {table.playersSeated.map((player) => player.username).join(', ') || 'No players listed'}
+              </div>
+            </article>
+          ))}
+          {liveTables.length === 0 && (
+            <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-6 text-sm text-white/55">
+              No live tables found.
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+          <h3 className="text-xl rt-page-title">Match Lookup</h3>
+          <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
+            <input
+              className="h-10 flex-1 rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
+              value={matchLookupId}
+              placeholder="Match ID"
+              onChange={(event) => setMatchLookupId(event.target.value)}
+            />
+            <Button size="sm" onClick={() => void lookupMatch()} isLoading={loading.tables}>
+              Fetch Match
+            </Button>
+          </div>
+          {matchDetails && (
+            <pre className="mt-4 max-h-72 overflow-auto rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-white/70">
+              {JSON.stringify(matchDetails, null, 2)}
+            </pre>
+          )}
+        </div>
+      </section>
+    );
+  };
+
+  const renderTournaments = () => {
+    return (
+      <section className="space-y-4">
+        <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl rt-page-title">Tournament Sessions</h3>
+            <p className="text-xs text-white/55">Cash Crown contest lifecycle overview.</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => void loadTournaments()} isLoading={loading.tournaments}>
+            Refresh
+          </Button>
+        </div>
+
+        <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#0f1622]">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-white/10 text-xs uppercase tracking-[0.14em] text-white/50">
+              <tr>
+                <th className="px-4 py-3">Contest</th>
+                <th className="px-4 py-3">Entry Fee</th>
+                <th className="px-4 py-3">Players</th>
+                <th className="px-4 py-3">Prize Pool</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/10">
+              {tournaments.map((item: any) => (
+                <tr key={item._id}>
+                  <td className="px-4 py-3 text-white">{item.contestId}</td>
+                  <td className="px-4 py-3 text-white/70">{formatCurrency(item.entryFee)}</td>
+                  <td className="px-4 py-3 text-white/70">{item.participants?.length ?? 0}/{item.playerCount}</td>
+                  <td className="px-4 py-3 text-white/70">{formatCurrency(item.prizePool)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2.5 py-1 text-xs ${statusChipClass(item.status)}`}>{item.status}</span>
+                  </td>
+                  <td className="px-4 py-3 text-white/60">{formatDate(item.createdAt)}</td>
+                </tr>
+              ))}
+              {tournaments.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-white/50">
+                    No tournaments found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    );
+  };
+
+  const renderMetrics = () => {
+    return (
+      <section className="space-y-4">
+        <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl rt-page-title">System Metrics</h3>
+            <p className="text-xs text-white/55">Runtime, throughput, and treasury posture.</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => void loadMetrics()} isLoading={loading.metrics || loading.dashboard}>
+            Refresh
+          </Button>
+        </div>
+        <pre className="max-h-[560px] overflow-auto rounded-2xl border border-white/10 bg-[#0f1622] p-4 text-xs text-white/70">
+          {JSON.stringify(metrics, null, 2)}
+        </pre>
+      </section>
+    );
+  };
+
+  const renderAudits = () => {
+    const totalPages = auditResponse ? Math.max(1, Math.ceil(auditResponse.total / auditResponse.limit)) : 1;
+
+    return (
+      <section className="space-y-4">
+        <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h3 className="text-xl rt-page-title">Audit Logs</h3>
+              <p className="text-xs text-white/55">Filter by admin or action type. Data is paginated.</p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <input
+                className="h-10 rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
+                placeholder="Action"
+                value={auditActionFilter}
+                onChange={(event) => setAuditActionFilter(event.target.value)}
+              />
+              <input
+                className="h-10 rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
+                placeholder="Admin User ID"
+                value={auditAdminFilter}
+                onChange={(event) => setAuditAdminFilter(event.target.value)}
+              />
+              <Button
+                size="sm"
+                onClick={() => {
+                  setAuditPage(1);
+                  void loadAudits(1, auditActionFilter, auditAdminFilter);
+                }}
+                isLoading={loading.audits}
+              >
+                Filter
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#0f1622]">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-white/10 text-xs uppercase tracking-[0.14em] text-white/50">
+              <tr>
+                <th className="px-4 py-3">When</th>
+                <th className="px-4 py-3">Admin</th>
+                <th className="px-4 py-3">Action</th>
+                <th className="px-4 py-3">Target</th>
+                <th className="px-4 py-3">IP</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/10">
+              {auditResponse?.records.map((item) => (
+                <tr key={item._id}>
+                  <td className="px-4 py-3 text-white/70">{formatDate(item.createdAt)}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-white">{item.adminUserId?.username || item.adminRole}</div>
+                    <div className="text-xs text-white/55">{item.adminRole}</div>
+                  </td>
+                  <td className="px-4 py-3 text-white/75">{item.action}</td>
+                  <td className="px-4 py-3 text-white/65">{item.targetType} {item.targetId ? `• ${item.targetId}` : ''}</td>
+                  <td className="px-4 py-3 text-white/55">{item.ipAddress || '--'}</td>
+                </tr>
+              ))}
+              {(!auditResponse || auditResponse.records.length === 0) && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-white/50">
+                    No audit records found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-[#0f1622] px-4 py-3 text-sm text-white/70">
+          <div>Page {auditResponse?.page || 1} of {totalPages}</div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={(auditResponse?.page || 1) <= 1}
+              onClick={() => {
+                const next = Math.max(1, (auditResponse?.page || 1) - 1);
+                setAuditPage(next);
+                void loadAudits(next, auditActionFilter, auditAdminFilter);
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" /> Prev
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={(auditResponse?.page || 1) >= totalPages}
+              onClick={() => {
+                const next = Math.min(totalPages, (auditResponse?.page || 1) + 1);
+                setAuditPage(next);
+                void loadAudits(next, auditActionFilter, auditAdminFilter);
+              }}
+            >
+              Next <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+    );
+  };
+
+  const renderActiveSection = () => {
+    if (activeSection === 'dashboard') return renderDashboard();
+    if (activeSection === 'users') return renderUsers();
+    if (activeSection === 'wallets') return renderWallets();
+    if (activeSection === 'withdrawals') return renderWithdrawals();
+    if (activeSection === 'tables') return renderTables();
+    if (activeSection === 'tournaments') return renderTournaments();
+    if (activeSection === 'metrics') return renderMetrics();
+    return renderAudits();
+  };
+
+  return (
+    <div className="relative min-h-[78vh] overflow-hidden rounded-3xl border border-white/10 bg-[#090d14]">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(800px_360px_at_10%_0%,rgba(0,196,255,0.15),transparent_66%),radial-gradient(780px_340px_at_90%_6%,rgba(41,255,160,0.14),transparent_64%),linear-gradient(180deg,#070a11,#0b111a_55%,#070a11)]" />
+      <div className="grid min-h-[78vh] lg:grid-cols-[260px_1fr]">
+        <aside className="border-r border-white/10 bg-[#0b111a]/85 p-4 backdrop-blur-xl">
+          <div className="mb-6 rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/70">Admin Ops</div>
+            <h1 className="mt-2 text-2xl rt-page-title">Operations Panel</h1>
+            <p className="mt-2 text-xs text-white/55">Secure controls for platform, funds, and live sessions.</p>
+          </div>
+
+          <nav className="space-y-1">
+            {SECTIONS.map((section) => {
+              const active = section.id === activeSection;
+              return (
+                <button
+                  key={section.id}
+                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
+                    active
+                      ? 'bg-cyan-400/20 text-cyan-100 border border-cyan-300/35'
+                      : 'text-white/70 hover:bg-white/5 hover:text-white'
+                  }`}
+                  onClick={() => setActiveSection(section.id)}
+                >
+                  {section.icon}
+                  {section.label}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        <main className="p-4 md:p-6">
+          <header className="mb-5 rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-white/45">Active Section</div>
+                <h2 className="text-2xl rt-page-title">{SECTIONS.find((item) => item.id === activeSection)?.label}</h2>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  if (activeSection === 'dashboard' || activeSection === 'metrics') void loadMetrics();
+                  if (activeSection === 'users') void loadUsers(userQuery);
+                  if (activeSection === 'wallets') void loadWalletProfile(walletLookupUserId || walletProfile?.user.id || '');
+                  if (activeSection === 'withdrawals') void loadWithdrawals(withdrawalStatus);
+                  if (activeSection === 'tables') void loadLiveTables();
+                  if (activeSection === 'tournaments') void loadTournaments();
+                  if (activeSection === 'audits') void loadAudits(auditPage, auditActionFilter, auditAdminFilter);
+                }}
+              >
+                <RefreshCw className="mr-1 h-4 w-4" /> Refresh
+              </Button>
+            </div>
+          </header>
+
+          {renderActiveSection()}
+        </main>
+      </div>
+
+      <ConfirmDialog state={confirmState} pending={actionPending} onClose={closeConfirm} onConfirm={() => void runConfirmAction()} />
+
+      <WalletAdjustModal
+        open={walletAdjustOpen}
+        draft={walletAdjustDraft}
+        onChange={setWalletAdjustDraft}
+        onClose={() => {
+          if (!actionPending) {
+            setWalletAdjustOpen(false);
+          }
+        }}
+        onSubmit={() => void handleWalletAdjustment()}
+        pending={actionPending}
+        targetUserId={walletProfile?.user.id || walletLookupUserId}
+      />
     </div>
   );
 };
