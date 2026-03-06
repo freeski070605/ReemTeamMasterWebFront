@@ -54,7 +54,7 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
     <motion.div
       className={cn(
         'relative w-24 h-36 rounded-lg shadow-lg cursor-pointer select-none transition-transform overflow-hidden',
-        isSelected ? '-translate-y-4 shadow-yellow-400/50 ring-4 ring-yellow-400' : '',
+        isSelected ? 'shadow-yellow-400/50 ring-4 ring-yellow-400' : '',
         className
       )}
       onClick={onClick}

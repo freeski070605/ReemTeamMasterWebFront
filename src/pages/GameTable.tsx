@@ -1309,65 +1309,45 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              <div
-                className={`absolute z-30 pointer-events-none ${
-                  isPhoneLandscapeLayout
-                    ? "left-1/2 top-9 -translate-x-1/2"
-                    : "right-3 top-14"
-                }`}
-              >
-                <div
-                  className={`rounded-lg border border-cyan-200/60 bg-black/72 shadow-[0_0_18px_rgba(34,211,238,0.2)] backdrop-blur-sm ${
-                    isPhoneLandscapeLayout ? "w-[min(58vw,320px)] px-2 py-1 text-center" : "max-w-[240px] px-3 py-2 text-right"
-                  }`}
-                >
-                  <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} font-semibold text-cyan-100`}>
-                    {flowActorLabel}
-                  </div>
-                  <div
-                    className={`${isPhoneLandscapeLayout ? "mt-0.5 text-[9px]" : "mt-1 text-[10px]"} flex items-center gap-2 uppercase tracking-wide ${
-                      isPhoneLandscapeLayout ? "justify-center" : "justify-end"
-                    }`}
-                  >
-                    <span
-                      className={`transition-all ${
-                        activeTurnStepLabel === "Draw"
-                          ? "text-cyan-100 drop-shadow-[0_0_10px_rgba(34,211,238,0.65)]"
-                          : "text-cyan-200/60"
-                      }`}
-                    >
-                      Draw
-                    </span>
-                    <div className={`relative h-[2px] rounded-full bg-cyan-100/20 ${isPhoneLandscapeLayout ? "w-12" : "w-16"}`}>
-                      <div
-                        className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
-                          activeTurnStepLabel === "Draw" ? "w-1/3 bg-cyan-300" : "w-full bg-emerald-300"
+              {!isPhoneLandscapeLayout ? (
+                <div className="absolute right-3 top-14 z-30 pointer-events-none">
+                  <div className="max-w-[240px] rounded-lg border border-cyan-200/60 bg-black/72 px-3 py-2 text-right shadow-[0_0_18px_rgba(34,211,238,0.2)] backdrop-blur-sm">
+                    <div className="text-[10px] font-semibold text-cyan-100">{flowActorLabel}</div>
+                    <div className="mt-1 flex items-center justify-end gap-2 text-[10px] uppercase tracking-wide">
+                      <span
+                        className={`transition-all ${
+                          activeTurnStepLabel === "Draw"
+                            ? "text-cyan-100 drop-shadow-[0_0_10px_rgba(34,211,238,0.65)]"
+                            : "text-cyan-200/60"
                         }`}
-                      />
+                      >
+                        Draw
+                      </span>
+                      <div className="relative h-[2px] w-16 rounded-full bg-cyan-100/20">
+                        <div
+                          className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
+                            activeTurnStepLabel === "Draw" ? "w-1/3 bg-cyan-300" : "w-full bg-emerald-300"
+                          }`}
+                        />
+                      </div>
+                      <span
+                        className={`transition-all ${
+                          activeTurnStepLabel === "Discard"
+                            ? "text-emerald-100 drop-shadow-[0_0_10px_rgba(52,211,153,0.68)]"
+                            : "text-cyan-200/60"
+                        }`}
+                      >
+                        Discard
+                      </span>
                     </div>
-                    <span
-                      className={`transition-all ${
-                        activeTurnStepLabel === "Discard"
-                          ? "text-emerald-100 drop-shadow-[0_0_10px_rgba(52,211,153,0.68)]"
-                          : "text-cyan-200/60"
-                      }`}
-                    >
-                      Discard
-                    </span>
+                    {isMyTurn ? (
+                      <div className="mt-1 text-[9px] font-medium text-cyan-200/90">
+                        {isDiscardStep ? "Select 1 card, then tap Discard." : "Draw from deck or discard pile."}
+                      </div>
+                    ) : null}
                   </div>
-                  {isMyTurn ? (
-                    <div className={`${isPhoneLandscapeLayout ? "mt-0.5 text-[8px]" : "mt-1 text-[9px]"} font-medium text-cyan-200/90`}>
-                      {isPhoneLandscapeLayout
-                        ? isDiscardStep
-                          ? "Select 1, then discard."
-                          : "Draw: deck or discard."
-                        : isDiscardStep
-                          ? "Select 1 card, then tap Discard."
-                          : "Draw from deck or discard pile."}
-                    </div>
-                  ) : null}
                 </div>
-              </div>
+              ) : null}
 
               {renderSeatInfo(topPlayer, topSeatPositionClass, topSeatAlign)}
               {renderSeatInfo(leftPlayer, leftSeatPositionClass, "left")}
@@ -1445,7 +1425,7 @@ const GameTable: React.FC = () => {
                 } -translate-x-1/2 -translate-y-1/2 flex flex-col items-center ${
                   isPhoneLandscapeLayout ? "gap-1.5" : "gap-2"
                 } transition-all duration-300 ${
-                  isMyTurn ? "brightness-110 scale-[1.03]" : "brightness-100 scale-100"
+                  isMyTurn ? "brightness-110" : "brightness-100"
                 }`}
               >
                 <div className={`flex items-center ${isPhoneLandscapeLayout ? "gap-3" : "gap-4"}`}>
@@ -1501,7 +1481,7 @@ const GameTable: React.FC = () => {
                       isMyTurn ? "active-seat" : "inactive-seat"
                     } relative rounded-lg border transition-all duration-300 ${
                       isPhoneLandscapeLayout
-                        ? "min-w-[104px] px-1.5 py-1 mb-1"
+                        ? "min-w-[128px] px-1.5 py-1 mb-1"
                         : `min-w-[140px] px-2 py-2 ${isCompactLandscape ? "mb-4" : "mb-6"}`
                     } ${
                       isMyTurn
@@ -1532,6 +1512,38 @@ const GameTable: React.FC = () => {
                         >
                           {myTurnStatus}
                         </div>
+                        {isPhoneLandscapeLayout ? (
+                          <div className="mb-1 rounded-md border border-cyan-200/40 bg-black/35 px-1.5 py-1 text-cyan-100">
+                            <div className="truncate text-[8px] font-semibold">{flowActorLabel}</div>
+                            <div className="mt-0.5 flex items-center gap-1 text-[8px] uppercase tracking-wide">
+                              <span
+                                className={`transition-all ${
+                                  activeTurnStepLabel === "Draw"
+                                    ? "text-cyan-100 drop-shadow-[0_0_8px_rgba(34,211,238,0.55)]"
+                                    : "text-cyan-200/60"
+                                }`}
+                              >
+                                D
+                              </span>
+                              <div className="relative h-[2px] w-10 rounded-full bg-cyan-100/20">
+                                <div
+                                  className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
+                                    activeTurnStepLabel === "Draw" ? "w-1/3 bg-cyan-300" : "w-full bg-emerald-300"
+                                  }`}
+                                />
+                              </div>
+                              <span
+                                className={`transition-all ${
+                                  activeTurnStepLabel === "Discard"
+                                    ? "text-emerald-100 drop-shadow-[0_0_8px_rgba(52,211,153,0.58)]"
+                                    : "text-cyan-200/60"
+                                }`}
+                              >
+                                X
+                              </span>
+                            </div>
+                          </div>
+                        ) : null}
                         <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} text-white font-semibold leading-tight`}>
                           {user.username}
                         </div>
@@ -1602,13 +1614,13 @@ const GameTable: React.FC = () => {
                                   className="card"
                                   initial={{ y: 30, opacity: 0 }}
                                   animate={{
-                                    y: isSelectedCard ? -10 : 0,
+                                    y: 0,
                                     scale: isSelectedCard ? 1.04 : 1,
                                     opacity: 1,
                                   }}
                                   exit={{ y: -20, opacity: 0 }}
                                   transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                                  whileHover={isMyTurn ? { y: isSelectedCard ? -12 : -6, scale: 1.03 } : undefined}
+                                  whileHover={isMyTurn ? { scale: 1.03 } : undefined}
                                   whileTap={isMyTurn ? { scale: 0.98 } : undefined}
                                 >
                                   <CardComponent
