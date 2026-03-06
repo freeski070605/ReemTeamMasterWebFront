@@ -1,6 +1,12 @@
 import React from 'react';
 import { motion, PanInfo } from 'framer-motion';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 import { CardSuit, CardRank } from '../../types/game';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 interface PlayingCardProps {
   suit: CardSuit;
@@ -46,7 +52,11 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
 
   return (
     <motion.div
-      className={`relative w-24 h-36 rounded-lg shadow-lg cursor-pointer select-none transition-transform overflow-hidden ${isSelected ? '-translate-y-4 shadow-yellow-400/50 ring-4 ring-yellow-400' : ''} ${className}`}
+      className={cn(
+        'relative w-24 h-36 rounded-lg shadow-lg cursor-pointer select-none transition-transform overflow-hidden',
+        isSelected ? '-translate-y-4 shadow-yellow-400/50 ring-4 ring-yellow-400' : '',
+        className
+      )}
       onClick={onClick}
       style={style}
       whileHover={{ scale: 1.05 }}

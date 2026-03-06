@@ -908,8 +908,9 @@ const GameTable: React.FC = () => {
   const activeTurnStepLabel = activeTurnHasDrawn ? "Discard" : "Draw";
   const isPhoneLandscapeLayout = isTouchDevice && isUltraShortLandscape;
   const topSeatPositionClass = isPhoneLandscapeLayout
-    ? "top-[11%] left-[63%] -translate-x-1/2"
+    ? "right-[2%] top-[24%]"
     : "top-2 left-[58%] -translate-x-1/2";
+  const topSeatAlign: "left" | "right" = isPhoneLandscapeLayout ? "right" : "left";
   const leftSeatPositionClass = isPhoneLandscapeLayout
     ? "left-[0.5%] top-1/2 -translate-y-1/2"
     : "left-[1.5%] top-1/2 -translate-y-1/2";
@@ -917,16 +918,16 @@ const GameTable: React.FC = () => {
     ? "right-[0.5%] top-1/2 -translate-y-1/2"
     : "right-[1.5%] top-1/2 -translate-y-1/2";
   const topSpreadPositionClass = isPhoneLandscapeLayout
-    ? "left-1/2 top-[24%] -translate-x-1/2 w-[40%] max-w-[300px]"
+    ? "left-1/2 top-[19%] -translate-x-1/2 w-[36%] max-w-[260px]"
     : "left-1/2 top-[28%] -translate-x-1/2 w-[34%] max-w-[300px]";
   const leftSpreadPositionClass = isPhoneLandscapeLayout
-    ? "left-[10%] top-[37%] -translate-y-1/2 w-[24%] max-w-[210px]"
+    ? "left-[10%] top-[34%] -translate-y-1/2 w-[24%] max-w-[210px]"
     : "left-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]";
   const rightSpreadPositionClass = isPhoneLandscapeLayout
-    ? "right-[10%] top-[37%] -translate-y-1/2 w-[24%] max-w-[210px]"
+    ? "right-[10%] top-[34%] -translate-y-1/2 w-[24%] max-w-[210px]"
     : "right-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]";
   const mySpreadPositionClass = isPhoneLandscapeLayout
-    ? "left-1/2 bottom-[34%] -translate-x-1/2 w-[34%] max-w-[260px]"
+    ? "left-1/2 bottom-[36%] -translate-x-1/2 w-[34%] max-w-[260px]"
     : "left-1/2 bottom-[30%] -translate-x-1/2 w-[30%] max-w-[260px]";
 
   const contextBannerText = isMyTurn
@@ -1111,6 +1112,14 @@ const GameTable: React.FC = () => {
     currentPlayer ? hand.slice(0, getVisibleCardCount(currentPlayer.userId, hand.length)) : [];
   const myTurnStatus = getTurnStatus(user._id, true);
   const canUseFlickDiscard = isTouchDevice && isDiscardReady;
+  const phoneHandCardClass =
+    visibleHand.length >= 6
+      ? "w-[2.05rem] h-[3rem]"
+      : visibleHand.length >= 5
+        ? "w-[2.25rem] h-[3.3rem]"
+        : visibleHand.length >= 4
+          ? "w-[2.45rem] h-[3.55rem]"
+          : "w-[2.65rem] h-[3.85rem]";
 
   const renderSpreadZone = (
     player: typeof gameState.players[number] | null,
@@ -1298,18 +1307,20 @@ const GameTable: React.FC = () => {
               <div
                 className={`absolute z-30 pointer-events-none ${
                   isPhoneLandscapeLayout
-                    ? "left-1/2 top-11 -translate-x-1/2"
+                    ? "left-1/2 top-9 -translate-x-1/2"
                     : "right-3 top-14"
                 }`}
               >
                 <div
                   className={`rounded-lg border border-cyan-200/60 bg-black/72 shadow-[0_0_18px_rgba(34,211,238,0.2)] backdrop-blur-sm ${
-                    isPhoneLandscapeLayout ? "w-[min(72vw,360px)] px-2.5 py-1.5 text-center" : "max-w-[240px] px-3 py-2 text-right"
+                    isPhoneLandscapeLayout ? "w-[min(58vw,320px)] px-2 py-1 text-center" : "max-w-[240px] px-3 py-2 text-right"
                   }`}
                 >
-                  <div className="text-[10px] font-semibold text-cyan-100">{flowActorLabel}</div>
+                  <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} font-semibold text-cyan-100`}>
+                    {flowActorLabel}
+                  </div>
                   <div
-                    className={`mt-1 flex items-center gap-2 text-[10px] uppercase tracking-wide ${
+                    className={`${isPhoneLandscapeLayout ? "mt-0.5 text-[9px]" : "mt-1 text-[10px]"} flex items-center gap-2 uppercase tracking-wide ${
                       isPhoneLandscapeLayout ? "justify-center" : "justify-end"
                     }`}
                   >
@@ -1322,7 +1333,7 @@ const GameTable: React.FC = () => {
                     >
                       Draw
                     </span>
-                    <div className={`relative h-[2px] rounded-full bg-cyan-100/20 ${isPhoneLandscapeLayout ? "w-14" : "w-16"}`}>
+                    <div className={`relative h-[2px] rounded-full bg-cyan-100/20 ${isPhoneLandscapeLayout ? "w-12" : "w-16"}`}>
                       <div
                         className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
                           activeTurnStepLabel === "Draw" ? "w-1/3 bg-cyan-300" : "w-full bg-emerald-300"
@@ -1340,11 +1351,11 @@ const GameTable: React.FC = () => {
                     </span>
                   </div>
                   {isMyTurn ? (
-                    <div className="mt-1 text-[9px] font-medium text-cyan-200/90">
+                    <div className={`${isPhoneLandscapeLayout ? "mt-0.5 text-[8px]" : "mt-1 text-[9px]"} font-medium text-cyan-200/90`}>
                       {isPhoneLandscapeLayout
                         ? isDiscardStep
-                          ? "Select 1 card, then discard."
-                          : "Draw from deck or discard pile."
+                          ? "Select 1, then discard."
+                          : "Draw: deck or discard."
                         : isDiscardStep
                           ? "Select 1 card, then tap Discard."
                           : "Draw from deck or discard pile."}
@@ -1353,7 +1364,7 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              {renderSeatInfo(topPlayer, topSeatPositionClass, "left")}
+              {renderSeatInfo(topPlayer, topSeatPositionClass, topSeatAlign)}
               {renderSeatInfo(leftPlayer, leftSeatPositionClass, "left")}
               {renderSeatInfo(rightPlayer, rightSeatPositionClass, "right")}
 
@@ -1425,7 +1436,7 @@ const GameTable: React.FC = () => {
 
               <div
                 className={`center-pile absolute left-1/2 ${
-                  isPhoneLandscapeLayout ? "top-[47%]" : "top-1/2"
+                  isPhoneLandscapeLayout ? "top-[43%]" : "top-1/2"
                 } -translate-x-1/2 -translate-y-1/2 flex flex-col items-center ${
                   isPhoneLandscapeLayout ? "gap-1.5" : "gap-2"
                 } transition-all duration-300 ${
@@ -1473,7 +1484,7 @@ const GameTable: React.FC = () => {
               <div
                 className={`seat absolute left-1/2 -translate-x-1/2 pointer-events-auto ${
                   isPhoneLandscapeLayout
-                    ? "w-[99%] h-[154px] bottom-0"
+                    ? "w-[99%] h-[160px] bottom-0"
                     : isCompactLandscape
                       ? "w-[96%] max-w-[820px] h-[168px] bottom-1"
                       : "w-[96%] max-w-[820px] h-[176px] bottom-2"
@@ -1485,7 +1496,7 @@ const GameTable: React.FC = () => {
                       isMyTurn ? "active-seat" : "inactive-seat"
                     } relative rounded-lg border transition-all duration-300 ${
                       isPhoneLandscapeLayout
-                        ? "min-w-[108px] px-1.5 py-1 mb-1.5"
+                        ? "min-w-[104px] px-1.5 py-1 mb-1"
                         : `min-w-[140px] px-2 py-2 ${isCompactLandscape ? "mb-4" : "mb-6"}`
                     } ${
                       isMyTurn
@@ -1534,14 +1545,14 @@ const GameTable: React.FC = () => {
                       <div
                         className={`w-full rounded-lg border border-sky-300/30 bg-black/45 text-center font-medium text-sky-100 shadow-[0_0_18px_rgba(56,189,248,0.18)] pointer-events-none select-none ${
                           isPhoneLandscapeLayout
-                            ? "mb-0.5 max-w-[560px] px-2 py-1 text-[10px]"
+                            ? "mb-0.5 max-w-[460px] px-2 py-0.5 text-[9px]"
                             : "mb-1 max-w-[520px] px-3 py-1.5 text-[11px]"
                         }`}
                       >
                         {guidanceBannerText}
                       </div>
                     ) : null}
-                    {shouldShowGuidanceHelper ? (
+                    {shouldShowGuidanceHelper && !isPhoneLandscapeLayout ? (
                       <div
                         className={`${isPhoneLandscapeLayout ? "mb-0.5 text-[9px]" : "mb-1 text-[10px]"} font-semibold pointer-events-none select-none ${
                           selectedIllegalDiscardCard ? "text-rose-300" : "text-emerald-200"
@@ -1562,13 +1573,13 @@ const GameTable: React.FC = () => {
                     >
                       <div
                         className={`hand relative w-full pointer-events-auto ${
-                          isPhoneLandscapeLayout ? "h-[82px] max-w-none px-1" : "h-28 max-w-[760px]"
+                          isPhoneLandscapeLayout ? "h-[86px] max-w-none px-1" : "h-28 max-w-[760px]"
                         }`}
                       >
                         <AnimatePresence>
                           <div
                             className={`flex flex-nowrap items-end justify-center ${
-                              isPhoneLandscapeLayout ? "gap-1.5" : "gap-1 sm:gap-1.5"
+                              isPhoneLandscapeLayout ? "gap-1" : "gap-1 sm:gap-1.5"
                             }`}
                           >
                             {visibleHand.map((card) => {
@@ -1600,7 +1611,7 @@ const GameTable: React.FC = () => {
                                     rank={card.rank}
                                     isSelected={isSelectedCard}
                                     onClick={() => toggleCardSelection(card)}
-                                    className={isPhoneLandscapeLayout ? "w-10 h-14" : "w-11 h-16 sm:w-12 sm:h-[4.5rem]"}
+                                    className={isPhoneLandscapeLayout ? phoneHandCardClass : "w-11 h-16 sm:w-12 sm:h-[4.5rem]"}
                                     badgeText={
                                       isIllegalDiscardSelection
                                         ? "Cannot discard this card this turn."
@@ -1620,7 +1631,7 @@ const GameTable: React.FC = () => {
                         <div
                           className={`actions pointer-events-auto ${
                             isPhoneLandscapeLayout
-                              ? "mt-1 w-full max-w-[500px] rounded-xl border border-white/15 bg-black/45 px-2 py-2 backdrop-blur-sm"
+                              ? "mt-1 w-full max-w-[460px] rounded-xl border border-white/15 bg-black/55 px-1.5 py-1.5 backdrop-blur-sm"
                               : `flex gap-1.5 mt-0 [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs ${
                                   isCompactLandscape ? "mt-1 translate-y-0" : "-translate-y-3 sm:-translate-y-1"
                                 }`
