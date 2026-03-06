@@ -909,7 +909,9 @@ const GameTable: React.FC = () => {
   const isPhoneLandscapeLayout = isTouchDevice && isUltraShortLandscape;
   const isHeadsUpTable = totalPlayers <= 2;
   const topSeatPositionClass = isPhoneLandscapeLayout
-    ? "left-1/2 top-[21%] -translate-x-1/2"
+    ? isHeadsUpTable
+      ? "left-1/2 top-[14%] -translate-x-1/2"
+      : "left-1/2 top-[15%] -translate-x-1/2"
     : "top-2 left-[58%] -translate-x-1/2";
   const topSeatAlign: "left" | "right" = "left";
   const leftSeatPositionClass = isPhoneLandscapeLayout
