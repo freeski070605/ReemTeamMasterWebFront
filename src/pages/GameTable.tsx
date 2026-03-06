@@ -68,6 +68,7 @@ const GameTable: React.FC = () => {
   const [playerBalances, setPlayerBalances] = useState<Record<string, number>>({});
   const [tableMaxWidthPx, setTableMaxWidthPx] = useState(860);
   const [isCompactLandscape, setIsCompactLandscape] = useState(false);
+  const [isUltraShortLandscape, setIsUltraShortLandscape] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [showGuidanceBanner, setShowGuidanceBanner] = useState(false);
   const [showGuidanceHelper, setShowGuidanceHelper] = useState(false);
@@ -260,12 +261,13 @@ const GameTable: React.FC = () => {
       const isLandscape = usableWidth > usableHeight;
       const compactLandscape = isLandscape && usableHeight <= 520;
       const veryShortLandscape = isLandscape && usableHeight <= 430;
-      const tableHeightRatio = veryShortLandscape ? 0.9 : compactLandscape ? 0.94 : isLandscape ? 0.96 : 0.92;
+      const tableHeightRatio = veryShortLandscape ? 0.95 : compactLandscape ? 0.94 : isLandscape ? 0.96 : 0.92;
       const maxByViewport = usableWidth * 0.96;
       const maxByHeight = usableHeight * tableHeightRatio * (16 / 9);
       const maxByTV = 1800;
       setTableMaxWidthPx(Math.floor(Math.min(maxByViewport, maxByHeight, maxByTV)));
       setIsCompactLandscape(compactLandscape);
+      setIsUltraShortLandscape(veryShortLandscape);
     };
 
     updateTableMaxWidth();
@@ -904,6 +906,28 @@ const GameTable: React.FC = () => {
     !selectedIllegalDiscardCard;
   const flowActorLabel = isMyTurn ? "Your Turn" : `${activeTurnPlayerName}'s Turn`;
   const activeTurnStepLabel = activeTurnHasDrawn ? "Discard" : "Draw";
+  const isPhoneLandscapeLayout = isTouchDevice && isUltraShortLandscape;
+  const topSeatPositionClass = isPhoneLandscapeLayout
+    ? "top-[11%] left-[63%] -translate-x-1/2"
+    : "top-2 left-[58%] -translate-x-1/2";
+  const leftSeatPositionClass = isPhoneLandscapeLayout
+    ? "left-[0.5%] top-1/2 -translate-y-1/2"
+    : "left-[1.5%] top-1/2 -translate-y-1/2";
+  const rightSeatPositionClass = isPhoneLandscapeLayout
+    ? "right-[0.5%] top-1/2 -translate-y-1/2"
+    : "right-[1.5%] top-1/2 -translate-y-1/2";
+  const topSpreadPositionClass = isPhoneLandscapeLayout
+    ? "left-1/2 top-[24%] -translate-x-1/2 w-[40%] max-w-[300px]"
+    : "left-1/2 top-[28%] -translate-x-1/2 w-[34%] max-w-[300px]";
+  const leftSpreadPositionClass = isPhoneLandscapeLayout
+    ? "left-[10%] top-[37%] -translate-y-1/2 w-[24%] max-w-[210px]"
+    : "left-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]";
+  const rightSpreadPositionClass = isPhoneLandscapeLayout
+    ? "right-[10%] top-[37%] -translate-y-1/2 w-[24%] max-w-[210px]"
+    : "right-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]";
+  const mySpreadPositionClass = isPhoneLandscapeLayout
+    ? "left-1/2 bottom-[34%] -translate-x-1/2 w-[34%] max-w-[260px]"
+    : "left-1/2 bottom-[30%] -translate-x-1/2 w-[30%] max-w-[260px]";
 
   const contextBannerText = isMyTurn
     ? isDiscardStep
@@ -993,7 +1017,12 @@ const GameTable: React.FC = () => {
     if (count <= 0) {
       return <div className="text-xs text-white/40">No cards</div>;
     }
-    const cardClass = size === "md" ? "w-11 h-16" : "w-9 h-14";
+    const cardClass =
+      size === "md"
+        ? "w-11 h-16"
+        : isPhoneLandscapeLayout
+          ? "w-8 h-12"
+          : "w-9 h-14";
     return (
       <div className="relative">
         <CardComponent
@@ -1032,7 +1061,9 @@ const GameTable: React.FC = () => {
           ) : null}
           {renderOpponentHand(getVisibleCardCount(player.userId, player.hand.length), "sm")}
           <div
-            className={`relative px-2 py-1 rounded-lg border min-w-[118px] transition-all duration-300 ${
+            className={`relative rounded-lg border transition-all duration-300 ${
+              isPhoneLandscapeLayout ? "px-1.5 py-1 min-w-[102px]" : "px-2 py-1 min-w-[118px]"
+            } ${
               isActive
                 ? "border-yellow-400/80 bg-yellow-400/10 brightness-100 opacity-100"
                 : "border-white/10 bg-black/35 brightness-90 opacity-60"
@@ -1045,20 +1076,26 @@ const GameTable: React.FC = () => {
                   duration={turnDurationMs}
                   timeRemaining={isActive ? turnTimeRemainingMs : turnDurationMs}
                   isActive={isActive}
-                  size={54}
-                  strokeWidth={3.5}
+                  size={isPhoneLandscapeLayout ? 44 : 54}
+                  strokeWidth={isPhoneLandscapeLayout ? 2.8 : 3.5}
                   className={isActive ? "animate-pulse" : ""}
                 />
               </div>
               <div>
-                <div className={`mb-1 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold tracking-wide ${turnStatusClasses[turnStatus]}`}>
+                <div
+                  className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-wide ${
+                    isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"
+                  } ${turnStatusClasses[turnStatus]}`}
+                >
                   {turnStatus}
                 </div>
-                <div className="text-[11px] text-white font-semibold leading-tight">{player.username}</div>
-                <div className="text-[10px] text-white/60 leading-tight">
+                <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} text-white font-semibold leading-tight`}>
+                  {player.username}
+                </div>
+                <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} text-white/60 leading-tight`}>
                   Cards: {getVisibleCardCount(player.userId, player.hand.length)}
                 </div>
-                <div className="text-[9px] text-yellow-300/95 leading-tight">
+                <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} text-yellow-300/95 leading-tight`}>
                   {formatSeatBalance(seatBalance)}
                 </div>
               </div>
@@ -1089,7 +1126,9 @@ const GameTable: React.FC = () => {
           {player.spreads.map((spread, sIdx) => (
             <motion.div
               key={`${player.userId}-spread-${sIdx}`}
-              className={`flex -space-x-5 ${isHitMode ? "cursor-pointer pointer-events-auto ring-2 ring-yellow-400 rounded-lg p-1 bg-yellow-400/10" : "pointer-events-none"}`}
+              className={`flex ${isPhoneLandscapeLayout ? "-space-x-4" : "-space-x-5"} ${
+                isHitMode ? "cursor-pointer pointer-events-auto ring-2 ring-yellow-400 rounded-lg p-1 bg-yellow-400/10" : "pointer-events-none"
+              }`}
               onClick={() => isHitMode && executeHit(player.userId, sIdx)}
               initial={{
                 opacity: 0,
@@ -1120,7 +1159,7 @@ const GameTable: React.FC = () => {
                   <CardComponent
                     suit={card.suit}
                     rank={card.rank}
-                    className="w-8 h-12 sm:w-9 sm:h-14 text-[9px]"
+                    className={isPhoneLandscapeLayout ? "w-8 h-12 text-[9px]" : "w-8 h-12 sm:w-9 sm:h-14 text-[9px]"}
                   />
                 </motion.div>
               ))}
@@ -1152,7 +1191,9 @@ const GameTable: React.FC = () => {
         style={{
           paddingTop: "var(--safe-area-top)",
           paddingRight: "var(--safe-area-right)",
-          paddingBottom: "calc(var(--safe-area-bottom) + 8px)",
+          paddingBottom: isPhoneLandscapeLayout
+            ? "calc(var(--safe-area-bottom) + 14px)"
+            : "calc(var(--safe-area-bottom) + 8px)",
           paddingLeft: "var(--safe-area-left)",
         }}
       >
@@ -1169,12 +1210,14 @@ const GameTable: React.FC = () => {
 
         <div
           className={`game-wrapper flex-1 relative overflow-hidden touch-manipulation ${
-            isCompactLandscape ? "pb-2" : "pb-6"
+            isPhoneLandscapeLayout ? "pb-0" : isCompactLandscape ? "pb-2" : "pb-6"
           } ${isMobilePortrait ? "pointer-events-none" : ""}`}
         >
           <div className="table-area relative w-full h-full flex items-center justify-center">
             <div
-              className={`table relative aspect-[16/9] rounded-[28px] border-[12px] shadow-2xl overflow-hidden bg-black/20 w-[96vw] ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
+              className={`table relative aspect-[16/9] ${
+                isPhoneLandscapeLayout ? "rounded-[22px] border-[8px] w-[99vw]" : "rounded-[28px] border-[12px] w-[96vw]"
+              } shadow-2xl overflow-hidden bg-black/20 ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
               style={{ maxWidth: `${tableMaxWidthPx}px` }}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.06),transparent_60%)]" />
@@ -1185,40 +1228,89 @@ const GameTable: React.FC = () => {
                     : "opacity-0"
                 }`}
               />
-              <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 bg-black/50 text-white rounded-full border border-white/10 px-2 py-1 backdrop-blur-sm min-w-0">
+              <div
+                className={`absolute z-20 flex items-center justify-between ${
+                  isPhoneLandscapeLayout ? "top-2 left-2 right-2 gap-1.5" : "top-3 left-3 right-3 gap-2"
+                }`}
+              >
+                <div
+                  className={`flex items-center bg-black/50 text-white rounded-full border border-white/10 backdrop-blur-sm min-w-0 ${
+                    isPhoneLandscapeLayout ? "gap-1 px-2 py-0.5" : "gap-2 px-2 py-1"
+                  }`}
+                >
                   <div className="relative flex-shrink-0">
                     <div className="absolute -inset-1 rounded-full bg-yellow-400/20 blur-lg" />
-                    <img src={logoSrc} alt="ReemTeam logo" className="relative w-6 h-6 object-contain" />
+                    <img
+                      src={logoSrc}
+                      alt="ReemTeam logo"
+                      className={`relative object-contain ${isPhoneLandscapeLayout ? "w-5 h-5" : "w-6 h-6"}`}
+                    />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[11px] font-bold tracking-wide truncate" style={{ fontFamily: displayFont }}>
+                    <div
+                      className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} font-bold tracking-wide truncate`}
+                      style={{ fontFamily: displayFont }}
+                    >
                       ReemTeam
                     </div>
-                    <div className="text-[9px] text-white/60 uppercase tracking-[0.3em]">Tonk Arena</div>
+                    {!isPhoneLandscapeLayout ? (
+                      <div className="text-[9px] text-white/60 uppercase tracking-[0.3em]">Tonk Arena</div>
+                    ) : null}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded-full border border-white/10 backdrop-blur-sm">
-                    <span className="uppercase tracking-widest text-[9px] text-white/60">Players</span>
-                    <span className="font-bold">{gameState.players.length}/{maxPlayers}</span>
-                  </div>
-                  <div className="flex items-center gap-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded-full border border-white/10 backdrop-blur-sm">
-                    <span className="uppercase tracking-widest text-[9px] text-white/60">
-                      Table Pot
-                    </span>
+                <div className={`flex items-center ${isPhoneLandscapeLayout ? "gap-1" : "gap-2"}`}>
+                  <div
+                    className={`flex items-center bg-black/50 text-white rounded-full border border-white/10 backdrop-blur-sm ${
+                      isPhoneLandscapeLayout ? "gap-1 px-2 py-0.5 text-[10px]" : "gap-2 px-2 py-1 text-[10px]"
+                    }`}
+                  >
+                    {!isPhoneLandscapeLayout ? (
+                      <span className="uppercase tracking-widest text-[9px] text-white/60">Players</span>
+                    ) : null}
                     <span className="font-bold">
-                      {formatSeatBalance(gameState.pot)}
+                      {isPhoneLandscapeLayout ? "P " : ""}
+                      {gameState.players.length}/{maxPlayers}
                     </span>
                   </div>
-                  <Button variant="danger" size="sm" onClick={handleLeaveTable}>Leave</Button>
+                  <div
+                    className={`flex items-center bg-black/50 text-white rounded-full border border-white/10 backdrop-blur-sm ${
+                      isPhoneLandscapeLayout ? "gap-1 px-2 py-0.5 text-[10px]" : "gap-2 px-2 py-1 text-[10px]"
+                    }`}
+                  >
+                    {!isPhoneLandscapeLayout ? (
+                      <span className="uppercase tracking-widest text-[9px] text-white/60">Table Pot</span>
+                    ) : null}
+                    <span className="font-bold">{formatSeatBalance(gameState.pot)}</span>
+                  </div>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={handleLeaveTable}
+                    className={isPhoneLandscapeLayout ? "h-9 px-3 text-[11px]" : ""}
+                  >
+                    Leave
+                  </Button>
                 </div>
               </div>
 
-              <div className="absolute right-3 top-14 z-30 pointer-events-none">
-                <div className="max-w-[240px] rounded-lg border border-cyan-200/60 bg-black/72 px-3 py-2 text-right shadow-[0_0_18px_rgba(34,211,238,0.2)] backdrop-blur-sm">
+              <div
+                className={`absolute z-30 pointer-events-none ${
+                  isPhoneLandscapeLayout
+                    ? "left-1/2 top-11 -translate-x-1/2"
+                    : "right-3 top-14"
+                }`}
+              >
+                <div
+                  className={`rounded-lg border border-cyan-200/60 bg-black/72 shadow-[0_0_18px_rgba(34,211,238,0.2)] backdrop-blur-sm ${
+                    isPhoneLandscapeLayout ? "w-[min(72vw,360px)] px-2.5 py-1.5 text-center" : "max-w-[240px] px-3 py-2 text-right"
+                  }`}
+                >
                   <div className="text-[10px] font-semibold text-cyan-100">{flowActorLabel}</div>
-                  <div className="mt-1 flex items-center justify-end gap-2 text-[10px] uppercase tracking-wide">
+                  <div
+                    className={`mt-1 flex items-center gap-2 text-[10px] uppercase tracking-wide ${
+                      isPhoneLandscapeLayout ? "justify-center" : "justify-end"
+                    }`}
+                  >
                     <span
                       className={`transition-all ${
                         activeTurnStepLabel === "Draw"
@@ -1228,7 +1320,7 @@ const GameTable: React.FC = () => {
                     >
                       Draw
                     </span>
-                    <div className="relative h-[2px] w-16 rounded-full bg-cyan-100/20">
+                    <div className={`relative h-[2px] rounded-full bg-cyan-100/20 ${isPhoneLandscapeLayout ? "w-14" : "w-16"}`}>
                       <div
                         className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
                           activeTurnStepLabel === "Draw" ? "w-1/3 bg-cyan-300" : "w-full bg-emerald-300"
@@ -1247,20 +1339,26 @@ const GameTable: React.FC = () => {
                   </div>
                   {isMyTurn ? (
                     <div className="mt-1 text-[9px] font-medium text-cyan-200/90">
-                      {isDiscardStep ? "Select 1 card, then tap Discard." : "Draw from deck or discard pile."}
+                      {isPhoneLandscapeLayout
+                        ? isDiscardStep
+                          ? "Select 1 card, then discard."
+                          : "Draw from deck or discard pile."
+                        : isDiscardStep
+                          ? "Select 1 card, then tap Discard."
+                          : "Draw from deck or discard pile."}
                     </div>
                   ) : null}
                 </div>
               </div>
 
-              {renderSeatInfo(topPlayer, "top-2 left-[58%] -translate-x-1/2", "left")}
-              {renderSeatInfo(leftPlayer, "left-[1.5%] top-1/2 -translate-y-1/2", "left")}
-              {renderSeatInfo(rightPlayer, "right-[1.5%] top-1/2 -translate-y-1/2", "right")}
+              {renderSeatInfo(topPlayer, topSeatPositionClass, "left")}
+              {renderSeatInfo(leftPlayer, leftSeatPositionClass, "left")}
+              {renderSeatInfo(rightPlayer, rightSeatPositionClass, "right")}
 
-              {renderSpreadZone(topPlayer, "Top Spread", "left-1/2 top-[28%] -translate-x-1/2 w-[34%] max-w-[300px]")}
-              {renderSpreadZone(leftPlayer, "Left Spread", "left-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]")}
-              {renderSpreadZone(rightPlayer, "Right Spread", "right-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]")}
-              {renderSpreadZone(currentPlayer ?? null, "Your Spread", "left-1/2 bottom-[30%] -translate-x-1/2 w-[30%] max-w-[260px]")}
+              {renderSpreadZone(topPlayer, "Top Spread", topSpreadPositionClass)}
+              {renderSpreadZone(leftPlayer, "Left Spread", leftSpreadPositionClass)}
+              {renderSpreadZone(rightPlayer, "Right Spread", rightSpreadPositionClass)}
+              {renderSpreadZone(currentPlayer ?? null, "Your Spread", mySpreadPositionClass)}
 
               {showDealAnimation && (
                 <div className="absolute inset-0 z-30 pointer-events-none">
@@ -1324,12 +1422,16 @@ const GameTable: React.FC = () => {
               )}
 
               <div
-                className={`center-pile absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 transition-all duration-300 ${
+                className={`center-pile absolute left-1/2 ${
+                  isPhoneLandscapeLayout ? "top-[47%]" : "top-1/2"
+                } -translate-x-1/2 -translate-y-1/2 flex flex-col items-center ${
+                  isPhoneLandscapeLayout ? "gap-1.5" : "gap-2"
+                } transition-all duration-300 ${
                   isMyTurn ? "brightness-110 scale-[1.03]" : "brightness-100 scale-100"
                 }`}
               >
-                <div className="flex items-center gap-4">
-                  <div className="relative w-8 h-12 sm:w-10 sm:h-14">
+                <div className={`flex items-center ${isPhoneLandscapeLayout ? "gap-3" : "gap-4"}`}>
+                  <div className={`relative ${isPhoneLandscapeLayout ? "w-8 h-12" : "w-8 h-12 sm:w-10 sm:h-14"}`}>
                     {!hideCardsForPresentation && gameState.deck.length > 0 && (
                       <div
                         className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center relative transition-transform ${deckPrimaryHighlightClass}`}
@@ -1344,7 +1446,7 @@ const GameTable: React.FC = () => {
                     )}
                   </div>
                   <div
-                    className="relative w-8 h-12 sm:w-10 sm:h-14"
+                    className={`relative ${isPhoneLandscapeLayout ? "w-8 h-12" : "w-8 h-12 sm:w-10 sm:h-14"}`}
                     onClick={() => {
                       if (!hideCardsForPresentation) handleDiscardPileClick();
                     }}
@@ -1354,7 +1456,7 @@ const GameTable: React.FC = () => {
                         <CardComponent
                           suit={gameState.discardPile[gameState.discardPile.length - 1].suit}
                           rank={gameState.discardPile[gameState.discardPile.length - 1].rank}
-                          className="w-8 h-12 sm:w-10 sm:h-14"
+                          className={isPhoneLandscapeLayout ? "w-8 h-12" : "w-8 h-12 sm:w-10 sm:h-14"}
                         />
                       </div>
                     ) : !hideCardsForPresentation ? (
@@ -1367,16 +1469,22 @@ const GameTable: React.FC = () => {
               </div>
 
               <div
-                className={`seat absolute w-[96%] max-w-[820px] left-1/2 -translate-x-1/2 pointer-events-auto ${
-                  isCompactLandscape ? "h-[168px] bottom-1" : "h-[176px] bottom-2"
+                className={`seat absolute left-1/2 -translate-x-1/2 pointer-events-auto ${
+                  isPhoneLandscapeLayout
+                    ? "w-[98%] h-[186px] bottom-0"
+                    : isCompactLandscape
+                      ? "w-[96%] max-w-[820px] h-[168px] bottom-1"
+                      : "w-[96%] max-w-[820px] h-[176px] bottom-2"
                 }`}
               >
-                <div className="flex items-end gap-2 w-full h-full">
+                <div className={`flex w-full h-full ${isPhoneLandscapeLayout ? "items-end gap-1.5" : "items-end gap-2"}`}>
                   <div
                     className={`${
                       isMyTurn ? "active-seat" : "inactive-seat"
-                    } relative px-2 py-2 rounded-lg border min-w-[140px] transition-all duration-300 ${
-                      isCompactLandscape ? "mb-4" : "mb-6"
+                    } relative rounded-lg border transition-all duration-300 ${
+                      isPhoneLandscapeLayout
+                        ? "min-w-[118px] px-1.5 py-1.5 mb-2"
+                        : `min-w-[140px] px-2 py-2 ${isCompactLandscape ? "mb-4" : "mb-6"}`
                     } ${
                       isMyTurn
                         ? "border-yellow-400/80 bg-yellow-400/10 brightness-100 opacity-100"
@@ -1386,55 +1494,81 @@ const GameTable: React.FC = () => {
                     {isMyTurn ? (
                       <div className="absolute -inset-1 rounded-2xl bg-amber-300/15 blur-xl" aria-hidden />
                     ) : null}
-                    <div className="flex items-center gap-2">
+                    <div className={`flex items-center ${isPhoneLandscapeLayout ? "gap-1.5" : "gap-2"}`}>
                       <div className="relative">
                         <PlayerAvatar player={{ name: user.username, avatarUrl: user.avatarUrl }} size="sm" />
                         <TurnTimer
                           duration={turnDurationMs}
                           timeRemaining={isMyTurn ? turnTimeRemainingMs : turnDurationMs}
                           isActive={isMyTurn}
-                          size={54}
-                          strokeWidth={3.5}
+                          size={isPhoneLandscapeLayout ? 48 : 54}
+                          strokeWidth={isPhoneLandscapeLayout ? 3 : 3.5}
                           className={isMyTurn ? "animate-pulse" : ""}
                         />
                       </div>
                       <div>
-                        <div className={`mb-1 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold tracking-wide ${turnStatusClasses[myTurnStatus]}`}>
+                        <div
+                          className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-wide ${
+                            isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"
+                          } ${turnStatusClasses[myTurnStatus]}`}
+                        >
                           {myTurnStatus}
                         </div>
-                        <div className="text-[11px] text-white font-semibold leading-tight">{user.username}</div>
-                        <div className="text-[10px] text-white/60 leading-tight">Cards: {visibleHand.length}</div>
-                        <div className="text-[9px] text-yellow-300/95 leading-tight">
+                        <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} text-white font-semibold leading-tight`}>
+                          {user.username}
+                        </div>
+                        <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} text-white/60 leading-tight`}>
+                          Cards: {visibleHand.length}
+                        </div>
+                        <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} text-yellow-300/95 leading-tight`}>
                           {balanceLoading ? "..." : formatSeatBalance(balance)}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex-1 flex flex-col items-center">
+                  <div className="flex-1 flex flex-col items-center justify-end">
                     {shouldShowGuidanceBanner ? (
-                      <div className="mb-1 w-full max-w-[520px] rounded-lg border border-sky-300/30 bg-black/45 px-3 py-1.5 text-center text-[11px] font-medium text-sky-100 shadow-[0_0_18px_rgba(56,189,248,0.18)] pointer-events-none select-none">
+                      <div
+                        className={`w-full rounded-lg border border-sky-300/30 bg-black/45 text-center font-medium text-sky-100 shadow-[0_0_18px_rgba(56,189,248,0.18)] pointer-events-none select-none ${
+                          isPhoneLandscapeLayout
+                            ? "mb-0.5 max-w-[560px] px-2 py-1 text-[10px]"
+                            : "mb-1 max-w-[520px] px-3 py-1.5 text-[11px]"
+                        }`}
+                      >
                         {guidanceBannerText}
                       </div>
                     ) : null}
                     {shouldShowGuidanceHelper ? (
                       <div
-                        className={`mb-1 text-[10px] font-semibold pointer-events-none select-none ${
+                        className={`${isPhoneLandscapeLayout ? "mb-0.5 text-[9px]" : "mb-1 text-[10px]"} font-semibold pointer-events-none select-none ${
                           selectedIllegalDiscardCard ? "text-rose-300" : "text-emerald-200"
                         }`}
                       >
                         {guidanceHelperText}
-                        {canUseFlickDiscard ? " Or flick selected card toward discard pile." : ""}
+                        {canUseFlickDiscard && !isPhoneLandscapeLayout ? " Or flick selected card toward discard pile." : ""}
                       </div>
                     ) : null}
                     <div
                       className={`w-full flex flex-col items-center ${
-                        isCompactLandscape ? "-translate-x-8 translate-y-4" : "-translate-x-12 translate-y-6"
+                        isPhoneLandscapeLayout
+                          ? "translate-x-0 translate-y-0"
+                          : isCompactLandscape
+                            ? "-translate-x-8 translate-y-4"
+                            : "-translate-x-12 translate-y-6"
                       }`}
                     >
-                      <div className="hand relative h-28 w-full max-w-[760px] pointer-events-auto">
+                      <div
+                        className={`hand relative w-full pointer-events-auto ${
+                          isPhoneLandscapeLayout ? "h-[94px] max-w-[620px]" : "h-28 max-w-[760px]"
+                        }`}
+                      >
                         <AnimatePresence>
-                          <div className="flex flex-nowrap items-end justify-center gap-1 sm:gap-1.5">
+                          <div
+                            className={`flex flex-nowrap items-end justify-center ${
+                              isPhoneLandscapeLayout ? "gap-2" : "gap-1 sm:gap-1.5"
+                            }`}
+                          >
                             {visibleHand.map((card) => {
                               const isSelectedCard = selectedCards.some(
                                 (c) => c.rank === card.rank && c.suit === card.suit
@@ -1464,7 +1598,7 @@ const GameTable: React.FC = () => {
                                     rank={card.rank}
                                     isSelected={isSelectedCard}
                                     onClick={() => toggleCardSelection(card)}
-                                    className="w-11 h-16 sm:w-12 sm:h-[4.5rem]"
+                                    className={isPhoneLandscapeLayout ? "w-11 h-16" : "w-11 h-16 sm:w-12 sm:h-[4.5rem]"}
                                     badgeText={
                                       isIllegalDiscardSelection
                                         ? "Cannot discard this card this turn."
@@ -1482,8 +1616,12 @@ const GameTable: React.FC = () => {
                       </div>
                       {isMyTurn && !hideCardsForPresentation && (
                         <div
-                          className={`actions flex gap-1.5 mt-0 pointer-events-auto [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs ${
-                            isCompactLandscape ? "mt-1 translate-y-0" : "-translate-y-3 sm:-translate-y-1"
+                          className={`actions pointer-events-auto ${
+                            isPhoneLandscapeLayout
+                              ? "mt-1 w-full max-w-[500px] rounded-xl border border-white/15 bg-black/45 px-2 py-2 backdrop-blur-sm"
+                              : `flex gap-1.5 mt-0 [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs ${
+                                  isCompactLandscape ? "mt-1 translate-y-0" : "-translate-y-3 sm:-translate-y-1"
+                                }`
                           }`}
                         >
                           <GameActions
@@ -1505,6 +1643,7 @@ const GameTable: React.FC = () => {
                             onDrop={handleDrop}
                             onSpread={handleSpread}
                             onHit={handleHitClick}
+                            layout={isPhoneLandscapeLayout ? "mobile-dock" : "default"}
                           />
                         </div>
                       )}

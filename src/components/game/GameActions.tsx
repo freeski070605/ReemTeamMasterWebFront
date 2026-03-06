@@ -15,6 +15,7 @@ interface GameActionsProps {
   onSpread: () => void;
   onHit: () => void;
   orientation?: "horizontal" | "vertical";
+  layout?: "default" | "mobile-dock";
 }
 
 const GameActions: React.FC<GameActionsProps> = ({
@@ -25,31 +26,43 @@ const GameActions: React.FC<GameActionsProps> = ({
   onSpread,
   onHit,
   orientation = "horizontal",
+  layout = "default",
 }) => {
   const layoutClass =
-    orientation === "vertical" ? "flex flex-col gap-2" : "flex flex-wrap justify-center gap-2.5";
+    layout === "mobile-dock"
+      ? "grid w-full grid-cols-3 gap-2"
+      : orientation === "vertical"
+        ? "flex flex-col gap-2"
+        : "flex flex-wrap justify-center gap-2.5";
 
   const renderAction = (
     label: string,
     state: ActionState,
     onClick: () => void
   ) => (
-    <div key={label} className="relative group flex min-w-[84px] flex-col items-center">
+    <div
+      key={label}
+      className={`relative group flex flex-col items-center ${
+        layout === "mobile-dock" ? "min-w-0 w-full" : "min-w-[84px]"
+      }`}
+    >
       <Button
         onClick={onClick}
         disabled={!state.enabled}
         title={!state.enabled ? state.reason : undefined}
         aria-label={!state.enabled && state.reason ? `${label}: ${state.reason}` : label}
         className={
-          state.enabled && state.isPrimary
-            ? "ring-2 ring-amber-300/90 shadow-[0_0_18px_rgba(251,191,36,0.52)] animate-pulse"
-            : ""
+          `${layout === "mobile-dock" ? "w-full h-11 px-2 text-sm" : ""} ${
+            state.enabled && state.isPrimary
+              ? "ring-2 ring-amber-300/90 shadow-[0_0_18px_rgba(251,191,36,0.52)] animate-pulse"
+              : ""
+          }`
         }
       >
         {label}
       </Button>
       {!state.enabled && state.reason ? (
-        <div className="pointer-events-none absolute top-full z-20 mt-1 max-w-[140px] rounded-md border border-white/20 bg-black/80 px-2 py-1 text-center text-[10px] leading-tight text-white/90 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+        <div className="pointer-events-none absolute top-full z-20 mt-1 max-w-[150px] rounded-md border border-white/20 bg-black/80 px-2 py-1 text-center text-[10px] leading-tight text-white/90 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
           {state.reason}
         </div>
       ) : null}
