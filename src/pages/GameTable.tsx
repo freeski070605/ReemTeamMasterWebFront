@@ -907,10 +907,11 @@ const GameTable: React.FC = () => {
   const flowActorLabel = isMyTurn ? "Your Turn" : `${activeTurnPlayerName}'s Turn`;
   const activeTurnStepLabel = activeTurnHasDrawn ? "Discard" : "Draw";
   const isPhoneLandscapeLayout = isTouchDevice && isUltraShortLandscape;
+  const isHeadsUpTable = totalPlayers <= 2;
   const topSeatPositionClass = isPhoneLandscapeLayout
-    ? "right-[2%] top-[24%]"
+    ? "left-1/2 top-[21%] -translate-x-1/2"
     : "top-2 left-[58%] -translate-x-1/2";
-  const topSeatAlign: "left" | "right" = isPhoneLandscapeLayout ? "right" : "left";
+  const topSeatAlign: "left" | "right" = "left";
   const leftSeatPositionClass = isPhoneLandscapeLayout
     ? "left-[0.5%] top-1/2 -translate-y-1/2"
     : "left-[1.5%] top-1/2 -translate-y-1/2";
@@ -918,16 +919,20 @@ const GameTable: React.FC = () => {
     ? "right-[0.5%] top-1/2 -translate-y-1/2"
     : "right-[1.5%] top-1/2 -translate-y-1/2";
   const topSpreadPositionClass = isPhoneLandscapeLayout
-    ? "left-1/2 top-[19%] -translate-x-1/2 w-[36%] max-w-[260px]"
+    ? isHeadsUpTable
+      ? "left-1/2 top-[29%] -translate-x-1/2 w-[32%] max-w-[240px]"
+      : "left-1/2 top-[24%] -translate-x-1/2 w-[36%] max-w-[260px]"
     : "left-1/2 top-[28%] -translate-x-1/2 w-[34%] max-w-[300px]";
   const leftSpreadPositionClass = isPhoneLandscapeLayout
-    ? "left-[10%] top-[34%] -translate-y-1/2 w-[24%] max-w-[210px]"
+    ? "left-[11%] top-[36%] -translate-y-1/2 w-[24%] max-w-[210px]"
     : "left-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]";
   const rightSpreadPositionClass = isPhoneLandscapeLayout
-    ? "right-[10%] top-[34%] -translate-y-1/2 w-[24%] max-w-[210px]"
+    ? "right-[11%] top-[36%] -translate-y-1/2 w-[24%] max-w-[210px]"
     : "right-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]";
   const mySpreadPositionClass = isPhoneLandscapeLayout
-    ? "left-1/2 bottom-[36%] -translate-x-1/2 w-[34%] max-w-[260px]"
+    ? isHeadsUpTable
+      ? "left-1/2 bottom-[33%] -translate-x-1/2 w-[34%] max-w-[250px]"
+      : "left-1/2 bottom-[33%] -translate-x-1/2 w-[34%] max-w-[260px]"
     : "left-1/2 bottom-[30%] -translate-x-1/2 w-[30%] max-w-[260px]";
 
   const contextBannerText = isMyTurn
@@ -1022,7 +1027,7 @@ const GameTable: React.FC = () => {
       size === "md"
         ? "w-11 h-16"
         : isPhoneLandscapeLayout
-          ? "w-7 h-10"
+          ? "w-8 h-11"
           : "w-9 h-14";
     return (
       <div className="relative">
@@ -1114,12 +1119,12 @@ const GameTable: React.FC = () => {
   const canUseFlickDiscard = isTouchDevice && isDiscardReady;
   const phoneHandCardClass =
     visibleHand.length >= 6
-      ? "w-[2.05rem] h-[3rem]"
+      ? "w-[2.2rem] h-[3.2rem]"
       : visibleHand.length >= 5
-        ? "w-[2.25rem] h-[3.3rem]"
+        ? "w-[2.4rem] h-[3.5rem]"
         : visibleHand.length >= 4
-          ? "w-[2.45rem] h-[3.55rem]"
-          : "w-[2.65rem] h-[3.85rem]";
+          ? "w-[2.6rem] h-[3.8rem]"
+          : "w-[2.8rem] h-[4.1rem]";
 
   const renderSpreadZone = (
     player: typeof gameState.players[number] | null,
@@ -1168,7 +1173,7 @@ const GameTable: React.FC = () => {
                   <CardComponent
                     suit={card.suit}
                     rank={card.rank}
-                    className={isPhoneLandscapeLayout ? "w-7 h-10 text-[8px]" : "w-8 h-12 sm:w-9 sm:h-14 text-[9px]"}
+                    className={isPhoneLandscapeLayout ? "w-8 h-11 text-[8px]" : "w-8 h-12 sm:w-9 sm:h-14 text-[9px]"}
                   />
                 </motion.div>
               ))}
@@ -1444,7 +1449,7 @@ const GameTable: React.FC = () => {
                 }`}
               >
                 <div className={`flex items-center ${isPhoneLandscapeLayout ? "gap-3" : "gap-4"}`}>
-                  <div className={`relative ${isPhoneLandscapeLayout ? "w-7 h-10" : "w-8 h-12 sm:w-10 sm:h-14"}`}>
+                  <div className={`relative ${isPhoneLandscapeLayout ? "w-8 h-11" : "w-8 h-12 sm:w-10 sm:h-14"}`}>
                     {!hideCardsForPresentation && gameState.deck.length > 0 && (
                       <div
                         className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center relative transition-transform ${deckPrimaryHighlightClass}`}
@@ -1459,7 +1464,7 @@ const GameTable: React.FC = () => {
                     )}
                   </div>
                   <div
-                    className={`relative ${isPhoneLandscapeLayout ? "w-7 h-10" : "w-8 h-12 sm:w-10 sm:h-14"}`}
+                    className={`relative ${isPhoneLandscapeLayout ? "w-8 h-11" : "w-8 h-12 sm:w-10 sm:h-14"}`}
                     onClick={() => {
                       if (!hideCardsForPresentation) handleDiscardPileClick();
                     }}
@@ -1469,7 +1474,7 @@ const GameTable: React.FC = () => {
                         <CardComponent
                           suit={gameState.discardPile[gameState.discardPile.length - 1].suit}
                           rank={gameState.discardPile[gameState.discardPile.length - 1].rank}
-                          className={isPhoneLandscapeLayout ? "w-7 h-10" : "w-8 h-12 sm:w-10 sm:h-14"}
+                          className={isPhoneLandscapeLayout ? "w-8 h-11" : "w-8 h-12 sm:w-10 sm:h-14"}
                         />
                       </div>
                     ) : !hideCardsForPresentation ? (
