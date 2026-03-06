@@ -261,7 +261,7 @@ const GameTable: React.FC = () => {
       const isLandscape = usableWidth > usableHeight;
       const compactLandscape = isLandscape && usableHeight <= 520;
       const veryShortLandscape = isLandscape && usableHeight <= 430;
-      const tableHeightRatio = veryShortLandscape ? 0.95 : compactLandscape ? 0.94 : isLandscape ? 0.96 : 0.92;
+      const tableHeightRatio = veryShortLandscape ? 0.9 : compactLandscape ? 0.94 : isLandscape ? 0.96 : 0.92;
       const maxByViewport = usableWidth * 0.96;
       const maxByHeight = usableHeight * tableHeightRatio * (16 / 9);
       const maxByTV = 1800;
@@ -1021,7 +1021,7 @@ const GameTable: React.FC = () => {
       size === "md"
         ? "w-11 h-16"
         : isPhoneLandscapeLayout
-          ? "w-8 h-12"
+          ? "w-7 h-10"
           : "w-9 h-14";
     return (
       <div className="relative">
@@ -1159,7 +1159,7 @@ const GameTable: React.FC = () => {
                   <CardComponent
                     suit={card.suit}
                     rank={card.rank}
-                    className={isPhoneLandscapeLayout ? "w-8 h-12 text-[9px]" : "w-8 h-12 sm:w-9 sm:h-14 text-[9px]"}
+                    className={isPhoneLandscapeLayout ? "w-7 h-10 text-[8px]" : "w-8 h-12 sm:w-9 sm:h-14 text-[9px]"}
                   />
                 </motion.div>
               ))}
@@ -1215,10 +1215,12 @@ const GameTable: React.FC = () => {
         >
           <div className="table-area relative w-full h-full flex items-center justify-center">
             <div
-              className={`table relative aspect-[16/9] ${
-                isPhoneLandscapeLayout ? "rounded-[22px] border-[8px] w-[99vw]" : "rounded-[28px] border-[12px] w-[96vw]"
+              className={`table relative ${
+                isPhoneLandscapeLayout
+                  ? "w-full h-full rounded-[18px] border-[8px]"
+                  : "aspect-[16/9] rounded-[28px] border-[12px] w-[96vw]"
               } shadow-2xl overflow-hidden bg-black/20 ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
-              style={{ maxWidth: `${tableMaxWidthPx}px` }}
+              style={isPhoneLandscapeLayout ? undefined : { maxWidth: `${tableMaxWidthPx}px` }}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.06),transparent_60%)]" />
               <div
@@ -1431,7 +1433,7 @@ const GameTable: React.FC = () => {
                 }`}
               >
                 <div className={`flex items-center ${isPhoneLandscapeLayout ? "gap-3" : "gap-4"}`}>
-                  <div className={`relative ${isPhoneLandscapeLayout ? "w-8 h-12" : "w-8 h-12 sm:w-10 sm:h-14"}`}>
+                  <div className={`relative ${isPhoneLandscapeLayout ? "w-7 h-10" : "w-8 h-12 sm:w-10 sm:h-14"}`}>
                     {!hideCardsForPresentation && gameState.deck.length > 0 && (
                       <div
                         className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center relative transition-transform ${deckPrimaryHighlightClass}`}
@@ -1446,7 +1448,7 @@ const GameTable: React.FC = () => {
                     )}
                   </div>
                   <div
-                    className={`relative ${isPhoneLandscapeLayout ? "w-8 h-12" : "w-8 h-12 sm:w-10 sm:h-14"}`}
+                    className={`relative ${isPhoneLandscapeLayout ? "w-7 h-10" : "w-8 h-12 sm:w-10 sm:h-14"}`}
                     onClick={() => {
                       if (!hideCardsForPresentation) handleDiscardPileClick();
                     }}
@@ -1456,7 +1458,7 @@ const GameTable: React.FC = () => {
                         <CardComponent
                           suit={gameState.discardPile[gameState.discardPile.length - 1].suit}
                           rank={gameState.discardPile[gameState.discardPile.length - 1].rank}
-                          className={isPhoneLandscapeLayout ? "w-8 h-12" : "w-8 h-12 sm:w-10 sm:h-14"}
+                          className={isPhoneLandscapeLayout ? "w-7 h-10" : "w-8 h-12 sm:w-10 sm:h-14"}
                         />
                       </div>
                     ) : !hideCardsForPresentation ? (
@@ -1471,7 +1473,7 @@ const GameTable: React.FC = () => {
               <div
                 className={`seat absolute left-1/2 -translate-x-1/2 pointer-events-auto ${
                   isPhoneLandscapeLayout
-                    ? "w-[98%] h-[186px] bottom-0"
+                    ? "w-[99%] h-[154px] bottom-0"
                     : isCompactLandscape
                       ? "w-[96%] max-w-[820px] h-[168px] bottom-1"
                       : "w-[96%] max-w-[820px] h-[176px] bottom-2"
@@ -1483,7 +1485,7 @@ const GameTable: React.FC = () => {
                       isMyTurn ? "active-seat" : "inactive-seat"
                     } relative rounded-lg border transition-all duration-300 ${
                       isPhoneLandscapeLayout
-                        ? "min-w-[118px] px-1.5 py-1.5 mb-2"
+                        ? "min-w-[108px] px-1.5 py-1 mb-1.5"
                         : `min-w-[140px] px-2 py-2 ${isCompactLandscape ? "mb-4" : "mb-6"}`
                     } ${
                       isMyTurn
@@ -1501,8 +1503,8 @@ const GameTable: React.FC = () => {
                           duration={turnDurationMs}
                           timeRemaining={isMyTurn ? turnTimeRemainingMs : turnDurationMs}
                           isActive={isMyTurn}
-                          size={isPhoneLandscapeLayout ? 48 : 54}
-                          strokeWidth={isPhoneLandscapeLayout ? 3 : 3.5}
+                          size={isPhoneLandscapeLayout ? 42 : 54}
+                          strokeWidth={isPhoneLandscapeLayout ? 2.6 : 3.5}
                           className={isMyTurn ? "animate-pulse" : ""}
                         />
                       </div>
@@ -1560,13 +1562,13 @@ const GameTable: React.FC = () => {
                     >
                       <div
                         className={`hand relative w-full pointer-events-auto ${
-                          isPhoneLandscapeLayout ? "h-[94px] max-w-[620px]" : "h-28 max-w-[760px]"
+                          isPhoneLandscapeLayout ? "h-[82px] max-w-none px-1" : "h-28 max-w-[760px]"
                         }`}
                       >
                         <AnimatePresence>
                           <div
                             className={`flex flex-nowrap items-end justify-center ${
-                              isPhoneLandscapeLayout ? "gap-2" : "gap-1 sm:gap-1.5"
+                              isPhoneLandscapeLayout ? "gap-1.5" : "gap-1 sm:gap-1.5"
                             }`}
                           >
                             {visibleHand.map((card) => {
@@ -1598,7 +1600,7 @@ const GameTable: React.FC = () => {
                                     rank={card.rank}
                                     isSelected={isSelectedCard}
                                     onClick={() => toggleCardSelection(card)}
-                                    className={isPhoneLandscapeLayout ? "w-11 h-16" : "w-11 h-16 sm:w-12 sm:h-[4.5rem]"}
+                                    className={isPhoneLandscapeLayout ? "w-10 h-14" : "w-11 h-16 sm:w-12 sm:h-[4.5rem]"}
                                     badgeText={
                                       isIllegalDiscardSelection
                                         ? "Cannot discard this card this turn."
