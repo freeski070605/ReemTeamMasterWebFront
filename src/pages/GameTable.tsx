@@ -910,10 +910,11 @@ const GameTable: React.FC = () => {
   const isHeadsUpTable = totalPlayers <= 2;
   const topSeatPositionClass = isPhoneLandscapeLayout
     ? isHeadsUpTable
-      ? "left-1/2 top-[8.5%] -translate-x-1/2"
+      ? "right-[6%] top-[16%]"
       : "left-1/2 top-[9.5%] -translate-x-1/2"
     : "top-2 left-[58%] -translate-x-1/2";
-  const topSeatAlign: "left" | "right" = "left";
+  const topSeatAlign: "left" | "right" =
+    isPhoneLandscapeLayout && isHeadsUpTable ? "right" : "left";
   const leftSeatPositionClass = isPhoneLandscapeLayout
     ? "left-[1.2%] top-[34%] -translate-y-1/2"
     : "left-[1.5%] top-1/2 -translate-y-1/2";
@@ -922,7 +923,7 @@ const GameTable: React.FC = () => {
     : "right-[1.5%] top-1/2 -translate-y-1/2";
   const topSpreadPositionClass = isPhoneLandscapeLayout
     ? isHeadsUpTable
-      ? "left-1/2 top-[29%] -translate-x-1/2 w-[32%] max-w-[240px]"
+      ? "right-[8%] top-[34%] w-[24%] max-w-[210px]"
       : "left-1/2 top-[24%] -translate-x-1/2 w-[36%] max-w-[260px]"
     : "left-1/2 top-[28%] -translate-x-1/2 w-[34%] max-w-[300px]";
   const leftSpreadPositionClass = isPhoneLandscapeLayout
