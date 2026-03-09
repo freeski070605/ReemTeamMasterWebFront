@@ -910,16 +910,15 @@ const GameTable: React.FC = () => {
   const isHeadsUpTable = totalPlayers <= 2;
   const topSeatPositionClass = isPhoneLandscapeLayout
     ? isHeadsUpTable
-      ? "right-[6%] top-[16%]"
+      ? "right-[18%] top-[11%]"
       : "left-1/2 top-[9.5%] -translate-x-1/2"
     : "top-2 left-[58%] -translate-x-1/2";
-  const topSeatAlign: "left" | "right" =
-    isPhoneLandscapeLayout && isHeadsUpTable ? "right" : "left";
+  const topSeatAlign: "left" | "right" = "left";
   const leftSeatPositionClass = isPhoneLandscapeLayout
-    ? "left-[1.2%] top-[34%] -translate-y-1/2"
+    ? "left-[3%] top-[40%] -translate-y-1/2"
     : "left-[1.5%] top-1/2 -translate-y-1/2";
   const rightSeatPositionClass = isPhoneLandscapeLayout
-    ? "right-[1.2%] top-[34%] -translate-y-1/2"
+    ? "right-[3%] top-[40%] -translate-y-1/2"
     : "right-[1.5%] top-1/2 -translate-y-1/2";
   const topSpreadPositionClass = isPhoneLandscapeLayout
     ? isHeadsUpTable
@@ -1120,6 +1119,7 @@ const GameTable: React.FC = () => {
     currentPlayer ? hand.slice(0, getVisibleCardCount(currentPlayer.userId, hand.length)) : [];
   const myTurnStatus = getTurnStatus(user._id, true);
   const canUseFlickDiscard = isTouchDevice && isDiscardReady;
+  const showSideActionStack = isMyTurn && !hideCardsForPresentation;
   const phoneHandCardClass =
     visibleHand.length >= 6
       ? "w-[2.2rem] h-[3.2rem]"
@@ -1560,6 +1560,39 @@ const GameTable: React.FC = () => {
                     </div>
                   </div>
 
+                  {showSideActionStack && (
+                    <div
+                      className={`actions pointer-events-auto self-end ${
+                        isPhoneLandscapeLayout
+                          ? "mb-1 ml-1 w-[80px]"
+                          : `${isCompactLandscape ? "mb-4 ml-2 w-[94px]" : "mb-6 ml-2 w-[98px]"}`
+                      }`}
+                    >
+                      <GameActions
+                        drop={{
+                          enabled: canDrop,
+                          reason: canDrop ? undefined : dropDisabledReason,
+                          isPrimary: canDrop && isDrawStep,
+                        }}
+                        spread={{
+                          enabled: canSpread,
+                          reason: canSpread ? undefined : spreadDisabledReason,
+                          isPrimary: canSpread,
+                        }}
+                        hit={{
+                          enabled: canHit,
+                          reason: canHit ? undefined : hitDisabledReason,
+                          isPrimary: canHit,
+                        }}
+                        onDrop={handleDrop}
+                        onSpread={handleSpread}
+                        onHit={handleHitClick}
+                        orientation="vertical"
+                        layout="side-stack"
+                      />
+                    </div>
+                  )}
+
                   <div className="flex-1 flex flex-col items-center justify-end">
                     {shouldShowGuidanceBanner ? (
                       <div
@@ -1585,10 +1618,10 @@ const GameTable: React.FC = () => {
                     <div
                       className={`w-full flex flex-col items-center ${
                         isPhoneLandscapeLayout
-                          ? "translate-x-0 translate-y-0"
+                          ? "-translate-x-3 translate-y-0"
                           : isCompactLandscape
-                            ? "-translate-x-8 translate-y-4"
-                            : "-translate-x-12 translate-y-6"
+                            ? "-translate-x-10 translate-y-4"
+                            : "-translate-x-14 translate-y-6"
                       }`}
                     >
                       <div
@@ -1647,39 +1680,6 @@ const GameTable: React.FC = () => {
                           </div>
                         </AnimatePresence>
                       </div>
-                      {isMyTurn && !hideCardsForPresentation && (
-                        <div
-                          className={`actions pointer-events-auto ${
-                            isPhoneLandscapeLayout
-                              ? "mt-1 w-full max-w-[460px] rounded-xl border border-white/15 bg-black/55 px-1.5 py-1.5 backdrop-blur-sm"
-                              : `flex gap-1.5 mt-0 [&_button]:min-w-[64px] [&_button]:h-8 [&_button]:text-xs ${
-                                  isCompactLandscape ? "mt-1 translate-y-0" : "-translate-y-3 sm:-translate-y-1"
-                                }`
-                          }`}
-                        >
-                          <GameActions
-                            drop={{
-                              enabled: canDrop,
-                              reason: canDrop ? undefined : dropDisabledReason,
-                              isPrimary: canDrop && isDrawStep,
-                            }}
-                            spread={{
-                              enabled: canSpread,
-                              reason: canSpread ? undefined : spreadDisabledReason,
-                              isPrimary: canSpread,
-                            }}
-                            hit={{
-                              enabled: canHit,
-                              reason: canHit ? undefined : hitDisabledReason,
-                              isPrimary: canHit,
-                            }}
-                            onDrop={handleDrop}
-                            onSpread={handleSpread}
-                            onHit={handleHitClick}
-                            layout={isPhoneLandscapeLayout ? "mobile-dock" : "default"}
-                          />
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
