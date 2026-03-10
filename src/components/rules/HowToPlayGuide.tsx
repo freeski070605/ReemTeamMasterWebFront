@@ -100,7 +100,16 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
         <summary className="cursor-pointer font-semibold text-white">Goal of the Game</summary>
         <div className="mt-2 text-sm text-white/75">
           Win the hand by Reem (play all cards in spreads), dropping with the lowest hand, winning when the draw pile runs out, or by a special hand (41 or 11 and under).
-          Each player starts with 5 cards, one card starts the discard pile, and turns move clockwise.
+        </div>
+      </details>
+
+      <details className="rounded-xl border border-white/10 bg-black/20 p-3">
+        <summary className="cursor-pointer font-semibold text-white">Game Setup</summary>
+        <div className="mt-2 space-y-1 text-sm text-white/75">
+          <div>Each player receives 5 cards.</div>
+          <div>The remaining cards form the draw pile.</div>
+          <div>One card is flipped to start the discard pile.</div>
+          <div>Play proceeds clockwise.</div>
         </div>
       </details>
 
@@ -165,9 +174,15 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
               <CardRow cards={[{ rank: "7", suit: "Diamonds" }]} />
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span>Hit locks: first hit locks drop for 2 turns; later-turn hits add +1 turn.</span>
-            <InfoButton onClick={() => setActivePopup("hitLock")} label="Rule Popup" />
+          <div className="space-y-1 rounded-lg border border-white/10 bg-black/25 p-3">
+            <div className="font-semibold text-white">Drop Penalty From Hits</div>
+            <div>First hit in a turn: target cannot drop for their next 2 turns.</div>
+            <div>More hits in that same turn: no additional penalty.</div>
+            <div>Hits on later turns: each hit adds +1 more no-drop turn.</div>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="text-white/70">Applies only when hitting another player&apos;s spread.</span>
+              <InfoButton onClick={() => setActivePopup("hitLock")} label="Rule Popup" />
+            </div>
           </div>
         </div>
       </details>
@@ -204,6 +219,28 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
       </details>
 
       <details className="rounded-xl border border-white/10 bg-black/20 p-3">
+        <summary className="cursor-pointer font-semibold text-white">Deck Runs Out</summary>
+        <div className="mt-2 space-y-1 text-sm text-white/75">
+          <div>When the draw pile becomes empty, the hand ends.</div>
+          <div>All players reveal hands and the lowest hand value wins.</div>
+          <div>Payout uses standard stake (each opponent pays one stake).</div>
+        </div>
+      </details>
+
+      <details className="rounded-xl border border-white/10 bg-black/20 p-3">
+        <summary className="cursor-pointer font-semibold text-white">Special Winning Hands</summary>
+        <div className="mt-2 space-y-2 text-sm text-white/75">
+          <div>
+            <span className="font-semibold text-white">41:</span> Starting hand totals exactly 41, but it must be declared at the start of your turn before drawing.
+          </div>
+          <div>
+            <span className="font-semibold text-white">11 and Under:</span> Starting hand of 11 points or less is an automatic win.
+          </div>
+          <div>Both special wins pay triple stake from each opponent.</div>
+        </div>
+      </details>
+
+      <details className="rounded-xl border border-white/10 bg-black/20 p-3">
         <summary className="cursor-pointer font-semibold text-white">Quick Payout Summary</summary>
         <div className="mt-3 overflow-x-auto rounded-lg border border-white/10">
           <table className="w-full text-left text-sm">
@@ -232,6 +269,16 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
           <div>Use hits to extend opponents&apos; drop lock windows.</div>
           <div>Track turn order so you know who can declare 41 next.</div>
           <div>Do not hold non-Ace spreads. Play them immediately.</div>
+        </div>
+      </details>
+
+      <details className="rounded-xl border border-white/10 bg-black/20 p-3">
+        <summary className="cursor-pointer font-semibold text-white">Ready to Play</summary>
+        <div className="mt-2 space-y-1 text-sm text-white/75">
+          <div>1. Join a table.</div>
+          <div>2. Keep your points low.</div>
+          <div>3. Watch the discard pile and spreads.</div>
+          <div>4. Time drops and special declarations carefully.</div>
         </div>
       </details>
 
