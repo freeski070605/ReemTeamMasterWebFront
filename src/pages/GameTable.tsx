@@ -53,6 +53,7 @@ const GameTable: React.FC = () => {
     spread,
     hit,
     drop,
+    declare41,
     requestLeaveTable,
     putIn,
   } = useGameStore();
@@ -708,6 +709,18 @@ const GameTable: React.FC = () => {
     }
   };
 
+  const handleDeclare41 = () => {
+    markActionActivity();
+
+    if (tableId && user) {
+      declare41(tableId, user._id);
+    }
+  };
+
+  const handleOpenHowToPlay = () => {
+    window.open("/how-to-play", "_blank", "noopener,noreferrer");
+  };
+
   const handleLeaveTable = () => {
     if (tableId && user) {
       if (
@@ -810,11 +823,11 @@ const GameTable: React.FC = () => {
   };
   const roundReasonLabel =
     gameState.roundEndedBy === "REGULAR"
-      ? "Drop / Hand Empty"
+      ? "Lowest Hand"
       : gameState.roundEndedBy === "REEM"
         ? "Reem"
         : gameState.roundEndedBy === "AUTO_TRIPLE"
-          ? "Automatic Win (41/<=11)"
+          ? "41 / 11 and Under"
           : gameState.roundEndedBy === "DECK_EMPTY"
             ? "Deck Empty"
             : gameState.roundEndedBy === "CAUGHT_DROP"
@@ -958,19 +971,42 @@ const GameTable: React.FC = () => {
   const guidanceHelperText = guidanceOverrideHelper ?? discardHelperText;
   const shouldShowGuidanceBanner = showGuidanceBanner && !!guidanceBannerText;
   const shouldShowGuidanceHelper = showGuidanceHelper && !!guidanceHelperText;
+  const currentHandValue = currentPlayer
+    ? currentPlayer.hand.reduce((sum, card) => sum + card.value, 0)
+    : null;
+  const dropLockTurnsRemaining = currentPlayer?.hitLockCounter ?? 0;
 
   const canDrop = !!(
     isMyTurn &&
     !hasDrawnThisTurn &&
-    !currentPlayer?.isHitLocked
+    dropLockTurnsRemaining <= 0
   );
   const dropDisabledReason = !isMyTurn
     ? "Wait for your turn."
     : hasDrawnThisTurn
       ? "Drop is only available before drawing."
-      : currentPlayer?.isHitLocked
-        ? "Drop is blocked while hit-locked."
+      : dropLockTurnsRemaining > 0
+        ? `Drop blocked for ${dropLockTurnsRemaining} turn${dropLockTurnsRemaining === 1 ? "" : "s"}.`
         : undefined;
+
+  const canDeclare41 = !!(
+    isMyTurn &&
+    !hasDrawnThisTurn &&
+    !hasDiscardedThisTurn &&
+    currentPlayer &&
+    !currentPlayer.hasDrawnAnyCard &&
+    currentPlayer.startingHandValue === 41 &&
+    currentHandValue === 41
+  );
+  const declare41DisabledReason = !isMyTurn
+    ? "Wait for your turn."
+    : hasDrawnThisTurn || hasDiscardedThisTurn || currentPlayer?.hasTakenActionThisTurn
+      ? "Declare 41 only before drawing."
+      : currentPlayer?.hasDrawnAnyCard
+        ? "41 can only be declared before your first draw."
+        : currentPlayer?.startingHandValue !== 41 || currentHandValue !== 41
+          ? "Starting hand is not exactly 41."
+          : undefined;
 
   const canSpread = !!(
     isMyTurn &&
@@ -1302,6 +1338,14 @@ const GameTable: React.FC = () => {
                     <span className="font-bold">{formatSeatBalance(gameState.pot)}</span>
                   </div>
                   <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleOpenHowToPlay}
+                    className={isPhoneLandscapeLayout ? "h-9 px-3 text-[11px]" : ""}
+                  >
+                    Rules
+                  </Button>
+                  <Button
                     variant="danger"
                     size="sm"
                     onClick={handleLeaveTable}
@@ -1574,6 +1618,11 @@ const GameTable: React.FC = () => {
                           reason: canDrop ? undefined : dropDisabledReason,
                           isPrimary: canDrop && isDrawStep,
                         }}
+                        declare41={{
+                          enabled: canDeclare41,
+                          reason: canDeclare41 ? undefined : declare41DisabledReason,
+                          isPrimary: canDeclare41 && isDrawStep,
+                        }}
                         spread={{
                           enabled: canSpread,
                           reason: canSpread ? undefined : spreadDisabledReason,
@@ -1585,6 +1634,7 @@ const GameTable: React.FC = () => {
                           isPrimary: canHit,
                         }}
                         onDrop={handleDrop}
+                        onDeclare41={handleDeclare41}
                         onSpread={handleSpread}
                         onHit={handleHitClick}
                         orientation="vertical"

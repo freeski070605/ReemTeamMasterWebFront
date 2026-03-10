@@ -33,6 +33,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       const links = [
         { to: '/tables', label: 'Cribs' },
         { to: '/contests', label: 'Cash Crown Tournaments' },
+        { to: '/how-to-play', label: 'How to Play' },
         { to: '/account', label: 'Account' },
       ];
       if (user?.role && hasAdminTabAccess(user.role)) {
@@ -193,6 +194,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             </Link>
             <Link to="/data-deletion" className="hover:text-amber-200 transition-colors">
               User Data Deletion
+            </Link>
+            <Link to="/how-to-play" className="hover:text-amber-200 transition-colors">
+              How to Play
             </Link>
           </div>
           <div>&copy; {new Date().getFullYear()} ReemTeam. All rights reserved.</div>

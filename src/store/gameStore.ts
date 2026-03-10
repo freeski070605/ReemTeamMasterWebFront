@@ -28,6 +28,7 @@ interface GameStore {
   spread: (tableId: string, userId: string, cards: Card[]) => void;
   hit: (tableId: string, userId: string, card: Card, targetPlayerId: string, targetSpreadIndex: number) => void;
   drop: (tableId: string, userId: string) => void;
+  declare41: (tableId: string, userId: string) => void;
   requestLeaveTable: (tableId: string, userId: string) => void;
   putIn: (tableId: string, userId: string) => void;
 }
@@ -120,6 +121,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
           if (gameState.roundEndedBy === 'REEM') {
               toast.success(`${winner?.username} REEMED!`);
+          } else if (gameState.roundEndedBy === 'AUTO_TRIPLE') {
+              if (gameState.lastAction?.type === 'declare41') {
+                toast.success(`${winner?.username} declared 41.`);
+              } else {
+                toast.success(`${winner?.username} wins with 11 or less.`);
+              }
+          } else if (gameState.roundEndedBy === 'CAUGHT_DROP') {
+               toast.info(`${winner?.username} caught the drop.`);
           } else if (gameState.roundEndedBy === 'REGULAR') {
                toast.info(`${winner?.username} wins on lowest hand.`);
           } else if (gameState.roundEndedBy === 'DECK_EMPTY') {
@@ -239,6 +248,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   drop: (tableId, userId) => {
     const { socket } = get();
     if (socket) socket.emit('drop', { tableId, userId });
+  },
+
+  declare41: (tableId, userId) => {
+    const { socket } = get();
+    if (socket) socket.emit('declare41', { tableId, userId });
   },
 
   requestLeaveTable: (tableId, userId) => {

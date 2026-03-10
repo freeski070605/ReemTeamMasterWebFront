@@ -1,5 +1,5 @@
 export type CardSuit = 'Hearts' | 'Diamonds' | 'Clubs' | 'Spades';
-export type CardRank = 'Ace' | '2' | '3' | '4' | '5' | '6' | '7' | 'Jack' | 'Queen' | 'King';
+export type CardRank = 'Ace' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'Jack' | 'Queen' | 'King';
 export type GameMode = 'FREE_RTC_TABLE' | 'RTC_TOURNAMENT' | 'RTC_SATELLITE' | 'USD_CONTEST';
 export type RoundEndType = 'REGULAR' | 'REEM' | 'AUTO_TRIPLE' | 'CAUGHT_DROP' | 'DECK_EMPTY';
 export type PlacementWinType = RoundEndType | 'LOSS';
@@ -24,6 +24,9 @@ export interface Player {
   hasTakenActionThisTurn: boolean;
   hasDrawnThisTurn: boolean;
   hasDiscardedThisTurn: boolean;
+  hasDrawnAnyCard: boolean;
+  startingHandValue: number;
+  lastHitAppliedOnTurn: number | null;
   currentBuyIn: number;
   restrictedDiscardCard?: string | null;
 }

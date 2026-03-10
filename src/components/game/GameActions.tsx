@@ -9,9 +9,11 @@ interface ActionState {
 
 interface GameActionsProps {
   drop: ActionState;
+  declare41?: ActionState;
   spread: ActionState;
   hit: ActionState;
   onDrop: () => void;
+  onDeclare41?: () => void;
   onSpread: () => void;
   onHit: () => void;
   orientation?: "horizontal" | "vertical";
@@ -20,20 +22,23 @@ interface GameActionsProps {
 
 const GameActions: React.FC<GameActionsProps> = ({
   drop,
+  declare41,
   spread,
   hit,
   onDrop,
+  onDeclare41,
   onSpread,
   onHit,
   orientation = "horizontal",
   layout = "default",
 }) => {
+  const hasDeclare41 = !!declare41 && !!onDeclare41;
   const layoutClass =
     layout === "mobile-dock"
-      ? "grid w-full grid-cols-3 gap-2"
+      ? `grid w-full ${hasDeclare41 ? "grid-cols-4" : "grid-cols-3"} gap-2`
       : layout === "side-stack"
         ? "flex w-full flex-col gap-1.5"
-      : orientation === "vertical"
+        : orientation === "vertical"
         ? "flex flex-col gap-2"
         : "flex flex-wrap justify-center gap-2.5";
 
@@ -76,6 +81,7 @@ const GameActions: React.FC<GameActionsProps> = ({
   return (
     <div className={layoutClass}>
       {renderAction("Drop", drop, onDrop)}
+      {hasDeclare41 && declare41 && onDeclare41 ? renderAction("Declare 41", declare41, onDeclare41) : null}
       {renderAction("Spread", spread, onSpread)}
       {renderAction("Hit", hit, onHit)}
     </div>
