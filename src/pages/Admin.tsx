@@ -29,7 +29,7 @@ import {
   AdminWithdrawal,
 } from '../api/admin';
 import { useAuthStore } from '../store/authStore';
-import { USER_ROLES, UserRole } from '../types/roles';
+import { USER_ROLES, UserRole, roleAtLeast } from '../types/roles';
 
 type AdminSection =
   | 'dashboard'
@@ -284,7 +284,27 @@ const Admin: React.FC = () => {
     onConfirm: null,
   });
 
-  const isSuperAdmin = user?.role === 'superadmin';
+  const currentRole = user?.role ?? 'user';
+  const canAdmin = roleAtLeast(currentRole, 'admin');
+  const canFinance = roleAtLeast(currentRole, 'finance');
+  const isSuperAdmin = currentRole === 'superadmin';
+
+  const availableSections = useMemo(() => {
+    if (canAdmin) {
+      return SECTIONS;
+    }
+    if (canFinance) {
+      return SECTIONS.filter((section) => section.id === 'wallets' || section.id === 'withdrawals');
+    }
+    return [];
+  }, [canAdmin, canFinance]);
+
+  useEffect(() => {
+    if (availableSections.length === 0) return;
+    if (!availableSections.some((section) => section.id === activeSection)) {
+      setActiveSection(availableSections[0].id);
+    }
+  }, [activeSection, availableSections]);
 
   const setSectionLoading = (section: AdminSection, value: boolean) => {
     setLoading((prev) => ({ ...prev, [section]: value }));
@@ -317,6 +337,8 @@ const Admin: React.FC = () => {
     try {
       await confirmState.onConfirm();
       closeConfirm();
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, 'Action failed.'));
     } finally {
       setActionPending(false);
     }
@@ -441,13 +463,17 @@ const Admin: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    void loadMetrics();
-    void loadUsers('');
-    void loadWithdrawals('pending');
-    void loadTables('all');
-    void loadAudits(1, '', '');
-    void loadTournaments();
-  }, [loadAudits, loadMetrics, loadTables, loadTournaments, loadUsers, loadWithdrawals]);
+    if (canAdmin) {
+      void loadMetrics();
+      void loadUsers('');
+      void loadTables('all');
+      void loadAudits(1, '', '');
+      void loadTournaments();
+    }
+    if (canFinance) {
+      void loadWithdrawals('pending');
+    }
+  }, [canAdmin, canFinance, loadAudits, loadMetrics, loadTables, loadTournaments, loadUsers, loadWithdrawals]);
 
   const pendingWithdrawalAmount = useMemo(
     () => withdrawals.filter((item) => item.status === 'pending').reduce((sum, item) => sum + item.amount, 0),
@@ -472,9 +498,13 @@ const Admin: React.FC = () => {
   };
 
   const handleRoleChange = async (target: AdminUser, role: UserRole) => {
-    await adminApi.setUserRole(target.id, role);
-    toast.success('Role updated.');
-    await Promise.all([loadUsers(userQuery), selectedProfile ? loadUserProfile(selectedProfile.user.id) : Promise.resolve(), loadMetrics()]);
+    try {
+      await adminApi.setUserRole(target.id, role);
+      toast.success('Role updated.');
+      await Promise.all([loadUsers(userQuery), selectedProfile ? loadUserProfile(selectedProfile.user.id) : Promise.resolve(), loadMetrics()]);
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, 'Failed to update role.'));
+    }
   };
 
   const handleWalletAdjustment = async () => {
@@ -1272,6 +1302,16 @@ const Admin: React.FC = () => {
   };
 
   const renderActiveSection = () => {
+    if (!availableSections.some((section) => section.id === activeSection)) {
+      if (availableSections.length === 0) {
+        return (
+          <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-6 text-sm text-white/60">
+            No admin sections are available for this role.
+          </div>
+        );
+      }
+      return null;
+    }
     if (activeSection === 'dashboard') return renderDashboard();
     if (activeSection === 'users') return renderUsers();
     if (activeSection === 'wallets') return renderWallets();
@@ -1294,7 +1334,7 @@ const Admin: React.FC = () => {
           </div>
 
           <nav className="space-y-1">
-            {SECTIONS.map((section) => {
+            {availableSections.map((section) => {
               const active = section.id === activeSection;
               return (
                 <button
@@ -1319,7 +1359,9 @@ const Admin: React.FC = () => {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-white/45">Active Section</div>
-                <h2 className="text-2xl rt-page-title">{SECTIONS.find((item) => item.id === activeSection)?.label}</h2>
+                <h2 className="text-2xl rt-page-title">
+                  {(availableSections.find((item) => item.id === activeSection) ?? SECTIONS.find((item) => item.id === activeSection))?.label}
+                </h2>
               </div>
               <Button
                 variant="secondary"
