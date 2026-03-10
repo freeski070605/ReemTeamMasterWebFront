@@ -24,8 +24,8 @@ const RULE_POPUPS: Record<RulePopupKey, RulePopupContent> = {
     body: "If the dropper is tied or beaten on hand value, the drop fails. The winner gets regular stake from others, and double stake from the dropper.",
   },
   declare41: {
-    title: "Declaring 41",
-    body: "A 41 hand must be declared at the start of your turn before drawing. If someone wins before your turn, you cannot use 41.",
+    title: "Automatic 41",
+    body: "If your starting hand is exactly 41, it is auto-claimed at the start of your first turn before drawing. If someone wins before your turn, you cannot use 41.",
   },
 };
 
@@ -108,7 +108,7 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
         <div className="mt-2 space-y-1 text-sm text-white/75">
           <div>Each player receives 5 cards.</div>
           <div>The remaining cards form the draw pile.</div>
-          <div>One card is flipped to start the discard pile.</div>
+          <div>The discard pile starts empty (no flipped starter card).</div>
           <div>Play proceeds clockwise.</div>
         </div>
       </details>
@@ -211,7 +211,7 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
             <div className="font-semibold text-white">41 and 11 and Under</div>
             <div>4 players at {formatRtc(examples.stake)} stake: winner receives {formatRtc(examples.triple4Players)}.</div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span>41 must be declared at the start of your turn before drawing.</span>
+              <span>41 is auto-claimed at the start of your first turn before drawing.</span>
               <InfoButton onClick={() => setActivePopup("declare41")} label="Rule Popup" />
             </div>
           </div>
@@ -231,7 +231,7 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
         <summary className="cursor-pointer font-semibold text-white">Special Winning Hands</summary>
         <div className="mt-2 space-y-2 text-sm text-white/75">
           <div>
-            <span className="font-semibold text-white">41:</span> Starting hand totals exactly 41, but it must be declared at the start of your turn before drawing.
+            <span className="font-semibold text-white">41:</span> Starting hand totals exactly 41 and is auto-claimed at the start of your first turn before drawing.
           </div>
           <div>
             <span className="font-semibold text-white">11 and Under:</span> Starting hand of 11 points or less is an automatic win.
@@ -267,7 +267,7 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
         <div className="mt-2 space-y-1 text-sm text-white/75">
           <div>Keep your hand value low to avoid losing drops.</div>
           <div>Use hits to extend opponents&apos; drop lock windows.</div>
-          <div>Track turn order so you know who can declare 41 next.</div>
+          <div>Track turn order so you know whose turn could auto-claim 41.</div>
           <div>Do not hold non-Ace spreads. Play them immediately.</div>
         </div>
       </details>
@@ -278,7 +278,7 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
           <div>1. Join a table.</div>
           <div>2. Keep your points low.</div>
           <div>3. Watch the discard pile and spreads.</div>
-          <div>4. Time drops and special declarations carefully.</div>
+          <div>4. Time drops carefully and watch for special auto-wins.</div>
         </div>
       </details>
 

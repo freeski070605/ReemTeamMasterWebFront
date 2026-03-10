@@ -18,6 +18,49 @@ import backCardImage from "../assets/cards/back.png";
 
 type TurnStatusBadge = "DRAWING" | "MUST DISCARD" | "HIT MODE" | "WAITING";
 
+const CARD_RANK_ORDER: Array<CardType["rank"]> = [
+  "Ace",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+  "Jack",
+  "Queen",
+  "King",
+];
+const CARD_SUIT_ORDER: Array<CardType["suit"]> = ["Hearts", "Diamonds", "Clubs", "Spades"];
+
+const getCardRankOrder = (rank: CardType["rank"]) => CARD_RANK_ORDER.indexOf(rank);
+const getCardSuitOrder = (suit: CardType["suit"]) => CARD_SUIT_ORDER.indexOf(suit);
+
+const sortHandCards = (cards: CardType[]): CardType[] =>
+  [...cards].sort((a, b) => {
+    const suitDiff = getCardSuitOrder(a.suit) - getCardSuitOrder(b.suit);
+    if (suitDiff !== 0) return suitDiff;
+    return getCardRankOrder(a.rank) - getCardRankOrder(b.rank);
+  });
+
+const sortSpreadCards = (cards: CardType[]): CardType[] => {
+  if (cards.length <= 1) return [...cards];
+
+  const allSameRank = cards.every((card) => card.rank === cards[0].rank);
+  if (allSameRank) {
+    return [...cards].sort((a, b) => getCardSuitOrder(a.suit) - getCardSuitOrder(b.suit));
+  }
+
+  const allSameSuit = cards.every((card) => card.suit === cards[0].suit);
+  if (allSameSuit) {
+    return [...cards].sort((a, b) => getCardRankOrder(a.rank) - getCardRankOrder(b.rank));
+  }
+
+  return sortHandCards(cards);
+};
+
 const getViewportSize = () => ({
   width: window.visualViewport?.width ?? window.innerWidth,
   height: window.visualViewport?.height ?? window.innerHeight,
@@ -53,7 +96,6 @@ const GameTable: React.FC = () => {
     spread,
     hit,
     drop,
-    declare41,
     requestLeaveTable,
     putIn,
   } = useGameStore();
@@ -709,14 +751,6 @@ const GameTable: React.FC = () => {
     }
   };
 
-  const handleDeclare41 = () => {
-    markActionActivity();
-
-    if (tableId && user) {
-      declare41(tableId, user._id);
-    }
-  };
-
   const handleOpenHowToPlay = () => {
     window.open("/how-to-play", "_blank", "noopener,noreferrer");
   };
@@ -971,9 +1005,6 @@ const GameTable: React.FC = () => {
   const guidanceHelperText = guidanceOverrideHelper ?? discardHelperText;
   const shouldShowGuidanceBanner = showGuidanceBanner && !!guidanceBannerText;
   const shouldShowGuidanceHelper = showGuidanceHelper && !!guidanceHelperText;
-  const currentHandValue = currentPlayer
-    ? currentPlayer.hand.reduce((sum, card) => sum + card.value, 0)
-    : null;
   const dropLockTurnsRemaining = currentPlayer?.hitLockCounter ?? 0;
 
   const canDrop = !!(
@@ -988,25 +1019,6 @@ const GameTable: React.FC = () => {
       : dropLockTurnsRemaining > 0
         ? `Drop blocked for ${dropLockTurnsRemaining} turn${dropLockTurnsRemaining === 1 ? "" : "s"}.`
         : undefined;
-
-  const canDeclare41 = !!(
-    isMyTurn &&
-    !hasDrawnThisTurn &&
-    !hasDiscardedThisTurn &&
-    currentPlayer &&
-    !currentPlayer.hasDrawnAnyCard &&
-    currentPlayer.startingHandValue === 41 &&
-    currentHandValue === 41
-  );
-  const declare41DisabledReason = !isMyTurn
-    ? "Wait for your turn."
-    : hasDrawnThisTurn || hasDiscardedThisTurn || currentPlayer?.hasTakenActionThisTurn
-      ? "Declare 41 only before drawing."
-      : currentPlayer?.hasDrawnAnyCard
-        ? "41 can only be declared before your first draw."
-        : currentPlayer?.startingHandValue !== 41 || currentHandValue !== 41
-          ? "Starting hand is not exactly 41."
-          : undefined;
 
   const canSpread = !!(
     isMyTurn &&
@@ -1150,7 +1162,7 @@ const GameTable: React.FC = () => {
     );
   };
 
-  const hand = currentPlayer?.hand ?? [];
+  const hand = sortHandCards(currentPlayer?.hand ?? []);
   const visibleHand =
     currentPlayer ? hand.slice(0, getVisibleCardCount(currentPlayer.userId, hand.length)) : [];
   const myTurnStatus = getTurnStatus(user._id, true);
@@ -1172,11 +1184,12 @@ const GameTable: React.FC = () => {
   ) => {
     if (hideCardsForPresentation) return null;
     if (!player || player.spreads.length === 0) return null;
+    const sortedSpreads = player.spreads.map(sortSpreadCards);
 
     return (
       <div className={`absolute z-10 pointer-events-none ${className}`}>
         <div className="flex flex-wrap items-center justify-center gap-1.5">
-          {player.spreads.map((spread, sIdx) => (
+          {sortedSpreads.map((spread, sIdx) => (
             <motion.div
               key={`${player.userId}-spread-${sIdx}`}
               className={`flex ${isPhoneLandscapeLayout ? "-space-x-4" : "-space-x-5"} ${
@@ -1618,11 +1631,6 @@ const GameTable: React.FC = () => {
                           reason: canDrop ? undefined : dropDisabledReason,
                           isPrimary: canDrop && isDrawStep,
                         }}
-                        declare41={{
-                          enabled: canDeclare41,
-                          reason: canDeclare41 ? undefined : declare41DisabledReason,
-                          isPrimary: canDeclare41 && isDrawStep,
-                        }}
                         spread={{
                           enabled: canSpread,
                           reason: canSpread ? undefined : spreadDisabledReason,
@@ -1634,7 +1642,6 @@ const GameTable: React.FC = () => {
                           isPrimary: canHit,
                         }}
                         onDrop={handleDrop}
-                        onDeclare41={handleDeclare41}
                         onSpread={handleSpread}
                         onHit={handleHitClick}
                         orientation="vertical"
