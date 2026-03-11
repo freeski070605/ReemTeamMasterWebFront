@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
 import { IGameState, Card, RoundResult } from '../types/game';
 import { toast } from 'react-toastify';
+import { SOCKET_URL } from '../api/socket';
 
-const BACKEND_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
+let presenceInterval: ReturnType<typeof setInterval> | null = null;
 
 interface GameStore {
   socket: Socket | null;
@@ -17,7 +18,8 @@ interface GameStore {
     userId: string,
     username: string,
     avatarUrl?: string,
-    contestId?: string
+    contestId?: string,
+    inviteCode?: string
   ) => void;
   disconnect: () => void;
   
@@ -40,13 +42,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isConnected: false,
   error: null,
 
-  connect: (tableId, userId, username, avatarUrl, contestId) => {
+  connect: (tableId, userId, username, avatarUrl, contestId, inviteCode) => {
     const existingSocket = get().socket;
     if (existingSocket) {
         existingSocket.disconnect();
     }
 
-    const socket = io(BACKEND_URL);
+    if (presenceInterval) {
+      clearInterval(presenceInterval);
+      presenceInterval = null;
+    }
+
+    const socket = io(SOCKET_URL);
     let lastRoundEndTimestamp: number | null = null;
     let activeRoundEndToastId: string | number | null = null;
     const formatRoundDeltaAmount = (amount: number, currency: 'USD' | 'RTC') => {
@@ -95,7 +102,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       console.log('Connected to game server');
       set({ isConnected: true, error: null });
       console.log(`Emitting joinTable for ${username} (${userId}) in table ${tableId}`);
-      socket.emit('joinTable', { tableId, userId, username, avatarUrl, contestId });
+      socket.emit('joinTable', { tableId, userId, username, avatarUrl, contestId, inviteCode });
+      socket.emit('presenceHeartbeat', { userId });
     });
 
     socket.on('initialGameState', (gameState: IGameState) => {
@@ -204,6 +212,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({ isConnected: false });
     });
 
+    presenceInterval = setInterval(() => {
+      socket.emit('presenceHeartbeat', { userId });
+    }, 20000);
+
     set({ socket });
   },
 
@@ -212,6 +224,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (socket) {
       socket.disconnect();
       set({ socket: null, gameState: null, lastRoundResult: null, isConnected: false });
+    }
+    if (presenceInterval) {
+      clearInterval(presenceInterval);
+      presenceInterval = null;
     }
   },
 

@@ -22,6 +22,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import UserDataDeletion from './pages/UserDataDeletion';
 import HowToPlay from './pages/HowToPlay';
+import Invite from './pages/Invite';
 
 const WalletRedirect: React.FC = () => {
   const location = useLocation();
@@ -48,6 +49,7 @@ const App: React.FC = () => {
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/data-deletion" element={<UserDataDeletion />} />
           <Route path="/how-to-play" element={<HowToPlay />} />
+          <Route path="/invite/:code" element={<Invite />} />
           
           <Route element={<ProtectedRoute />}>
             <Route path="/tables" element={<TableSelect />} />

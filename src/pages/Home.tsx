@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import client from '../api/client';
 import { Table } from '../types/game';
 import { Button } from '../components/ui/Button';
+import { trackEvent } from '../api/analytics';
 import {
   getModeLabel,
   getStakeDisplay,
@@ -19,6 +20,7 @@ const Home: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    trackEvent('home_view');
     const fetchTables = async () => {
       try {
         const response = await client.get<Table[]>('/tables');

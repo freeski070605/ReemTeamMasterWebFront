@@ -7,6 +7,7 @@ import { useWalletBalance } from "../hooks/useWalletBalance";
 import { Card as CardType } from "../types/game";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { toast } from "react-toastify";
+import { trackEvent } from "../api/analytics";
 
 import { PlayingCard as CardComponent } from "../components/ui/Card";
 import PlayerAvatar from "../components/game/PlayerAvatar";
@@ -135,6 +136,8 @@ const GameTable: React.FC = () => {
     refresh: refreshBalance,
   } = useWalletBalance({ refreshIntervalMs: 15000, currency: walletCurrency });
   const contestId = searchParams.get("contestId") ?? undefined;
+  const inviteCode = searchParams.get("inviteCode") ?? undefined;
+  const previousStatusRef = useRef<string | null>(null);
 
   const clearGuidanceTimers = useCallback(() => {
     if (guidanceBannerTimeoutRef.current !== null) {
@@ -196,7 +199,8 @@ const GameTable: React.FC = () => {
 
   useEffect(() => {
     if (tableId && user) {
-      connect(tableId, user._id, user.username, user.avatarUrl, contestId);
+      connect(tableId, user._id, user.username, user.avatarUrl, contestId, inviteCode);
+      trackEvent('table_joined', { tableId, contestId, inviteCode });
     }
 
     const handlePlayerLeft = ({ userId: leftPlayerId }: { userId: string }) => {
@@ -211,8 +215,35 @@ const GameTable: React.FC = () => {
     return () => {
       useGameStore.getState().socket?.off('playerLeft', handlePlayerLeft);
       disconnect();
+      if (tableId) {
+        trackEvent('table_left', { tableId });
+      }
     };
-  }, [tableId, user, connect, disconnect, navigate, contestId]);
+  }, [tableId, user, connect, disconnect, navigate, contestId, inviteCode]);
+
+  useEffect(() => {
+    if (!tableId) return;
+    localStorage.setItem('last_table_id', tableId);
+    if (inviteCode) {
+      localStorage.setItem('last_table_invite_code', inviteCode);
+    }
+  }, [tableId, inviteCode]);
+
+  useEffect(() => {
+    if (!gameState) return;
+    const currentStatus = gameState.status;
+    const previousStatus = previousStatusRef.current;
+
+    if (previousStatus !== currentStatus && currentStatus === "in-progress") {
+      trackEvent('game_start', { tableId, mode: gameState.mode ?? 'FREE_RTC_TABLE' });
+    }
+
+    if (previousStatus !== currentStatus && currentStatus === "round-end") {
+      trackEvent('round_end', { tableId, mode: gameState.mode ?? 'FREE_RTC_TABLE', endedBy: gameState.roundEndedBy });
+    }
+
+    previousStatusRef.current = currentStatus;
+  }, [gameState, tableId]);
 
   useEffect(() => {
     if (gameState?.status === "round-end") {

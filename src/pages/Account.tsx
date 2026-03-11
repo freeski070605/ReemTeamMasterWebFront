@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/authStore';
 import { createCheckout } from '../api/wallet';
-import { createRtcCheckout, getRtcBundles, RtcPurchaseBundle } from '../api/rtc';
+import { createRtcCheckout, getRtcBundles, RtcPurchaseBundle, requestRtcRefill } from '../api/rtc';
 import TransactionHistory from '../components/wallet/TransactionHistory';
 import PayoutForm from '../components/wallet/PayoutForm';
 import PlayerAvatar from '../components/game/PlayerAvatar';
@@ -39,6 +39,8 @@ const Account: React.FC = () => {
   const [rtcBundlesLoading, setRtcBundlesLoading] = useState(true);
   const [rtcBundlesError, setRtcBundlesError] = useState<string | null>(null);
   const [purchasingBundleId, setPurchasingBundleId] = useState<string | null>(null);
+  const [rtcRefillLoading, setRtcRefillLoading] = useState(false);
+  const [rtcRefillNextEligibleAt, setRtcRefillNextEligibleAt] = useState<string | null>(null);
   const {
     balance: usdBalance,
     loading: usdBalanceLoading,
@@ -156,6 +158,25 @@ const Account: React.FC = () => {
       toast.error(error?.response?.data?.message || 'Could not start Reem Team Cash checkout.');
     } finally {
       setPurchasingBundleId(null);
+    }
+  };
+
+  const handleRtcRefill = async () => {
+    setRtcRefillLoading(true);
+    try {
+      const result = await requestRtcRefill();
+      setRtcRefillNextEligibleAt(result.nextEligibleAt);
+      if (result.refilled) {
+        toast.success(`Daily RTC boost claimed: +${Math.floor(result.refillAmount)} RTC`);
+      } else {
+        toast.info('Daily RTC boost already claimed. Check back later.');
+      }
+      window.dispatchEvent(new Event('wallet-balance-refresh'));
+      void refreshRtcBalance();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Could not claim daily RTC.');
+    } finally {
+      setRtcRefillLoading(false);
     }
   };
 
@@ -321,6 +342,27 @@ const Account: React.FC = () => {
             <p className="mt-3 text-sm text-white/65">
               Use RTC bundles for crib games and RTC tournament lanes.
             </p>
+
+            <div className="mt-4 rounded-2xl border border-white/12 bg-black/25 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Daily RTC Boost</div>
+              <div className="mt-2 text-sm text-white/70">
+                Keep your bankroll topped up with a once‑per‑day refill.
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Button
+                  variant="secondary"
+                  disabled={rtcRefillLoading}
+                  onClick={() => void handleRtcRefill()}
+                >
+                  {rtcRefillLoading ? 'Claiming...' : 'Claim Daily RTC'}
+                </Button>
+                {rtcRefillNextEligibleAt && (
+                  <div className="text-xs text-white/55">
+                    Next eligible: {new Date(rtcRefillNextEligibleAt).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            </div>
 
             {rtcBalanceError && <p className="mt-3 text-sm text-red-300">{rtcBalanceError}</p>}
             {rtcBundlesError && <p className="mt-3 text-sm text-red-300">{rtcBundlesError}</p>}

@@ -1,11 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Coins, Users } from 'lucide-react';
+import { io } from 'socket.io-client';
+import { toast } from 'react-toastify';
 import client from '../api/client';
 import { Table } from '../types/game';
 import { Button } from '../components/ui/Button';
 import { Loader } from '../components/ui/Loader';
 import { Modal } from '../components/ui/Modal';
+import { SOCKET_URL } from '../api/socket';
+import { useAuthStore } from '../store/authStore';
+import { trackEvent } from '../api/analytics';
+import { getLobbySummary } from '../api/lobby';
+import { quickSeat, createPrivateTable } from '../api/tables';
+import { createInvite } from '../api/invites';
+import { getRecentPlayers, RecentPlayer } from '../api/users';
+import PlayerAvatar from '../components/game/PlayerAvatar';
+import { Input } from '../components/ui/Input';
 import {
   getModeBadge,
   getModeDescription,
@@ -20,7 +31,19 @@ const TableSelect: React.FC = () => {
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+  const [lobbyPresence, setLobbyPresence] = useState({ onlinePlayers: 0, lobbyConnections: 0 });
+  const [lobbyFeed, setLobbyFeed] = useState<Array<{ message: string; timestamp: number }>>([]);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [quickSeatLoading, setQuickSeatLoading] = useState(false);
+  const [privateModalOpen, setPrivateModalOpen] = useState(false);
+  const [privateStake, setPrivateStake] = useState<number>(1);
+  const [privateMaxPlayers, setPrivateMaxPlayers] = useState<number>(4);
+  const [privateCreating, setPrivateCreating] = useState(false);
+  const [recentPlayers, setRecentPlayers] = useState<RecentPlayer[]>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [recentError, setRecentError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { user } = useAuthStore();
 
   const fetchTables = async () => {
     try {
@@ -34,6 +57,7 @@ const TableSelect: React.FC = () => {
       });
       setTables(sortedTables);
       setError('');
+      trackEvent('table_list_impression', { count: sortedTables.length });
     } catch (err) {
       setError('Could not load crib tables right now. Try again.');
       console.error(err);
@@ -42,9 +66,131 @@ const TableSelect: React.FC = () => {
     }
   };
 
+  const fetchSummary = async () => {
+    try {
+      setSummaryLoading(true);
+      const summary = await getLobbySummary();
+      setLobbyPresence((prev) => ({
+        ...prev,
+        onlinePlayers: summary.onlinePlayers ?? prev.onlinePlayers,
+      }));
+    } catch (err) {
+      console.error('Failed to load lobby summary', err);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const handleQuickSeat = async () => {
+    setQuickSeatLoading(true);
+    try {
+      const table = await quickSeat();
+      trackEvent('quick_seat_clicked', { tableId: table._id });
+      navigate(`/game/${table._id}`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'No open seats available right now.');
+    } finally {
+      setQuickSeatLoading(false);
+    }
+  };
+
+  const handleCreateInvite = async (table: Table) => {
+    try {
+      const invite = await createInvite({ tableId: table._id });
+      const copied = await copyToClipboard(invite.inviteUrl);
+      trackEvent('invite_created', { tableId: table._id });
+      toast.success(copied ? 'Invite link copied.' : 'Invite created.');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to create invite.');
+    }
+  };
+
+  const handleCreatePrivate = async () => {
+    if (!Number.isFinite(privateStake) || privateStake <= 0) {
+      toast.error('Select a valid stake for the private table.');
+      return;
+    }
+    setPrivateCreating(true);
+    try {
+      const result = await createPrivateTable({ stake: privateStake, maxPlayers: privateMaxPlayers });
+      const copied = await copyToClipboard(result.inviteUrl);
+      trackEvent('private_table_created', { tableId: result.table._id });
+      toast.success(copied ? 'Private table created. Invite link copied.' : 'Private table created.');
+      setPrivateModalOpen(false);
+      navigate(`/game/${result.table._id}?inviteCode=${encodeURIComponent(result.inviteCode)}`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to create private table.');
+    } finally {
+      setPrivateCreating(false);
+    }
+  };
+
+  const handleRejoinLast = () => {
+    const lastTableId = localStorage.getItem('last_table_id');
+    if (!lastTableId) {
+      return;
+    }
+    const lastInviteCode = localStorage.getItem('last_table_invite_code');
+    const query = lastInviteCode ? `?inviteCode=${encodeURIComponent(lastInviteCode)}` : '';
+    navigate(`/game/${lastTableId}${query}`);
+  };
+
   useEffect(() => {
+    trackEvent('lobby_view', { source: 'tables' });
     void fetchTables();
+    void fetchSummary();
   }, []);
+
+  useEffect(() => {
+    if (!user?._id) {
+      return;
+    }
+
+    setRecentLoading(true);
+    setRecentError(null);
+    getRecentPlayers(10)
+      .then(setRecentPlayers)
+      .catch((error: any) => {
+        setRecentError(error?.response?.data?.message || 'Could not load recent players.');
+        setRecentPlayers([]);
+      })
+      .finally(() => setRecentLoading(false));
+  }, [user?._id]);
+
+  useEffect(() => {
+    const socket = io(SOCKET_URL);
+    socket.emit('joinLobby', { userId: user?._id, username: user?.username });
+
+    socket.on('lobbyPresence', (payload: { onlinePlayers?: number; lobbyConnections?: number }) => {
+      setLobbyPresence((prev) => ({
+        onlinePlayers: payload.onlinePlayers ?? prev.onlinePlayers,
+        lobbyConnections: payload.lobbyConnections ?? prev.lobbyConnections,
+      }));
+    });
+
+    socket.on('lobbyEvent', (payload: { message: string; timestamp: number }) => {
+      setLobbyFeed((prev) => [payload, ...prev].slice(0, 8));
+    });
+
+    const heartbeat = setInterval(() => {
+      socket.emit('presenceHeartbeat', { userId: user?._id });
+    }, 20000);
+
+    return () => {
+      clearInterval(heartbeat);
+      socket.emit('leaveLobby');
+      socket.disconnect();
+    };
+  }, [user?._id, user?.username]);
 
   const rtcTables = useMemo(
     () => tables.filter((table) => table.mode !== 'USD_CONTEST'),
@@ -66,12 +212,26 @@ const TableSelect: React.FC = () => {
     return Array.from(byStake.entries()).sort(([a], [b]) => a - b);
   }, [rtcTables]);
 
+  useEffect(() => {
+    if (rtcTables.length === 0) {
+      return;
+    }
+    const stakes = Array.from(new Set(rtcTables.map((table) => table.stake))).sort((a, b) => a - b);
+    if (!stakes.includes(privateStake)) {
+      setPrivateStake(stakes[0]);
+    }
+  }, [rtcTables, privateStake]);
+
   const metrics = useMemo(() => {
     const active = rtcTables.filter((table) => table.status === 'in-game').length;
     const usd = cashCrownTables.length;
     const rtc = rtcTables.length;
     return { active, usd, rtc };
   }, [cashCrownTables.length, rtcTables]);
+
+  const openSeats = useMemo(() => {
+    return tables.reduce((sum, table) => sum + Math.max(0, table.maxPlayers - table.currentPlayerCount), 0);
+  }, [tables]);
 
   const handleJoinClick = (table: Table) => {
     if (table.mode === 'USD_CONTEST') {
@@ -85,6 +245,7 @@ const TableSelect: React.FC = () => {
 
   const handleConfirmJoin = () => {
     if (!selectedTable) return;
+    trackEvent('table_join_clicked', { tableId: selectedTable._id });
     navigate(`/game/${selectedTable._id}`);
   };
 
@@ -111,13 +272,34 @@ const TableSelect: React.FC = () => {
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button onClick={() => void fetchTables()}>Reload Cribs</Button>
+          <Button onClick={handleQuickSeat} disabled={quickSeatLoading}>
+            {quickSeatLoading ? 'Finding Seat...' : 'Quick Seat'}
+          </Button>
+          <Button variant="secondary" onClick={() => setPrivateModalOpen(true)}>
+            Create Private Table
+          </Button>
+          {localStorage.getItem('last_table_id') && (
+            <Button variant="secondary" onClick={handleRejoinLast}>
+              Rejoin Last Table
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => navigate('/contests')}>
             View Cash Crown Tournaments
           </Button>
         </div>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="rt-glass rounded-2xl p-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Players Online</div>
+          <div className="mt-2 text-3xl rt-page-title">
+            {summaryLoading ? '--' : lobbyPresence.onlinePlayers}
+          </div>
+        </div>
+        <div className="rt-glass rounded-2xl p-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Open Seats</div>
+          <div className="mt-2 text-3xl rt-page-title">{openSeats}</div>
+        </div>
         <div className="rt-glass rounded-2xl p-4">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Live Cribs</div>
           <div className="mt-2 text-3xl rt-page-title">{metrics.rtc}</div>
@@ -129,6 +311,52 @@ const TableSelect: React.FC = () => {
         <div className="rt-glass rounded-2xl p-4">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Cash Crown Tournaments Live</div>
           <div className="mt-2 text-3xl rt-page-title">{metrics.usd}</div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="rt-panel-strong rounded-2xl p-5">
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Recent Players</div>
+          {recentLoading && <div className="mt-3 text-sm text-white/60">Loading recent players...</div>}
+          {!recentLoading && recentError && (
+            <div className="mt-3 text-sm text-red-300">{recentError}</div>
+          )}
+          {!recentLoading && !recentError && recentPlayers.length === 0 && (
+            <div className="mt-3 text-sm text-white/60">Play a few hands to see recent players.</div>
+          )}
+          {!recentLoading && recentPlayers.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-4">
+              {recentPlayers.map((player) => (
+                <div key={player._id} className="flex flex-col items-center gap-2">
+                  <PlayerAvatar
+                    player={{ name: player.recentUsername, avatarUrl: player.recentAvatarUrl ?? undefined }}
+                    size="sm"
+                    showName
+                  />
+                  <div className="text-[11px] text-white/60">
+                    Last played {new Date(player.lastPlayedAt).toLocaleDateString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rt-panel-strong rounded-2xl p-5">
+          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Lobby Pulse</div>
+          {lobbyFeed.length === 0 && (
+            <div className="mt-3 text-sm text-white/60">Lobby updates will appear here.</div>
+          )}
+          <div className="mt-4 space-y-2">
+            {lobbyFeed.map((entry, index) => (
+              <div key={`${entry.timestamp}-${index}`} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/75">
+                <div>{entry.message}</div>
+                <div className="text-[11px] text-white/45">
+                  {new Date(entry.timestamp).toLocaleTimeString()}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -185,6 +413,13 @@ const TableSelect: React.FC = () => {
                     >
                       {table.currentPlayerCount >= table.maxPlayers ? 'Crib Full' : 'Enter Crib'}
                     </Button>
+                    <Button
+                      className="mt-2 w-full"
+                      variant="secondary"
+                      onClick={() => handleCreateInvite(table)}
+                    >
+                      Invite Friends
+                    </Button>
                   </article>
                 );
               })}
@@ -209,6 +444,35 @@ const TableSelect: React.FC = () => {
           <p>Start a Reem Team Cash crib at {getStakeTierHeading(selectedTable.stake, selectedTable.mode)}.</p>
         </Modal>
       )}
+
+      <Modal
+        isOpen={privateModalOpen}
+        onClose={() => setPrivateModalOpen(false)}
+        onConfirm={handleCreatePrivate}
+        title="Create Private Table"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Stake Tier"
+            type="number"
+            min={1}
+            value={privateStake}
+            onChange={(event) => setPrivateStake(Number(event.target.value))}
+          />
+          <Input
+            label="Max Players (2-4)"
+            type="number"
+            min={2}
+            max={4}
+            value={privateMaxPlayers}
+            onChange={(event) => setPrivateMaxPlayers(Number(event.target.value))}
+          />
+          <p className="text-xs text-white/60">
+            We&apos;ll copy the invite link and seat you instantly.
+          </p>
+          {privateCreating && <p className="text-xs text-white/70">Creating private table...</p>}
+        </div>
+      </Modal>
     </div>
   );
 };

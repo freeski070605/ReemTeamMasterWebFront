@@ -82,6 +82,8 @@ export interface Table {
   stake: number;
   mode?: GameMode;
   activeContestId?: string;
+  isPrivate?: boolean;
+  createdBy?: string;
   minPlayers: number;
   maxPlayers: number;
   currentPlayerCount: number;
