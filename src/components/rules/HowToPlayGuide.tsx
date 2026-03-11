@@ -117,7 +117,7 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
         <summary className="cursor-pointer font-semibold text-white">Card Values</summary>
         <div className="mt-2 space-y-1 text-sm text-white/75">
           <div>Ace = 1</div>
-          <div>2-10 = face value</div>
+          <div>2-7 = face value</div>
           <div>Jack / Queen / King = 10</div>
           <div className="text-white/60">Lower hand value is better.</div>
         </div>
