@@ -30,7 +30,7 @@ const formatRtcBalance = (amount: number | null): string => {
 };
 
 const Account: React.FC = () => {
-  const { user, uploadAvatar, selectDefaultAvatar } = useAuthStore();
+  const { user, uploadAvatar, selectDefaultAvatar, refreshVipStatus } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const [file, setFile] = useState<File | null>(null);
   const [depositBusy, setDepositBusy] = useState(false);
@@ -64,6 +64,9 @@ const Account: React.FC = () => {
     if (paymentStatus === 'success') {
       if (paymentType === 'rtc') {
         toast.success('RTC purchase completed. Your RTC balance will update shortly.');
+      } else if (paymentType === 'vip') {
+        toast.success('VIP subscription activated. Private tables are now unlocked.');
+        void refreshVipStatus();
       } else {
         toast.success('Deposit completed. Your balance will update shortly.');
       }
@@ -80,7 +83,7 @@ const Account: React.FC = () => {
     nextParams.delete('userId');
     nextParams.delete('amount');
     setSearchParams(nextParams, { replace: true });
-  }, [refreshRtcBalance, refreshUsdBalance, searchParams, setSearchParams]);
+  }, [refreshRtcBalance, refreshUsdBalance, refreshVipStatus, searchParams, setSearchParams]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files?.[0]) {

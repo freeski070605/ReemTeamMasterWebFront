@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import { Table } from '../types/game';
 import { Button } from '../components/ui/Button';
+import { createVipCheckout } from '../api/vip';
+import { toast } from 'react-toastify';
+import { useAuthStore } from '../store/authStore';
 import { trackEvent } from '../api/analytics';
 import {
   getModeLabel,
@@ -18,6 +21,9 @@ const formatRtcAmount = (stake?: number): string | null => {
 const Home: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vipCheckoutLoading, setVipCheckoutLoading] = useState(false);
+  const { isAuthenticated } = useAuthStore();
+  const navigate = useNavigate();
 
   useEffect(() => {
     trackEvent('home_view');
@@ -35,6 +41,26 @@ const Home: React.FC = () => {
 
     void fetchTables();
   }, []);
+
+  const handleVipCheckout = async () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: { pathname: '/' } } });
+      return;
+    }
+    setVipCheckoutLoading(true);
+    try {
+      const checkoutUrl = await createVipCheckout();
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+        return;
+      }
+      toast.error('Failed to start VIP checkout.');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Could not start VIP checkout.');
+    } finally {
+      setVipCheckoutLoading(false);
+    }
+  };
 
   const tableSummary = useMemo(() => {
     const active = tables.filter((table) => table.status === 'in-game').length;
@@ -136,6 +162,34 @@ const Home: React.FC = () => {
               <div className="text-xs uppercase tracking-[0.2em] text-white/55">Cash Crown Tournaments</div>
               <div className="mt-2 text-3xl rt-page-title">{loading ? '--' : tableSummary.usd}</div>
             </div>
+          </div>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link to="/tables">
+              <Button>Pull Up to Cribs</Button>
+            </Link>
+            <Button variant="secondary" onClick={handleVipCheckout} disabled={vipCheckoutLoading}>
+              {vipCheckoutLoading ? 'Starting VIP...' : 'Go VIP ($4.99/mo)'}
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="rt-panel-strong rounded-2xl p-6">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-[0.2em] text-white/55">VIP Tables</div>
+            <h2 className="mt-2 text-2xl rt-page-title">Private Cribs + Priority Seat</h2>
+            <p className="mt-2 text-sm text-white/70">
+              VIP unlocks private tables, exclusive invite links, and a smoother lane into live games.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={handleVipCheckout} disabled={vipCheckoutLoading}>
+              {vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP Subscription'}
+            </Button>
+            <Link to="/tables">
+              <Button variant="secondary">Browse Cribs</Button>
+            </Link>
           </div>
         </div>
       </section>

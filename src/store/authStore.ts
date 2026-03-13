@@ -10,6 +10,9 @@ interface User {
   avatarUrl?: string;
   role: UserRole;
   isAdmin?: boolean;
+  isVip?: boolean;
+  vipStatus?: string;
+  vipExpiresAt?: string | null;
 }
 
 const normalizeStoredUser = (value: any): User | null => {
@@ -25,6 +28,9 @@ const normalizeStoredUser = (value: any): User | null => {
     avatarUrl: value.avatarUrl,
     role,
     isAdmin: role === 'admin' || role === 'superadmin',
+    isVip: !!value.isVip,
+    vipStatus: value.vipStatus,
+    vipExpiresAt: value.vipExpiresAt ?? null,
   };
 };
 
@@ -39,6 +45,7 @@ interface AuthState {
   checkAuth: () => void;
   uploadAvatar: (file: File) => Promise<void>;
   selectDefaultAvatar: (avatarUrl: string) => Promise<void>;
+  refreshVipStatus: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -55,6 +62,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const response = await client.post('/auth/login', { email, password });
       const { token, userId, username, email: userEmail, avatarUrl, role, isAdmin } = response.data;
+      const { isVip, vipStatus, vipExpiresAt } = response.data;
       const resolvedRole = resolveUserRole(role, !!isAdmin);
       
       const user = {
@@ -64,6 +72,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         avatarUrl,
         role: resolvedRole,
         isAdmin: resolvedRole === 'admin' || resolvedRole === 'superadmin',
+        isVip: !!isVip,
+        vipStatus,
+        vipExpiresAt: vipExpiresAt ?? null,
       };
       
       localStorage.setItem('token', token);
@@ -83,6 +94,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const response = await client.post('/auth/register', { username, email, password });
       const { token, userId, avatarUrl, role, isAdmin } = response.data;
+      const { isVip, vipStatus, vipExpiresAt } = response.data;
       const resolvedRole = resolveUserRole(role, !!isAdmin);
       
       const user = {
@@ -92,6 +104,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         avatarUrl,
         role: resolvedRole,
         isAdmin: resolvedRole === 'admin' || resolvedRole === 'superadmin',
+        isVip: !!isVip,
+        vipStatus,
+        vipExpiresAt: vipExpiresAt ?? null,
       };
       
       localStorage.setItem('token', token);
@@ -163,6 +178,28 @@ export const useAuthStore = create<AuthState>((set) => ({
       toast.success('Avatar updated successfully!');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Avatar update failed');
+    }
+  },
+
+  refreshVipStatus: async () => {
+    try {
+      const response = await client.get('/vip/status');
+      const { vipStatus, vipExpiresAt, isVip } = response.data ?? {};
+      set((state) => {
+        if (!state.user) {
+          return state;
+        }
+        const user = {
+          ...state.user,
+          vipStatus,
+          vipExpiresAt: vipExpiresAt ?? null,
+          isVip: !!isVip,
+        };
+        localStorage.setItem('user', JSON.stringify(user));
+        return { ...state, user };
+      });
+    } catch {
+      // Ignore refresh failures.
     }
   },
 }));

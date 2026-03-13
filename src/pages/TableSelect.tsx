@@ -17,6 +17,7 @@ import { createInvite } from '../api/invites';
 import { getRecentPlayers, RecentPlayer } from '../api/users';
 import PlayerAvatar from '../components/game/PlayerAvatar';
 import { Input } from '../components/ui/Input';
+import { createVipCheckout } from '../api/vip';
 import {
   getModeBadge,
   getModeDescription,
@@ -39,6 +40,8 @@ const TableSelect: React.FC = () => {
   const [privateStake, setPrivateStake] = useState<number>(1);
   const [privateMaxPlayers, setPrivateMaxPlayers] = useState<number>(4);
   const [privateCreating, setPrivateCreating] = useState(false);
+  const [vipModalOpen, setVipModalOpen] = useState(false);
+  const [vipCheckoutLoading, setVipCheckoutLoading] = useState(false);
   const [recentPlayers, setRecentPlayers] = useState<RecentPlayer[]>([]);
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
@@ -134,6 +137,30 @@ const TableSelect: React.FC = () => {
     } finally {
       setPrivateCreating(false);
     }
+  };
+
+  const handleVipCheckout = async () => {
+    setVipCheckoutLoading(true);
+    try {
+      const checkoutUrl = await createVipCheckout();
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+        return;
+      }
+      toast.error('Failed to start VIP checkout.');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Could not start VIP checkout.');
+    } finally {
+      setVipCheckoutLoading(false);
+    }
+  };
+
+  const handlePrivateEntry = () => {
+    if (!user?.isVip) {
+      setVipModalOpen(true);
+      return;
+    }
+    setPrivateModalOpen(true);
   };
 
   const handleRejoinLast = () => {
@@ -277,7 +304,7 @@ const TableSelect: React.FC = () => {
           <Button onClick={handleQuickSeat} disabled={quickSeatLoading}>
             {quickSeatLoading ? 'Finding Seat...' : 'Quick Seat'}
           </Button>
-          <Button variant="secondary" onClick={() => setPrivateModalOpen(true)}>
+          <Button variant="secondary" onClick={handlePrivateEntry}>
             Create Private Table
           </Button>
           {localStorage.getItem('last_table_id') && (
@@ -473,6 +500,19 @@ const TableSelect: React.FC = () => {
             We&apos;ll copy the invite link and seat you instantly.
           </p>
           {privateCreating && <p className="text-xs text-white/70">Creating private table...</p>}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={vipModalOpen}
+        onClose={() => setVipModalOpen(false)}
+        onConfirm={handleVipCheckout}
+        title="VIP Subscription Required"
+      >
+        <div className="space-y-3">
+          <p>Private tables are reserved for VIP members.</p>
+          <p className="text-sm text-white/70">$4.99/month. Cancel anytime.</p>
+          {vipCheckoutLoading && <p className="text-xs text-white/70">Starting VIP checkout...</p>}
         </div>
       </Modal>
     </div>
