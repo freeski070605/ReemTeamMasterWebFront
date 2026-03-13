@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -9,13 +9,16 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const { login, isLoading } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const logoSrc = '/assets/logo.png';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await login(email, password);
-      navigate('/tables');
+      const from = (location.state as any)?.from;
+      const nextPath = from?.pathname ? `${from.pathname}${from.search ?? ''}` : '/tables';
+      navigate(nextPath, { replace: true });
     } catch {
       // Error state handled in store toast.
     }

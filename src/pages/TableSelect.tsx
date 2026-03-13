@@ -106,7 +106,8 @@ const TableSelect: React.FC = () => {
   const handleCreateInvite = async (table: Table) => {
     try {
       const invite = await createInvite({ tableId: table._id });
-      const copied = await copyToClipboard(invite.inviteUrl);
+      const inviteUrl = `${window.location.origin}/invite/${invite.code}`;
+      const copied = await copyToClipboard(inviteUrl);
       trackEvent('invite_created', { tableId: table._id });
       toast.success(copied ? 'Invite link copied.' : 'Invite created.');
     } catch (err: any) {
@@ -122,7 +123,8 @@ const TableSelect: React.FC = () => {
     setPrivateCreating(true);
     try {
       const result = await createPrivateTable({ stake: privateStake, maxPlayers: privateMaxPlayers });
-      const copied = await copyToClipboard(result.inviteUrl);
+      const inviteUrl = `${window.location.origin}/invite/${result.inviteCode}`;
+      const copied = await copyToClipboard(inviteUrl);
       trackEvent('private_table_created', { tableId: result.table._id });
       toast.success(copied ? 'Private table created. Invite link copied.' : 'Private table created.');
       setPrivateModalOpen(false);
