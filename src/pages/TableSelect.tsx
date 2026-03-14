@@ -46,7 +46,7 @@ const TableSelect: React.FC = () => {
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, refreshVipStatus } = useAuthStore();
   const isVip = !!user?.isVip;
 
   const fetchTables = async () => {
@@ -161,10 +161,14 @@ const TableSelect: React.FC = () => {
     }
   };
 
-  const handlePrivateEntry = () => {
+  const handlePrivateEntry = async () => {
     if (!user?.isVip) {
-      setVipModalOpen(true);
-      return;
+      await refreshVipStatus(true);
+      const latestVip = useAuthStore.getState().user?.isVip;
+      if (!latestVip) {
+        setVipModalOpen(true);
+        return;
+      }
     }
     setPrivateModalOpen(true);
   };

@@ -47,7 +47,7 @@ interface AuthState {
   checkAuth: () => void;
   uploadAvatar: (file: File) => Promise<void>;
   selectDefaultAvatar: (avatarUrl: string) => Promise<void>;
-  refreshVipStatus: () => Promise<void>;
+  refreshVipStatus: (sync?: boolean) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -185,9 +185,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  refreshVipStatus: async () => {
+  refreshVipStatus: async (sync = false) => {
     try {
-      const response = await client.get('/vip/status');
+      const response = sync
+        ? await client.post('/vip/sync')
+        : await client.get('/vip/status');
       const { vipStatus, vipExpiresAt, isVip } = response.data ?? {};
       set((state) => {
         if (!state.user) {

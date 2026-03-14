@@ -82,7 +82,7 @@ const Account: React.FC = () => {
         toast.success('RTC purchase completed. Your RTC balance will update shortly.');
       } else if (paymentType === 'vip') {
         toast.success('VIP subscription activated. Private tables are now unlocked.');
-        void refreshVipStatus();
+        void refreshVipStatus(true);
       } else {
         toast.success('Deposit completed. Your balance will update shortly.');
       }
@@ -237,6 +237,18 @@ const Account: React.FC = () => {
       toast.error(error?.response?.data?.message || 'Could not cancel VIP right now.');
     } finally {
       setVipCanceling(false);
+    }
+  };
+
+  const handleVipSync = async () => {
+    if (vipCheckoutLoading || vipCanceling) {
+      return;
+    }
+    try {
+      await refreshVipStatus(true);
+      toast.success('VIP status synced.');
+    } catch {
+      toast.error('Could not sync VIP status right now.');
     }
   };
 
@@ -634,9 +646,14 @@ const Account: React.FC = () => {
                   </Link>
                 </>
               ) : (
-                <Button onClick={handleVipCheckout} disabled={vipCheckoutLoading}>
-                  {vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP ($4.99/mo)'}
-                </Button>
+                <>
+                  <Button onClick={handleVipCheckout} disabled={vipCheckoutLoading}>
+                    {vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP ($4.99/mo)'}
+                  </Button>
+                  <Button variant="secondary" onClick={handleVipSync}>
+                    Sync VIP Status
+                  </Button>
+                </>
               )}
             </div>
 

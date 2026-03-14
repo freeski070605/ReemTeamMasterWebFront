@@ -9,6 +9,7 @@ export interface VipStatusResponse {
   vipExpiresAt?: string | null;
   vipSince?: string | null;
   isVip: boolean;
+  synced?: boolean;
 }
 
 export const createVipCheckout = async (): Promise<string> => {
@@ -18,6 +19,11 @@ export const createVipCheckout = async (): Promise<string> => {
 
 export const getVipStatus = async (): Promise<VipStatusResponse> => {
   const { data } = await client.get<VipStatusResponse>('/vip/status');
+  return data;
+};
+
+export const syncVipStatus = async (): Promise<VipStatusResponse> => {
+  const { data } = await client.post<VipStatusResponse>('/vip/sync');
   return data;
 };
 
