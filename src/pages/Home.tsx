@@ -22,8 +22,9 @@ const Home: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
   const [vipCheckoutLoading, setVipCheckoutLoading] = useState(false);
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const navigate = useNavigate();
+  const isVip = !!user?.isVip;
 
   useEffect(() => {
     trackEvent('home_view');
@@ -43,6 +44,10 @@ const Home: React.FC = () => {
   }, []);
 
   const handleVipCheckout = async () => {
+    if (isVip) {
+      navigate('/account');
+      return;
+    }
     if (!isAuthenticated) {
       navigate('/login', { state: { from: { pathname: '/' } } });
       return;
@@ -167,8 +172,8 @@ const Home: React.FC = () => {
             <Link to="/tables">
               <Button>Pull Up to Cribs</Button>
             </Link>
-            <Button variant="secondary" onClick={handleVipCheckout} disabled={vipCheckoutLoading}>
-              {vipCheckoutLoading ? 'Starting VIP...' : 'Go VIP ($4.99/mo)'}
+            <Button variant="secondary" onClick={handleVipCheckout} disabled={vipCheckoutLoading || isVip}>
+              {isVip ? 'VIP Active' : vipCheckoutLoading ? 'Starting VIP...' : 'Go VIP ($4.99/mo)'}
             </Button>
           </div>
         </div>
@@ -180,13 +185,18 @@ const Home: React.FC = () => {
             <div className="text-xs uppercase tracking-[0.2em] text-white/55">VIP Tables</div>
             <h2 className="mt-2 text-2xl rt-page-title">Private Cribs + Priority Seat</h2>
             <p className="mt-2 text-sm text-white/70">
-              VIP unlocks private tables, exclusive invite links, and a smoother lane into live games.
+              VIP unlocks private tables, private invite links, and a smoother lane into live games.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={handleVipCheckout} disabled={vipCheckoutLoading}>
-              {vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP Subscription'}
+            <Button onClick={handleVipCheckout} disabled={vipCheckoutLoading || isVip}>
+              {isVip ? 'VIP Active' : vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP Subscription'}
             </Button>
+            {isVip && (
+              <Link to="/account">
+                <Button variant="secondary">Manage VIP</Button>
+              </Link>
+            )}
             <Link to="/tables">
               <Button variant="secondary">Browse Cribs</Button>
             </Link>

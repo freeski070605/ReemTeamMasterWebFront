@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/authStore';
 import { createCheckout } from '../api/wallet';
 import { createRtcCheckout, getRtcBundles, RtcPurchaseBundle, requestRtcRefill } from '../api/rtc';
+import { cancelVipSubscription, createVipCheckout } from '../api/vip';
 import TransactionHistory from '../components/wallet/TransactionHistory';
 import PayoutForm from '../components/wallet/PayoutForm';
 import PlayerAvatar from '../components/game/PlayerAvatar';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
 import { DEFAULT_AVATAR_PATHS } from '../constants/avatars';
 import { resolveAvatarUrl } from '../utils/avatar';
 import { useWalletBalance } from '../hooks/useWalletBalance';
@@ -29,6 +31,17 @@ const formatRtcBalance = (amount: number | null): string => {
   return Math.max(0, Math.floor(amount)).toLocaleString('en-US');
 };
 
+const formatVipDate = (value?: string | null): string => {
+  if (!value) {
+    return '--';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '--';
+  }
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+};
+
 const Account: React.FC = () => {
   const { user, uploadAvatar, selectDefaultAvatar, refreshVipStatus } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -41,6 +54,9 @@ const Account: React.FC = () => {
   const [purchasingBundleId, setPurchasingBundleId] = useState<string | null>(null);
   const [rtcRefillLoading, setRtcRefillLoading] = useState(false);
   const [rtcRefillNextEligibleAt, setRtcRefillNextEligibleAt] = useState<string | null>(null);
+  const [vipCheckoutLoading, setVipCheckoutLoading] = useState(false);
+  const [vipCancelOpen, setVipCancelOpen] = useState(false);
+  const [vipCanceling, setVipCanceling] = useState(false);
   const {
     balance: usdBalance,
     loading: usdBalanceLoading,
@@ -147,6 +163,10 @@ const Account: React.FC = () => {
     void fetchRtcBundles();
   }, [fetchRtcBundles]);
 
+  useEffect(() => {
+    void refreshVipStatus();
+  }, [refreshVipStatus]);
+
   const handleRtcPurchase = async (bundleId: string) => {
     setPurchasingBundleId(bundleId);
     try {
@@ -180,6 +200,43 @@ const Account: React.FC = () => {
       toast.error(error?.response?.data?.message || 'Could not claim daily RTC.');
     } finally {
       setRtcRefillLoading(false);
+    }
+  };
+
+  const handleVipCheckout = async () => {
+    if (isVipActive) {
+      toast.info('VIP is already active on your account.');
+      return;
+    }
+    setVipCheckoutLoading(true);
+    try {
+      const checkoutUrl = await createVipCheckout();
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+        return;
+      }
+      toast.error('Failed to start VIP checkout.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Could not start VIP checkout.');
+    } finally {
+      setVipCheckoutLoading(false);
+    }
+  };
+
+  const handleVipCancel = async () => {
+    if (vipCanceling) {
+      return;
+    }
+    setVipCanceling(true);
+    try {
+      await cancelVipSubscription();
+      toast.success('VIP cancellation scheduled. Access remains until your billing period ends.');
+      setVipCancelOpen(false);
+      void refreshVipStatus();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Could not cancel VIP right now.');
+    } finally {
+      setVipCanceling(false);
     }
   };
 
@@ -220,6 +277,46 @@ const Account: React.FC = () => {
     }
     return 'Live';
   }, [rtcBalanceError, rtcBalanceLoading, usdBalanceError, usdBalanceLoading]);
+
+  const vipStatus = (user?.vipStatus || 'NONE').toUpperCase();
+  const vipStatusLabel = useMemo(() => {
+    switch (vipStatus) {
+      case 'ACTIVE':
+        return 'Active';
+      case 'PENDING':
+        return 'Pending Activation';
+      case 'PAUSED':
+        return 'Paused';
+      case 'CANCELED':
+        return 'Canceled';
+      case 'DEACTIVATED':
+        return 'Deactivated';
+      case 'COMPLETED':
+        return 'Completed';
+      default:
+        return 'Not Active';
+    }
+  }, [vipStatus]);
+  const isVipActive = !!user?.isVip;
+  const canCancelVip = vipStatus === 'ACTIVE' || vipStatus === 'PENDING' || vipStatus === 'PAUSED';
+  const isVipCanceled = vipStatus === 'CANCELED';
+  const vipRenewalLabel = useMemo(() => {
+    if (!user?.vipExpiresAt) {
+      return isVipActive ? 'Renewal date pending' : '--';
+    }
+    const formatted = formatVipDate(user.vipExpiresAt);
+    if (isVipCanceled) {
+      return `Access ends on ${formatted}`;
+    }
+    return `Renews on ${formatted}`;
+  }, [isVipActive, isVipCanceled, user?.vipExpiresAt]);
+  const vipSinceLabel = useMemo(() => formatVipDate(user?.vipSince ?? null), [user?.vipSince]);
+  const vipBadgeClass = useMemo(() => {
+    if (isVipActive || vipStatus === 'PENDING') {
+      return 'border-amber-300/40 bg-amber-300/10 text-amber-200';
+    }
+    return 'border-white/15 bg-white/5 text-white/70';
+  }, [isVipActive, vipStatus]);
 
   return (
     <div className="relative space-y-6">
@@ -494,6 +591,62 @@ const Account: React.FC = () => {
             </div>
           </div>
 
+          <div className="account-reveal rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '150ms' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-[0.2em] text-white/50">VIP Membership</div>
+                <h2 className="mt-2 text-2xl rt-page-title">Private Cribs + Priority Seat</h2>
+                <p className="mt-2 text-sm text-white/65">
+                  VIP membership keeps private tables on lock and fast lanes into live games.
+                </p>
+              </div>
+              <span className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.17em] ${vipBadgeClass}`}>
+                {vipStatusLabel}
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-2 text-sm text-white/70">
+              <div>Status: <span className="text-white/90">{vipStatusLabel}</span></div>
+              <div>Billing: {vipRenewalLabel}</div>
+              <div>Member since: {vipSinceLabel}</div>
+            </div>
+
+            <ul className="mt-4 space-y-2 text-sm text-white/70 list-disc pl-5">
+              <li>Launch private tables with custom stakes</li>
+              <li>Private invite links for your crew</li>
+              <li>Priority seat access when you host</li>
+            </ul>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              {isVipActive ? (
+                <>
+                  {canCancelVip && (
+                    <Button
+                      variant="danger"
+                      onClick={() => setVipCancelOpen(true)}
+                      disabled={vipCanceling}
+                    >
+                      {vipCanceling ? 'Canceling...' : 'Cancel VIP'}
+                    </Button>
+                  )}
+                  <Link to="/tables">
+                    <Button variant="secondary">Create Private Table</Button>
+                  </Link>
+                </>
+              ) : (
+                <Button onClick={handleVipCheckout} disabled={vipCheckoutLoading}>
+                  {vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP ($4.99/mo)'}
+                </Button>
+              )}
+            </div>
+
+            {isVipCanceled && user?.vipExpiresAt && (
+              <p className="mt-3 text-xs text-white/55">
+                Cancellation scheduled. VIP access remains until {formatVipDate(user.vipExpiresAt)}.
+              </p>
+            )}
+          </div>
+
           <div className="account-reveal rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '170ms' }}>
             <div className="text-xs uppercase tracking-[0.2em] text-white/50">Account Security</div>
             <h3 className="mt-2 text-xl rt-page-title">Credential-First Access</h3>
@@ -518,6 +671,22 @@ const Account: React.FC = () => {
           </div>
         </div>
       </section>
+
+      <Modal
+        isOpen={vipCancelOpen}
+        onClose={() => setVipCancelOpen(false)}
+        onConfirm={handleVipCancel}
+        title="Cancel VIP Membership?"
+      >
+        <div className="space-y-2">
+          <p>
+            This will stop future VIP renewals. You keep VIP access until your current billing period ends.
+          </p>
+          <p className="text-xs text-white/60">
+            Need help? Reach out to support before the renewal date.
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 };

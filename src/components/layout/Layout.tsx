@@ -27,6 +27,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   );
   const logoSrc = '/assets/logo.png';
   const isGameRoute = location.pathname.startsWith('/game/');
+  const vipStatus = user?.vipStatus?.toUpperCase();
+  const showVipBadge = !!user?.isVip || vipStatus === 'PENDING';
+  const vipBadgeLabel = vipStatus === 'PENDING' && !user?.isVip ? 'VIP Pending' : 'VIP';
 
   const navLinks = useMemo(
     () => {
@@ -107,6 +110,11 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <div className="text-right">
                   <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Active Profile</div>
                   <div className="text-sm text-white/85">{user?.username}</div>
+                  {showVipBadge && (
+                    <span className="mt-1 inline-flex items-center rounded-full border border-amber-300/40 bg-amber-300/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-amber-200">
+                      {vipBadgeLabel}
+                    </span>
+                  )}
                 </div>
                 <Button variant="secondary" size="sm" onClick={handleLogout}>
                   Logout
@@ -141,6 +149,11 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <div className="md:hidden border-t border-white/10 bg-[#0c0f14]/94 px-4 py-4">
             {isAuthenticated ? (
               <div className="space-y-2">
+                {showVipBadge && (
+                  <div className="rounded-xl border border-amber-300/35 bg-amber-300/10 px-3 py-2 text-center text-[11px] uppercase tracking-[0.18em] text-amber-200">
+                    {vipBadgeLabel}
+                  </div>
+                )}
                 {navLinks.map((link) => (
                   <Link
                     key={link.to}

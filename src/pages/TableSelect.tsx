@@ -47,6 +47,7 @@ const TableSelect: React.FC = () => {
   const [recentError, setRecentError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const isVip = !!user?.isVip;
 
   const fetchTables = async () => {
     try {
@@ -140,6 +141,11 @@ const TableSelect: React.FC = () => {
   };
 
   const handleVipCheckout = async () => {
+    if (isVip) {
+      toast.info('VIP is already active on your account.');
+      setVipModalOpen(false);
+      return;
+    }
     setVipCheckoutLoading(true);
     try {
       const checkoutUrl = await createVipCheckout();
@@ -305,7 +311,7 @@ const TableSelect: React.FC = () => {
             {quickSeatLoading ? 'Finding Seat...' : 'Quick Seat'}
           </Button>
           <Button variant="secondary" onClick={handlePrivateEntry}>
-            Create Private Table
+            {isVip ? 'Create Private Table' : 'Create Private Table (VIP)'}
           </Button>
           {localStorage.getItem('last_table_id') && (
             <Button variant="secondary" onClick={handleRejoinLast}>
@@ -511,7 +517,12 @@ const TableSelect: React.FC = () => {
       >
         <div className="space-y-3">
           <p>Private tables are reserved for VIP members.</p>
-          <p className="text-sm text-white/70">$4.99/month. Cancel anytime.</p>
+          <ul className="list-disc pl-5 text-sm text-white/70 space-y-1">
+            <li>Launch private cribs with custom stakes</li>
+            <li>Private invite links for your table</li>
+            <li>Priority seat access when you host</li>
+          </ul>
+          <p className="text-sm text-white/70">$4.99/mo. Cancel anytime.</p>
           {vipCheckoutLoading && <p className="text-xs text-white/70">Starting VIP checkout...</p>}
         </div>
       </Modal>

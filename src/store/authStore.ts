@@ -13,6 +13,7 @@ interface User {
   isVip?: boolean;
   vipStatus?: string;
   vipExpiresAt?: string | null;
+  vipSince?: string | null;
 }
 
 const normalizeStoredUser = (value: any): User | null => {
@@ -31,6 +32,7 @@ const normalizeStoredUser = (value: any): User | null => {
     isVip: !!value.isVip,
     vipStatus: value.vipStatus,
     vipExpiresAt: value.vipExpiresAt ?? null,
+    vipSince: value.vipSince ?? null,
   };
 };
 
@@ -75,6 +77,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         isVip: !!isVip,
         vipStatus,
         vipExpiresAt: vipExpiresAt ?? null,
+        vipSince: response.data?.vipSince ?? null,
       };
       
       localStorage.setItem('token', token);
@@ -107,6 +110,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         isVip: !!isVip,
         vipStatus,
         vipExpiresAt: vipExpiresAt ?? null,
+        vipSince: response.data?.vipSince ?? null,
       };
       
       localStorage.setItem('token', token);
@@ -194,6 +198,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           vipStatus,
           vipExpiresAt: vipExpiresAt ?? null,
           isVip: !!isVip,
+          vipSince: response.data?.vipSince ?? null,
         };
         localStorage.setItem('user', JSON.stringify(user));
         return { ...state, user };
