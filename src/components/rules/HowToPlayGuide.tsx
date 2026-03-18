@@ -17,7 +17,7 @@ const RULE_POPUPS: Record<RulePopupKey, RulePopupContent> = {
   },
   hitLock: {
     title: "Hit Lock Timing",
-    body: "First hit on a player locks drop for 2 of their turns. More hits in that same turn do not stack. Hits on later turns add +1 more locked turn each.",
+    body: "First hit on another player locks drop for 2 of their turns. More hits in that same turn do not stack. Hits on later turns add +1 more locked turn each.",
   },
   caughtDrop: {
     title: "Caught Drop Payout",
@@ -157,7 +157,7 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
         <summary className="cursor-pointer font-semibold text-white">Turn Structure and Hitting</summary>
         <div className="mt-3 space-y-3 text-sm text-white/75">
           <div>1. Draw from deck or discard pile.</div>
-          <div>2. Play spreads / add to spreads / hit another player&apos;s spread.</div>
+          <div>2. Play spreads / add to spreads / hit any spread, including your own.</div>
           <div>3. Discard one card to end your turn.</div>
           <div className="text-white/65">Drop is only allowed at the start of your turn before drawing.</div>
           <div>
