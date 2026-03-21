@@ -71,12 +71,13 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
     const stake = Math.max(100, Math.trunc(exampleStakeRtc));
     return {
       stake,
+      reem4Players: stake * 6,
       standard4Players: stake * 3,
       drop3Players: stake * 2,
       caughtDrop3Players: stake * 3,
       triple4Players: stake * 9,
       summary: [
-        { label: "Reem", payout: `Each opponent pays ${formatRtc(stake)}` },
+        { label: "Reem", payout: `Each opponent pays ${formatRtc(stake * 2)}` },
         { label: "Successful Drop", payout: `Each opponent pays ${formatRtc(stake)}` },
         { label: "Caught Dropping", payout: `Dropper pays ${formatRtc(stake * 2)}; others pay ${formatRtc(stake)}` },
         { label: "Deck Runs Out", payout: `Each opponent pays ${formatRtc(stake)}` },
@@ -192,7 +193,7 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
         <div className="mt-3 space-y-3 text-sm text-white/75">
           <div className="rounded-lg border border-white/10 bg-black/25 p-3">
             <div className="font-semibold text-white">Reem</div>
-            <div>4 players at {formatRtc(examples.stake)} stake: winner receives {formatRtc(examples.standard4Players)}.</div>
+            <div>4 players at {formatRtc(examples.stake)} stake: winner receives {formatRtc(examples.reem4Players)}.</div>
           </div>
           <div className="rounded-lg border border-white/10 bg-black/25 p-3">
             <div className="font-semibold text-white">Successful Drop</div>

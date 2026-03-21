@@ -168,7 +168,7 @@ export const getRoundPayoutSummary = (
   }
 
   if (state.roundEndedBy === "REEM") {
-    return `Each opponent paid ${singleStake}.`;
+    return `Each opponent paid ${doubleStake}.`;
   }
 
   if (state.roundEndedBy === "DECK_EMPTY") {
