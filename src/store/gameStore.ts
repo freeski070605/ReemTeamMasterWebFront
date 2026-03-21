@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { IGameState, Card, RoundResult } from '../types/game';
 import { toast } from 'react-toastify';
 import { SOCKET_URL } from '../api/socket';
+import { buildRoundDeltaMessage, getRoundAnnouncement } from '../utils/roundResults';
 
 let presenceInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -56,47 +57,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const socket = io(SOCKET_URL);
     let lastRoundEndTimestamp: number | null = null;
     let activeRoundEndToastId: string | number | null = null;
-    const formatRoundDeltaAmount = (amount: number, currency: 'USD' | 'RTC') => {
-      const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
-      const absoluteAmount = Math.abs(amount);
-
-      if (currency === 'USD') {
-        return `${sign}$${absoluteAmount.toFixed(2)}`;
-      }
-
-      return `${sign}${Math.trunc(absoluteAmount).toLocaleString('en-US')} RTC`;
-    };
-    const buildRoundDeltaMessage = (state: IGameState): string | null => {
-      if (!state.payouts) {
-        return null;
-      }
-
-      const currency: 'USD' | 'RTC' = state.mode === 'USD_CONTEST' ? 'USD' : 'RTC';
-      const parts = state.players
-        .filter((player) => !player.isAI)
-        .map((player) => {
-          const rawPayout = state.payouts?.[player.userId];
-          if (rawPayout === undefined) return null;
-
-          let net = rawPayout;
-          if (
-            (!state.mode || state.mode === 'FREE_RTC_TABLE') &&
-            player.userId === state.roundWinnerId
-          ) {
-            const ante = state.lockedAntes?.[player.userId] ?? state.baseStake;
-            net = rawPayout - ante;
-          }
-
-          return `${player.username} ${formatRoundDeltaAmount(net, currency)}`;
-        })
-        .filter((entry): entry is string => !!entry);
-
-      if (parts.length === 0) {
-        return null;
-      }
-
-      return `W/L: ${parts.join(' | ')}`;
-    };
 
     socket.on('connect', () => {
       console.log('Connected to game server');
@@ -122,25 +82,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
             return;
           }
           lastRoundEndTimestamp = roundEndTimestamp;
-          const winnerPlacement = (gameState.placements ?? []).find((placement) => placement.rank === 1);
-          const winner = winnerPlacement
-            ? gameState.players.find((player) => player.userId === winnerPlacement.userId)
-            : gameState.players.find((player) => player.userId === gameState.roundWinnerId);
-
-          if (gameState.roundEndedBy === 'REEM') {
-              toast.success(`${winner?.username} REEMED!`);
-          } else if (gameState.roundEndedBy === 'AUTO_TRIPLE') {
-              if (gameState.lastAction?.type === 'declare41') {
-                toast.success(`${winner?.username} declared 41.`);
-              } else {
-                toast.success(`${winner?.username} wins with 11 or less.`);
-              }
-          } else if (gameState.roundEndedBy === 'CAUGHT_DROP') {
-               toast.info(`${winner?.username} caught the drop.`);
-          } else if (gameState.roundEndedBy === 'REGULAR') {
-               toast.info(`${winner?.username} wins on lowest hand.`);
-          } else if (gameState.roundEndedBy === 'DECK_EMPTY') {
-              toast.info(`Deck empty. ${winner?.username} wins on lowest hand.`);
+          const announcement = getRoundAnnouncement(gameState);
+          if (announcement) {
+            if (gameState.roundEndedBy === 'REEM' || gameState.roundEndedBy === 'AUTO_TRIPLE') {
+              toast.success(announcement);
+            } else {
+              toast.info(announcement);
+            }
           }
           const deltaMessage = buildRoundDeltaMessage(gameState);
           if (deltaMessage) {

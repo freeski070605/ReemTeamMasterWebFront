@@ -14,6 +14,13 @@ import PlayerAvatar from "../components/game/PlayerAvatar";
 import TurnTimer from "../components/game/TurnTimer";
 import GameActions from "../components/game/GameActions";
 import { Button } from "../components/ui/Button";
+import {
+  formatRoundDeltaAmount,
+  getPlacementWinTypeLabel,
+  getRoundNetForPlayer,
+  getRoundPayoutSummary,
+  getRoundReasonLabel,
+} from "../utils/roundResults";
 import bgImage from '../assets/bg.png';
 import backCardImage from "../assets/cards/back.png";
 
@@ -884,17 +891,7 @@ const GameTable: React.FC = () => {
     return `${Math.max(0, Math.floor(amount)).toLocaleString("en-US")} RTC`;
   };
   const roundReasonLabel =
-    gameState.roundEndedBy === "REGULAR"
-      ? "Lowest Hand"
-      : gameState.roundEndedBy === "REEM"
-        ? "Reem"
-        : gameState.roundEndedBy === "AUTO_TRIPLE"
-          ? "41 / 11 and Under"
-          : gameState.roundEndedBy === "DECK_EMPTY"
-            ? "Deck Empty"
-            : gameState.roundEndedBy === "CAUGHT_DROP"
-              ? "Caught Drop"
-              : "Round End";
+    getRoundReasonLabel(gameState);
   const placementByUserId = new Map((gameState.placements ?? []).map((placement) => [placement.userId, placement]));
   const isContinuousMode = !gameState.mode || gameState.mode === "FREE_RTC_TABLE";
   const rankedRoundPlayers = [...gameState.players].sort((a, b) => {
@@ -912,43 +909,9 @@ const GameTable: React.FC = () => {
       : gameState.roundSettlementStatus === "failed"
         ? "Settlement Failed"
         : "Settlement Pending";
-  const getRoundNetForPlayer = (playerId: string): number | null => {
-    const payout = gameState.payouts?.[playerId];
-    if (payout === undefined) return null;
-
-    // In FREE_RTC_TABLE, payout for winners is gross (includes their ante); show net W/L.
-    if (!gameState.mode || gameState.mode === "FREE_RTC_TABLE") {
-      const ante = gameState.lockedAntes?.[playerId] ?? gameState.baseStake;
-      if (playerId === gameState.roundWinnerId) {
-        return payout - ante;
-      }
-    }
-
-    return payout;
-  };
-  const formatRoundDelta = (amount: number | null) => {
-    if (amount === null) return "--";
-    if (walletCurrency === "usd") {
-      const absoluteFormatted = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(Math.abs(amount));
-      const sign = amount > 0 ? "+" : amount < 0 ? "-" : "";
-      return `${sign}${absoluteFormatted}`;
-    }
-    const sign = amount > 0 ? "+" : amount < 0 ? "-" : "";
-    return `${sign}${Math.abs(Math.trunc(amount)).toLocaleString("en-US")} RTC`;
-  };
-  const formatPlacementWinType = (winType?: string) => {
-    if (!winType || winType === "LOSS") return "Loss";
-    if (winType === "AUTO_TRIPLE") return "Auto Triple";
-    if (winType === "CAUGHT_DROP") return "Caught Drop";
-    if (winType === "DECK_EMPTY") return "Deck Empty";
-    if (winType === "REEM") return "Reem";
-    return "Regular";
-  };
+  const displayCurrency = walletCurrency === "usd" ? "USD" : "RTC";
+  const roundPayoutSummary = getRoundPayoutSummary(gameState, displayCurrency);
+  const winnerRoundNet = winnerPlayer ? getRoundNetForPlayer(gameState, winnerPlayer.userId) : null;
 
   const activeTurnPlayer = gameState.players[gameState.currentPlayerIndex] ?? null;
   const activeTurnPlayerName = activeTurnPlayer?.username ?? "Player";
@@ -1804,8 +1767,14 @@ const GameTable: React.FC = () => {
                 </Button>
               </div>
             )}
-            <div className="mt-2 text-sm text-green-400 font-bold">
-              Winner: {winnerPlayer?.username || "Unknown"}
+            <div className="mt-2 rounded-lg border border-green-400/20 bg-green-500/10 p-2">
+              <div className="text-sm font-bold text-green-300">
+                Winner: {winnerPlayer?.username || "Unknown"}
+                {winnerRoundNet !== null ? ` (${formatRoundDeltaAmount(winnerRoundNet, displayCurrency)})` : ""}
+              </div>
+              {roundPayoutSummary ? (
+                <div className="mt-1 text-[11px] text-white/70">{roundPayoutSummary}</div>
+              ) : null}
             </div>
             {gameState.handScores && (
               <div className="mt-2 max-h-[42vh] overflow-auto rounded-lg border border-white/10 bg-black/35">
@@ -1820,7 +1789,7 @@ const GameTable: React.FC = () => {
                   {rankedRoundPlayers.map((player) => {
                     const placement = placementByUserId.get(player.userId);
                     const isWinner = placement?.rank === 1 || player.userId === gameState.roundWinnerId;
-                    const roundNet = getRoundNetForPlayer(player.userId);
+                    const roundNet = getRoundNetForPlayer(gameState, player.userId);
                     return (
                     <div
                       key={player.userId}
@@ -1829,7 +1798,7 @@ const GameTable: React.FC = () => {
                       <div className="truncate text-white">{player.username}</div>
                       <div className="font-mono text-white/80">{placement?.rank ?? "-"}</div>
                       <div className={`${isWinner ? "text-green-300" : "text-white/70"}`}>
-                        {formatPlacementWinType(placement?.winType)}
+                        {getPlacementWinTypeLabel(gameState, placement?.winType)}
                       </div>
                       <div className="font-mono text-white/80">{gameState.handScores?.[player.userId] ?? "-"}</div>
                       <div
@@ -1843,7 +1812,7 @@ const GameTable: React.FC = () => {
                                 : "text-white/80"
                         }`}
                       >
-                        {formatRoundDelta(roundNet)}
+                        {roundNet === null ? "--" : formatRoundDeltaAmount(roundNet, displayCurrency)}
                       </div>
                     </div>
                   );
