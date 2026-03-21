@@ -141,6 +141,8 @@ const GameTable: React.FC = () => {
   } = useWalletBalance({ refreshIntervalMs: 15000, currency: walletCurrency });
   const contestId = searchParams.get("contestId") ?? undefined;
   const inviteCode = searchParams.get("inviteCode") ?? undefined;
+  const spectatorModeRequested = searchParams.get("spectator") === "1";
+  const promoModeRequested = searchParams.get("promo") === "1";
   const previousStatusRef = useRef<string | null>(null);
 
   const clearGuidanceTimers = useCallback(() => {
@@ -203,12 +205,12 @@ const GameTable: React.FC = () => {
 
   useEffect(() => {
     if (tableId && user) {
-      connect(tableId, user._id, user.username, user.avatarUrl, contestId, inviteCode);
+      connect(tableId, user._id, user.username, user.avatarUrl, contestId, inviteCode, spectatorModeRequested);
       trackEvent('table_joined', { tableId, contestId, inviteCode });
     }
 
     const handlePlayerLeft = ({ userId: leftPlayerId }: { userId: string }) => {
-      if (leftPlayerId === user?._id) {
+      if (!spectatorModeRequested && leftPlayerId === user?._id) {
         toast.info("You have left the table.");
         navigate("/tables");
       }
@@ -223,15 +225,15 @@ const GameTable: React.FC = () => {
         trackEvent('table_left', { tableId });
       }
     };
-  }, [tableId, user, connect, disconnect, navigate, contestId, inviteCode]);
+  }, [tableId, user, connect, disconnect, navigate, contestId, inviteCode, spectatorModeRequested]);
 
   useEffect(() => {
-    if (!tableId) return;
+    if (!tableId || spectatorModeRequested) return;
     localStorage.setItem('last_table_id', tableId);
     if (inviteCode) {
       localStorage.setItem('last_table_invite_code', inviteCode);
     }
-  }, [tableId, inviteCode]);
+  }, [tableId, inviteCode, spectatorModeRequested]);
 
   useEffect(() => {
     if (!gameState) return;
@@ -512,9 +514,11 @@ const GameTable: React.FC = () => {
   }, [showDealAnimation]);
 
   const currentPlayer = gameState?.players.find((p) => p.userId === user?._id);
+  const isSpectator = spectatorModeRequested && !currentPlayer;
   const isMyTurn = !!(
     gameState &&
     user &&
+    !isSpectator &&
     gameState.players[gameState.currentPlayerIndex]?.userId === user._id
   );
   const turnDurationMs = gameState?.turnDurationMs ?? 20_000;
@@ -791,6 +795,10 @@ const GameTable: React.FC = () => {
   };
 
   const handleLeaveTable = () => {
+    if (isSpectator) {
+      navigate("/tables");
+      return;
+    }
     if (tableId && user) {
       if (
         window.confirm(
@@ -804,6 +812,10 @@ const GameTable: React.FC = () => {
   };
 
   const handleRequestLeaveTable = () => {
+    if (isSpectator) {
+      navigate("/tables");
+      return;
+    }
     if (tableId && user) {
       if (gameState.status === "round-end") {
         leaveTable(tableId, user._id, user.username);
@@ -825,7 +837,9 @@ const GameTable: React.FC = () => {
     }
   };
 
-  const localIndex = gameState.players.findIndex((p) => p.userId === user._id);
+  const localIndex = isSpectator
+    ? 0
+    : Math.max(0, gameState.players.findIndex((p) => p.userId === user._id));
   const totalPlayers = gameState.players.length;
   const seatAt = (offset: number) => {
     if (offset >= totalPlayers) return null;
@@ -836,6 +850,7 @@ const GameTable: React.FC = () => {
   const topPlayer = seatAt(1);
   const rightPlayer = seatAt(2);
   const leftPlayer = seatAt(3);
+  const viewerSeatPlayer = seatAt(0);
   const totalPlayersInRound = Math.max(1, gameState.players.length);
   const cardsPerPlayerAtDeal = Math.max(
     0,
@@ -975,7 +990,11 @@ const GameTable: React.FC = () => {
       : "left-1/2 bottom-[33%] -translate-x-1/2 w-[34%] max-w-[260px]"
     : "left-1/2 bottom-[30%] -translate-x-1/2 w-[30%] max-w-[260px]";
 
-  const contextBannerText = isMyTurn
+  const contextBannerText = isSpectator
+    ? promoModeRequested
+      ? `Watching promo action: ${activeTurnPlayerName}.`
+      : `Spectating ${activeTurnPlayerName}.`
+    : isMyTurn
     ? isDiscardStep
       ? selectedCards.length === 1
         ? selectedIllegalDiscardCard
@@ -1153,12 +1172,27 @@ const GameTable: React.FC = () => {
     );
   };
 
-  const hand = sortHandCards(currentPlayer?.hand ?? []);
+  const displayedBottomPlayer = isSpectator ? viewerSeatPlayer : currentPlayer;
+  const hand = sortHandCards(displayedBottomPlayer?.hand ?? []);
   const visibleHand =
-    currentPlayer ? hand.slice(0, getVisibleCardCount(currentPlayer.userId, hand.length)) : [];
-  const myTurnStatus = getTurnStatus(user._id, true);
-  const canUseFlickDiscard = isTouchDevice && isDiscardReady;
-  const showSideActionStack = isMyTurn && !hideCardsForPresentation;
+    displayedBottomPlayer ? hand.slice(0, getVisibleCardCount(displayedBottomPlayer.userId, hand.length)) : [];
+  const myTurnStatus = getTurnStatus(displayedBottomPlayer?.userId ?? user._id, true);
+  const canUseFlickDiscard = !isSpectator && isTouchDevice && isDiscardReady;
+  const showSideActionStack = !isSpectator && isMyTurn && !hideCardsForPresentation;
+  const isBottomSeatActive = isSpectator
+    ? gameState.players[gameState.currentPlayerIndex]?.userId === displayedBottomPlayer?.userId
+    : isMyTurn;
+  const bottomSeatName = isSpectator
+    ? displayedBottomPlayer?.username ?? "Promo AI"
+    : user.username;
+  const bottomSeatAvatarUrl = isSpectator
+    ? displayedBottomPlayer?.avatarUrl
+    : user.avatarUrl;
+  const bottomSeatBalance = isSpectator
+    ? "PROMO AI"
+    : balanceLoading
+      ? "..."
+      : formatSeatBalance(balance);
   const phoneHandCardClass =
     visibleHand.length >= 6
       ? "w-[2.2rem] h-[3.2rem]"
@@ -1529,30 +1563,30 @@ const GameTable: React.FC = () => {
                 <div className={`flex w-full h-full ${isPhoneLandscapeLayout ? "items-end gap-1.5" : "items-end gap-2"}`}>
                   <div
                     className={`${
-                      isMyTurn ? "active-seat" : "inactive-seat"
+                      isBottomSeatActive ? "active-seat" : "inactive-seat"
                     } relative rounded-lg border transition-all duration-300 ${
                       isPhoneLandscapeLayout
                         ? "min-w-[128px] px-1.5 py-1 mb-1"
                         : `min-w-[140px] px-2 py-2 ${isCompactLandscape ? "mb-4" : "mb-6"}`
                     } ${
-                      isMyTurn
+                      isBottomSeatActive
                         ? "border-yellow-400/80 bg-yellow-400/10 brightness-100 opacity-100"
                         : "border-white/10 bg-black/30 brightness-90 opacity-60"
                     }`}
                   >
-                    {isMyTurn ? (
+                    {isBottomSeatActive ? (
                       <div className="absolute -inset-1 rounded-2xl bg-amber-300/15 blur-xl" aria-hidden />
                     ) : null}
                     <div className={`flex items-center ${isPhoneLandscapeLayout ? "gap-1.5" : "gap-2"}`}>
                       <div className="relative">
-                        <PlayerAvatar player={{ name: user.username, avatarUrl: user.avatarUrl }} size="sm" />
+                        <PlayerAvatar player={{ name: bottomSeatName, avatarUrl: bottomSeatAvatarUrl }} size="sm" />
                         <TurnTimer
                           duration={turnDurationMs}
-                          timeRemaining={isMyTurn ? turnTimeRemainingMs : turnDurationMs}
-                          isActive={isMyTurn}
+                          timeRemaining={isBottomSeatActive ? turnTimeRemainingMs : turnDurationMs}
+                          isActive={isBottomSeatActive}
                           size={isPhoneLandscapeLayout ? 42 : 54}
                           strokeWidth={isPhoneLandscapeLayout ? 2.6 : 3.5}
-                          className={isMyTurn ? "animate-pulse" : ""}
+                          className={isBottomSeatActive ? "animate-pulse" : ""}
                         />
                       </div>
                       <div>
@@ -1596,13 +1630,13 @@ const GameTable: React.FC = () => {
                           </div>
                         ) : null}
                         <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} text-white font-semibold leading-tight`}>
-                          {user.username}
+                          {bottomSeatName}
                         </div>
                         <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} text-white/60 leading-tight`}>
                           Cards: {visibleHand.length}
                         </div>
                         <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} text-yellow-300/95 leading-tight`}>
-                          {balanceLoading ? "..." : formatSeatBalance(balance)}
+                          {bottomSeatBalance}
                         </div>
                       </div>
                     </div>
@@ -1711,7 +1745,7 @@ const GameTable: React.FC = () => {
                                     suit={card.suit}
                                     rank={card.rank}
                                     isSelected={isSelectedCard}
-                                    onClick={() => toggleCardSelection(card)}
+                                    onClick={isSpectator ? undefined : () => toggleCardSelection(card)}
                                     className={isPhoneLandscapeLayout ? phoneHandCardClass : "w-11 h-16 sm:w-12 sm:h-[4.5rem]"}
                                     badgeText={
                                       isIllegalDiscardSelection

@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Coins, Users } from 'lucide-react';
+import { Coins, Shield, Users } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
 import client from '../api/client';
@@ -18,6 +18,8 @@ import { getRecentPlayers, RecentPlayer } from '../api/users';
 import PlayerAvatar from '../components/game/PlayerAvatar';
 import { Input } from '../components/ui/Input';
 import { createVipCheckout } from '../api/vip';
+import { adminApi, AdminTable } from '../api/admin';
+import { roleAtLeast } from '../types/roles';
 import {
   getModeBadge,
   getModeDescription,
@@ -45,9 +47,14 @@ const TableSelect: React.FC = () => {
   const [recentPlayers, setRecentPlayers] = useState<RecentPlayer[]>([]);
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<'cribs' | 'promo'>('cribs');
+  const [promoTable, setPromoTable] = useState<AdminTable | null>(null);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoLaunching, setPromoLaunching] = useState(false);
   const navigate = useNavigate();
   const { user, refreshVipStatus } = useAuthStore();
   const isVip = !!user?.isVip;
+  const isAdmin = !!user?.role && roleAtLeast(user.role, 'admin');
 
   const fetchTables = async () => {
     try {
@@ -183,11 +190,50 @@ const TableSelect: React.FC = () => {
     navigate(`/game/${lastTableId}${query}`);
   };
 
+  const loadPromoTable = useCallback(async () => {
+    if (!isAdmin) {
+      setPromoTable(null);
+      return;
+    }
+
+    setPromoLoading(true);
+    try {
+      const table = await adminApi.getPromoTable();
+      setPromoTable(table);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Could not load the promo table.');
+    } finally {
+      setPromoLoading(false);
+    }
+  }, [isAdmin]);
+
+  const handleOpenPromoTable = async (reset: boolean = false) => {
+    setPromoLaunching(true);
+    try {
+      const table = await adminApi.ensurePromoTable(reset);
+      setPromoTable(table);
+      navigate(`/game/${table.tableId}?spectator=1&promo=1`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Could not open the promo table.');
+    } finally {
+      setPromoLaunching(false);
+    }
+  };
+
   useEffect(() => {
     trackEvent('lobby_view', { source: 'tables' });
     void fetchTables();
     void fetchSummary();
   }, []);
+
+  useEffect(() => {
+    if (isAdmin) {
+      void loadPromoTable();
+      return;
+    }
+    setActiveView('cribs');
+    setPromoTable(null);
+  }, [isAdmin, loadPromoTable]);
 
   useEffect(() => {
     if (!user?._id) {
@@ -302,6 +348,137 @@ const TableSelect: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {isAdmin && (
+        <section className="rt-glass rounded-2xl p-2">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              className={`rounded-xl px-4 py-3 text-left transition ${
+                activeView === 'cribs'
+                  ? 'bg-white/12 text-white'
+                  : 'bg-transparent text-white/65 hover:bg-white/5 hover:text-white'
+              }`}
+              onClick={() => setActiveView('cribs')}
+            >
+              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Standard</div>
+              <div className="mt-1 text-lg rt-page-title">Cribs</div>
+            </button>
+            <button
+              type="button"
+              className={`rounded-xl px-4 py-3 text-left transition ${
+                activeView === 'promo'
+                  ? 'bg-amber-300/12 text-white ring-1 ring-amber-300/30'
+                  : 'bg-transparent text-white/65 hover:bg-white/5 hover:text-white'
+              }`}
+              onClick={() => setActiveView('promo')}
+            >
+              <div className="text-xs uppercase tracking-[0.18em] text-amber-200/70">Admin Only</div>
+              <div className="mt-1 flex items-center gap-2 text-lg rt-page-title">
+                <Shield className="h-4 w-4 text-amber-300" />
+                Promo Table
+              </div>
+            </button>
+          </div>
+        </section>
+      )}
+
+      {activeView === 'promo' ? (
+        <section className="space-y-5">
+          <header className="rt-panel-strong rounded-3xl p-7">
+            <div className="text-xs uppercase tracking-[0.2em] text-amber-200/70">Admin Promo Capture</div>
+            <h1 className="mt-2 text-4xl rt-page-title font-semibold">AI Content Table</h1>
+            <p className="mt-2 max-w-3xl text-white/65">
+              This hidden table is reserved for capture sessions. It runs 4 AI players and opens in spectator mode so
+              you can record gameplay footage for RGE without occupying a seat.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button onClick={() => void handleOpenPromoTable(false)} disabled={promoLaunching}>
+                {promoLaunching ? 'Opening Promo Table...' : promoTable ? 'Open Promo Table' : 'Create Promo Table'}
+              </Button>
+              <Button variant="secondary" onClick={() => void handleOpenPromoTable(true)} disabled={promoLaunching}>
+                Start Fresh AI Match
+              </Button>
+              <Button variant="secondary" onClick={() => void loadPromoTable()} disabled={promoLoading}>
+                {promoLoading ? 'Refreshing...' : 'Refresh Status'}
+              </Button>
+            </div>
+          </header>
+
+          <section className="grid gap-4 md:grid-cols-3">
+            <div className="rt-glass rounded-2xl p-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-white/50">Promo Status</div>
+              <div className="mt-2 text-3xl rt-page-title">
+                {promoLoading ? '--' : promoTable?.status === 'in-game' ? 'Live' : promoTable ? 'Ready' : 'Missing'}
+              </div>
+            </div>
+            <div className="rt-glass rounded-2xl p-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-white/50">AI Seats</div>
+              <div className="mt-2 text-3xl rt-page-title">{promoTable?.currentPlayerCount ?? 0}/4</div>
+            </div>
+            <div className="rt-glass rounded-2xl p-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-white/50">Stake</div>
+              <div className="mt-2 text-3xl rt-page-title">{promoTable ? `${promoTable.stake} RTC` : '--'}</div>
+            </div>
+          </section>
+
+          <section className="rt-panel-strong rounded-2xl p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-[0.2em] text-white/50">Current Room</div>
+                <h2 className="mt-2 text-2xl rt-page-title">
+                  {promoTable?.name || 'Promo Content Table'}
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm text-white/65">
+                  Open the room to boot or rejoin the AI match. The spectator viewer stays out of gameplay while the bots keep cycling rounds.
+                </p>
+              </div>
+              {promoTable && (
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/70">
+                  Table ID: {promoTable.tableId}
+                </div>
+              )}
+            </div>
+
+            {promoTable ? (
+              <>
+                <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div className="text-xs uppercase tracking-[0.18em] text-white/50">AI Lineup</div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {promoTable.playersSeated.map((player) => (
+                        <div key={player.userId} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                          <div className="text-sm font-semibold text-white">{player.username}</div>
+                          <div className="mt-1 text-xs text-white/55">{player.isAI ? 'AI seat' : 'Human seat'}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div className="text-xs uppercase tracking-[0.18em] text-white/50">Live State</div>
+                    <div className="mt-4 space-y-2 text-sm text-white/70">
+                      <div>Mode: {promoTable.mode}</div>
+                      <div>Turn: {promoTable.turnState?.turn ?? '--'}</div>
+                      <div>Current actor: {promoTable.turnState?.currentPlayerUsername || '--'}</div>
+                      <div>
+                        Time remaining:{' '}
+                        {typeof promoTable.turnState?.turnTimeRemainingMs === 'number'
+                          ? `${Math.ceil(promoTable.turnState.turnTimeRemainingMs / 1000)}s`
+                          : '--'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="mt-5 rounded-2xl border border-dashed border-white/12 bg-black/15 p-6 text-sm text-white/60">
+                No promo table has been provisioned yet. Use Create Promo Table to generate the hidden AI capture room.
+              </div>
+            )}
+          </section>
+        </section>
+      ) : (
+        <>
       <header className="rt-panel-strong rounded-3xl p-7">
         <div className="text-xs uppercase tracking-[0.2em] text-white/50">Crib Lobby (Recommended Start)</div>
         <h1 className="mt-2 text-4xl rt-page-title font-semibold">Play Reem Team Cash Cribs</h1>
@@ -530,6 +707,8 @@ const TableSelect: React.FC = () => {
           {vipCheckoutLoading && <p className="text-xs text-white/70">Starting VIP checkout...</p>}
         </div>
       </Modal>
+        </>
+      )}
     </div>
   );
 };

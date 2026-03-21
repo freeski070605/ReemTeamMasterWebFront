@@ -47,6 +47,7 @@ export interface AdminTable {
   mode: string;
   stake: number;
   status: 'waiting' | 'in-game';
+  isPromo?: boolean;
   minPlayers: number;
   maxPlayers: number;
   currentPlayerCount: number;
@@ -179,6 +180,14 @@ export const adminApi = {
   getLiveTables: async () => {
     const { data } = await client.get<{ tables: AdminTable[] }>('/admin/tables/live');
     return data.tables || [];
+  },
+  getPromoTable: async () => {
+    const { data } = await client.get<{ table: AdminTable | null }>('/admin/tables/promo');
+    return data.table;
+  },
+  ensurePromoTable: async (reset: boolean = false) => {
+    const { data } = await client.post<{ table: AdminTable }>('/admin/tables/promo/ensure', { reset });
+    return data.table;
   },
   resetTable: async (tableId: string) => {
     const { data } = await client.post(`/admin/tables/${tableId}/reset`, { keepContestBinding: false });

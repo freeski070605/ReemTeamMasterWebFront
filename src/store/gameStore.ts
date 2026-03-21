@@ -20,7 +20,8 @@ interface GameStore {
     username: string,
     avatarUrl?: string,
     contestId?: string,
-    inviteCode?: string
+    inviteCode?: string,
+    spectator?: boolean
   ) => void;
   disconnect: () => void;
   
@@ -43,7 +44,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isConnected: false,
   error: null,
 
-  connect: (tableId, userId, username, avatarUrl, contestId, inviteCode) => {
+  connect: (tableId, userId, username, avatarUrl, contestId, inviteCode, spectator) => {
     const existingSocket = get().socket;
     if (existingSocket) {
         existingSocket.disconnect();
@@ -62,7 +63,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       console.log('Connected to game server');
       set({ isConnected: true, error: null });
       console.log(`Emitting joinTable for ${username} (${userId}) in table ${tableId}`);
-      socket.emit('joinTable', { tableId, userId, username, avatarUrl, contestId, inviteCode });
+      socket.emit('joinTable', { tableId, userId, username, avatarUrl, contestId, inviteCode, spectator });
       socket.emit('presenceHeartbeat', { userId });
     });
 

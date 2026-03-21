@@ -83,6 +83,7 @@ export interface Table {
   mode?: GameMode;
   activeContestId?: string;
   isPrivate?: boolean;
+  isPromo?: boolean;
   createdBy?: string;
   minPlayers: number;
   maxPlayers: number;
