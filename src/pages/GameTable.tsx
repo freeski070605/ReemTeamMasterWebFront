@@ -13,18 +13,25 @@ import { PlayingCard as CardComponent } from "../components/ui/Card";
 import PlayerAvatar from "../components/game/PlayerAvatar";
 import TurnTimer from "../components/game/TurnTimer";
 import GameActions from "../components/game/GameActions";
+import RoundEndOverlay from "../components/game/RoundEndOverlay";
 import { Button } from "../components/ui/Button";
 import {
   formatRoundDeltaAmount,
   getPlacementWinTypeLabel,
   getRoundNetForPlayer,
+  getRoundOutcomePresentation,
   getRoundPayoutSummary,
-  getRoundReasonLabel,
 } from "../utils/roundResults";
 import bgImage from '../assets/bg.png';
 import backCardImage from "../assets/cards/back.png";
 
 type TurnStatusBadge = "DRAWING" | "MUST DISCARD" | "HIT MODE" | "WAITING";
+type SessionRoundStats = {
+  profit: number;
+  winStreak: number;
+  reems: number;
+  handsPlayed: number;
+};
 
 const CARD_RANK_ORDER: Array<CardType["rank"]> = [
   "Ace",
@@ -123,12 +130,19 @@ const GameTable: React.FC = () => {
   const [guidanceOverrideText, setGuidanceOverrideText] = useState<string | null>(null);
   const [guidanceOverrideHelper, setGuidanceOverrideHelper] = useState<string | null>(null);
   const [activityTick, setActivityTick] = useState(0);
+  const [sessionStats, setSessionStats] = useState<SessionRoundStats>({
+    profit: 0,
+    winStreak: 0,
+    reems: 0,
+    handsPlayed: 0,
+  });
   const lastAnimatedRoundKeyRef = useRef<string | null>(null);
   const hasInitializedLastActionRef = useRef(false);
   const lastObservedActionTimestampRef = useRef<number | null>(null);
   const guidanceBannerTimeoutRef = useRef<number | null>(null);
   const guidanceHelperTimeoutRef = useRef<number | null>(null);
   const idleGuidanceTimeoutRef = useRef<number | null>(null);
+  const sessionStatsRoundKeyRef = useRef<string | null>(null);
   const myTurnStartCountRef = useRef(0);
   const wasMyTurnRef = useRef(false);
   const previousTurnStepRef = useRef<"waiting" | "draw" | "discard">("waiting");
@@ -380,6 +394,51 @@ const GameTable: React.FC = () => {
       window.clearInterval(interval);
     };
   }, [gameState?.status, gameState?.lastAction?.timestamp, gameState?.roundReadyDeadline]);
+
+  useEffect(() => {
+    setSessionStats({
+      profit: 0,
+      winStreak: 0,
+      reems: 0,
+      handsPlayed: 0,
+    });
+    sessionStatsRoundKeyRef.current = null;
+  }, [tableId, user?._id]);
+
+  useEffect(() => {
+    if (!gameState || gameState.status !== "round-end" || !user?._id) {
+      return;
+    }
+
+    const participatingPlayer = gameState.players.some((player) => player.userId === user._id);
+    if (!participatingPlayer) {
+      return;
+    }
+
+    const roundKey = [
+      gameState.tableId,
+      gameState.lastAction?.timestamp ?? "no-action",
+      gameState.roundEndedBy ?? "unknown",
+      gameState.roundWinnerId ?? "no-winner",
+    ].join(":");
+
+    if (sessionStatsRoundKeyRef.current === roundKey) {
+      return;
+    }
+
+    sessionStatsRoundKeyRef.current = roundKey;
+
+    const myPlacement = (gameState.placements ?? []).find((placement) => placement.userId === user._id);
+    const didWin = myPlacement?.rank === 1 || gameState.roundWinnerId === user._id;
+    const myRoundNet = getRoundNetForPlayer(gameState, user._id) ?? 0;
+
+    setSessionStats((current) => ({
+      profit: current.profit + myRoundNet,
+      winStreak: didWin ? current.winStreak + 1 : 0,
+      reems: current.reems + (didWin && gameState.roundEndedBy === "REEM" ? 1 : 0),
+      handsPlayed: current.handsPlayed + 1,
+    }));
+  }, [gameState, user?._id]);
 
   const roundAnimationPlan = (() => {
     if (!gameState) return null;
@@ -905,8 +964,6 @@ const GameTable: React.FC = () => {
     if (amount === null || amount === undefined) return "-- RTC";
     return `${Math.max(0, Math.floor(amount)).toLocaleString("en-US")} RTC`;
   };
-  const roundReasonLabel =
-    getRoundReasonLabel(gameState);
   const placementByUserId = new Map((gameState.placements ?? []).map((placement) => [placement.userId, placement]));
   const isContinuousMode = !gameState.mode || gameState.mode === "FREE_RTC_TABLE";
   const rankedRoundPlayers = [...gameState.players].sort((a, b) => {
@@ -918,15 +975,88 @@ const GameTable: React.FC = () => {
   const winnerPlayer = winnerPlacement
     ? gameState.players.find((player) => player.userId === winnerPlacement.userId)
     : gameState.players.find((player) => player.userId === gameState.roundWinnerId);
-  const settlementLabel =
-    gameState.roundSettlementStatus === "settled"
-      ? "Settled - player W/L shown below"
-      : gameState.roundSettlementStatus === "failed"
-        ? "Settlement Failed"
-        : "Settlement Pending";
   const displayCurrency = walletCurrency === "usd" ? "USD" : "RTC";
   const roundPayoutSummary = getRoundPayoutSummary(gameState, displayCurrency);
   const winnerRoundNet = winnerPlayer ? getRoundNetForPlayer(gameState, winnerPlayer.userId) : null;
+  const roundOutcome = getRoundOutcomePresentation(gameState, {
+    currency: displayCurrency,
+    winnerName: winnerPlayer?.username,
+    winnerAmount: winnerRoundNet,
+  });
+  const settlementTitle =
+    gameState.roundSettlementStatus === "failed"
+      ? "Settlement Issue"
+      : gameState.roundSettlementStatus === "pending"
+        ? "Settlement Pending"
+        : "Settlement Complete";
+  const settlementSummary =
+    gameState.roundSettlementStatus === "failed"
+      ? gameState.roundSettlementError ?? "Payout sync did not finalize correctly."
+      : gameState.roundSettlementStatus === "pending"
+        ? "Finalizing payouts for every seat."
+        : roundPayoutSummary;
+  const settlementLines =
+    gameState.roundSettlementStatus === "settled"
+      ? rankedRoundPlayers
+          .filter((player) => player.userId !== winnerPlayer?.userId)
+          .map((player) => {
+            const roundNet = getRoundNetForPlayer(gameState, player.userId);
+            if (roundNet === null || roundNet >= 0) return null;
+            const paidAmount = formatRoundDeltaAmount(Math.abs(roundNet), displayCurrency).replace(/^[+-]/, "");
+            return { playerName: player.username, paidAmount };
+          })
+          .filter((entry): entry is { playerName: string; paidAmount: string } => !!entry)
+      : [];
+  const shouldShowDetailedSettlementLines =
+    settlementLines.length > 0 &&
+    new Set(settlementLines.map((entry) => entry.paidAmount)).size > 1;
+  const overlaySettlementLines = shouldShowDetailedSettlementLines
+    ? settlementLines.map((entry) => `${entry.playerName} paid ${entry.paidAmount}`)
+    : [];
+  const overlayPlayerRows = rankedRoundPlayers.map((player) => {
+    const placement = placementByUserId.get(player.userId);
+    const isWinner = placement?.rank === 1 || player.userId === gameState.roundWinnerId;
+    const roundNet = getRoundNetForPlayer(gameState, player.userId);
+    const handScore = gameState.handScores?.[player.userId];
+
+    return {
+      userId: player.userId,
+      username: player.username,
+      rank: placement?.rank ?? null,
+      resultLabel: getPlacementWinTypeLabel(gameState, placement?.winType),
+      scoreLabel: isWinner
+        ? `Score ${handScore ?? 0}`
+        : handScore !== undefined
+          ? `${handScore} in hand`
+          : "Score unavailable",
+      deltaLabel: roundNet === null ? "--" : formatRoundDeltaAmount(roundNet, displayCurrency),
+      deltaValue: roundNet,
+      isWinner,
+    };
+  });
+  const roundStatusLabel = isContinuousMode
+    ? readyCount === totalRoundPlayers
+      ? "All players ready"
+      : totalRoundPlayers - readyCount === 1
+        ? "Waiting on 1 player"
+        : `Ready for next hand: ${readyCount}/${totalRoundPlayers}`
+    : "Match complete";
+  const roundStatusDetail =
+    isContinuousMode && isReadyForNextRound ? "Your seat is locked for the next hand." : null;
+  const countdownLabel = isContinuousMode ? `Next hand in ${roundCountdownSeconds ?? 30}s` : null;
+  const winnerHighlightCards = winnerPlayer?.spreads.length
+    ? sortSpreadCards(
+        [...winnerPlayer.spreads].sort((a, b) => b.length - a.length)[0] ?? []
+      )
+    : [];
+  const sessionStatsDisplay = sessionStats.handsPlayed > 0 && !isSpectator
+    ? {
+        profitLabel: formatRoundDeltaAmount(sessionStats.profit, displayCurrency),
+        winStreak: sessionStats.winStreak,
+        reems: sessionStats.reems,
+        handsPlayed: sessionStats.handsPlayed,
+      }
+    : null;
 
   const activeTurnPlayer = gameState.players[gameState.currentPlayerIndex] ?? null;
   const activeTurnPlayerName = activeTurnPlayer?.username ?? "Player";
@@ -1770,93 +1900,23 @@ const GameTable: React.FC = () => {
           </div>
         </div>
 
-        {gameState.status === 'round-end' && (
-          <div className="absolute right-3 top-3 z-40 w-[min(46vw,420px)] rounded-xl border border-yellow-500/40 bg-black/70 backdrop-blur-md p-3 pointer-events-auto">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <div className="text-[11px] uppercase tracking-widest text-white/60">Round Over</div>
-                <div className="text-sm font-semibold text-white">{roundReasonLabel}</div>
-              </div>
-              <Button onClick={isContinuousMode ? handleRequestLeaveTable : handleLeaveTable} variant="danger" size="sm">
-                Leave
-              </Button>
-            </div>
-            {isContinuousMode && (
-              <div className="mt-1 text-[11px] text-yellow-300">
-                Next round starts in {roundCountdownSeconds ?? 30}s
-              </div>
-            )}
-            {isContinuousMode && (
-              <div className="mt-1 text-[11px] text-white/70">
-                Ready: {readyCount}/{totalRoundPlayers}
-              </div>
-            )}
-            <div className="mt-1 text-[11px] text-white/70">
-              {settlementLabel}
-            </div>
-            {isContinuousMode && (
-              <div className="mt-2">
-                <Button onClick={handlePutIn} variant="primary" size="sm" disabled={isReadyForNextRound}>
-                  {isReadyForNextRound ? "Put In: Ready" : "Put In"}
-                </Button>
-              </div>
-            )}
-            <div className="mt-2 rounded-lg border border-green-400/20 bg-green-500/10 p-2">
-              <div className="text-sm font-bold text-green-300">
-                Winner: {winnerPlayer?.username || "Unknown"}
-                {winnerRoundNet !== null ? ` (${formatRoundDeltaAmount(winnerRoundNet, displayCurrency)})` : ""}
-              </div>
-              {roundPayoutSummary ? (
-                <div className="mt-1 text-[11px] text-white/70">{roundPayoutSummary}</div>
-              ) : null}
-            </div>
-            {gameState.handScores && (
-              <div className="mt-2 max-h-[42vh] overflow-auto rounded-lg border border-white/10 bg-black/35">
-                <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-white/50 grid grid-cols-[1.25fr_0.4fr_0.75fr_0.55fr_0.7fr] gap-2">
-                  <span>Player</span>
-                  <span>Rank</span>
-                  <span>Result</span>
-                  <span>Score</span>
-                  <span>W/L</span>
-                </div>
-                <div className="divide-y divide-white/10">
-                  {rankedRoundPlayers.map((player) => {
-                    const placement = placementByUserId.get(player.userId);
-                    const isWinner = placement?.rank === 1 || player.userId === gameState.roundWinnerId;
-                    const roundNet = getRoundNetForPlayer(gameState, player.userId);
-                    return (
-                    <div
-                      key={player.userId}
-                      className={`px-2 py-1.5 grid grid-cols-[1.25fr_0.4fr_0.75fr_0.55fr_0.7fr] gap-2 items-center text-xs ${isWinner ? "bg-green-500/10" : ""}`}
-                    >
-                      <div className="truncate text-white">{player.username}</div>
-                      <div className="font-mono text-white/80">{placement?.rank ?? "-"}</div>
-                      <div className={`${isWinner ? "text-green-300" : "text-white/70"}`}>
-                        {getPlacementWinTypeLabel(gameState, placement?.winType)}
-                      </div>
-                      <div className="font-mono text-white/80">{gameState.handScores?.[player.userId] ?? "-"}</div>
-                      <div
-                        className={`font-mono ${
-                          roundNet === null
-                            ? "text-white/40"
-                            : roundNet > 0
-                              ? "text-emerald-300"
-                              : roundNet < 0
-                                ? "text-rose-300"
-                                : "text-white/80"
-                        }`}
-                      >
-                        {roundNet === null ? "--" : formatRoundDeltaAmount(roundNet, displayCurrency)}
-                      </div>
-                    </div>
-                  );
-                  })}
-                </div>
-              </div>
-            )}
-            <div className="mt-2 text-[11px] text-white/60">Cards stay visible until the next clockwise deal starts.</div>
-          </div>
-        )}
+        <RoundEndOverlay
+          open={gameState.status === "round-end"}
+          outcome={roundOutcome}
+          settlementTitle={settlementTitle}
+          settlementSummary={settlementSummary}
+          settlementLines={overlaySettlementLines}
+          playerRows={overlayPlayerRows}
+          countdownLabel={countdownLabel}
+          readinessLabel={roundStatusLabel}
+          readinessDetail={roundStatusDetail}
+          showRunItBack={isContinuousMode && !isSpectator}
+          runItBackDisabled={isReadyForNextRound}
+          onRunItBack={handlePutIn}
+          onLeaveTable={isContinuousMode ? handleRequestLeaveTable : handleLeaveTable}
+          winningCards={winnerHighlightCards}
+          sessionStats={sessionStatsDisplay}
+        />
       </div>
     </div>
   );

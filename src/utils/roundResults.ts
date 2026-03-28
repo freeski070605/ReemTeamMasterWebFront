@@ -1,6 +1,25 @@
 import { IGameState, PlacementWinType } from "../types/game";
 
 export type RoundDisplayCurrency = "USD" | "RTC";
+export type RoundOutcomeKey =
+  | "reem"
+  | "tonk"
+  | "point-win"
+  | "drop-win"
+  | "drop-caught"
+  | "deck-out"
+  | "tie"
+  | "round-end";
+export type RoundOutcomeTone = "gold" | "emerald" | "sky" | "rose" | "slate";
+
+export interface RoundOutcomePresentation {
+  key: RoundOutcomeKey;
+  tone: RoundOutcomeTone;
+  eyebrow: string;
+  headline: string;
+  secondary: string;
+  explanation: string;
+}
 
 const is41Win = (state: Pick<IGameState, "roundEndedBy" | "lastAction">): boolean =>
   state.roundEndedBy === "AUTO_TRIPLE" && state.lastAction?.type === "declare41";
@@ -28,6 +47,9 @@ const findPlayerName = (state: Pick<IGameState, "players">, userId?: string): st
 
 const shouldConvertWinnerGrossToNet = (state: Pick<IGameState, "mode">): boolean =>
   !state.mode || state.mode === "FREE_RTC_TABLE" || state.mode === "RTC_TOURNAMENT";
+
+const hasTieWinner = (state: Pick<IGameState, "placements">): boolean =>
+  (state.placements ?? []).filter((placement) => placement.rank === 1).length > 1;
 
 export const formatRoundDeltaAmount = (amount: number, currency: RoundDisplayCurrency): string => {
   const sign = amount > 0 ? "+" : amount < 0 ? "-" : "";
@@ -64,7 +86,112 @@ export const getPlacementWinTypeLabel = (
   if (winType === "CAUGHT_DROP") return "Caught Dropping";
   if (winType === "DECK_EMPTY") return "Deck Runs Out";
   if (winType === "REEM") return "Reem";
-  return "Regular";
+  return isSuccessfulDrop(state) ? "Successful Drop" : "Point Win";
+};
+
+export const resolveRoundOutcomeKey = (
+  state: Pick<IGameState, "placements" | "roundEndedBy" | "lastAction">
+): RoundOutcomeKey => {
+  if (hasTieWinner(state)) return "tie";
+  if (state.roundEndedBy === "REEM") return "reem";
+  if (state.roundEndedBy === "AUTO_TRIPLE") return "tonk";
+  if (state.roundEndedBy === "CAUGHT_DROP") return "drop-caught";
+  if (state.roundEndedBy === "DECK_EMPTY") return "deck-out";
+  if (isSuccessfulDrop(state)) return "drop-win";
+  if (state.roundEndedBy === "REGULAR") return "point-win";
+  return "round-end";
+};
+
+export const getRoundOutcomePresentation = (
+  state: Pick<IGameState, "placements" | "roundEndedBy" | "lastAction">,
+  options: {
+    currency: RoundDisplayCurrency;
+    winnerName?: string | null;
+    winnerAmount?: number | null;
+  }
+): RoundOutcomePresentation => {
+  const winnerName = options.winnerName ?? "Unknown";
+  const amountText =
+    options.winnerAmount === null || options.winnerAmount === undefined
+      ? `${winnerName} takes the hand`
+      : `${winnerName} takes ${formatRoundDeltaAmount(options.winnerAmount, options.currency)}`;
+
+  switch (resolveRoundOutcomeKey(state)) {
+    case "reem":
+      return {
+        key: "reem",
+        tone: "gold",
+        eyebrow: "ROUND OVER",
+        headline: "REEEM HIT",
+        secondary: amountText,
+        explanation: "Second spread completed. Hand cleared instantly.",
+      };
+    case "tonk":
+      return {
+        key: "tonk",
+        tone: "emerald",
+        eyebrow: "ROUND OVER",
+        headline: is41Win(state) ? "TONK 41" : "TONK CALLED",
+        secondary: amountText,
+        explanation: is41Win(state)
+          ? "Declared 41 for the triple-stake finish."
+          : "11 and under locked the hand at triple stakes.",
+      };
+    case "drop-caught":
+      return {
+        key: "drop-caught",
+        tone: "rose",
+        eyebrow: "ROUND OVER",
+        headline: "DROP CAUGHT",
+        secondary: amountText,
+        explanation: "The fold attempt got punished before it could stand.",
+      };
+    case "drop-win":
+      return {
+        key: "drop-win",
+        tone: "sky",
+        eyebrow: "ROUND OVER",
+        headline: "DROP HOLDS",
+        secondary: amountText,
+        explanation: "The drop stood up and the hand ended on the spot.",
+      };
+    case "deck-out":
+      return {
+        key: "deck-out",
+        tone: "slate",
+        eyebrow: "ROUND OVER",
+        headline: "POINT WIN",
+        secondary: amountText,
+        explanation: "Deck ran dry. Lowest hand on the table took the win.",
+      };
+    case "point-win":
+      return {
+        key: "point-win",
+        tone: "sky",
+        eyebrow: "ROUND OVER",
+        headline: "POINT WIN",
+        secondary: amountText,
+        explanation: "Lowest hand at showdown sealed the round.",
+      };
+    case "tie":
+      return {
+        key: "tie",
+        tone: "slate",
+        eyebrow: "ROUND OVER",
+        headline: "HAND TIED",
+        secondary: "No payout swing on this finish.",
+        explanation: "The table finished level and moves on to the next hand.",
+      };
+    default:
+      return {
+        key: "round-end",
+        tone: "slate",
+        eyebrow: "ROUND OVER",
+        headline: "HAND COMPLETE",
+        secondary: amountText,
+        explanation: "Settlement is wrapping up for the next hand.",
+      };
+  }
 };
 
 export const getRoundNetForPlayer = (
