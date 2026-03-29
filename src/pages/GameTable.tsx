@@ -941,7 +941,7 @@ const GameTable: React.FC = () => {
     const isWinner = placement?.rank === 1 || player.userId === gameState.roundWinnerId;
     const roundNet = getRoundNetForPlayer(gameState, player.userId);
     const handScore = gameState.handScores?.[player.userId];
-    const resultLabel = getPlacementWinTypeLabel(gameState, placement?.winType);
+    const resultLabel = isWinner ? getPlacementWinTypeLabel(gameState, placement?.winType) : "Loss";
 
     return {
       userId: player.userId,
@@ -964,18 +964,15 @@ const GameTable: React.FC = () => {
     };
   });
   const roundResultByUserId = new Map(roundResultRows.map((row) => [row.userId, row]));
-  const roundStatusLabel = isContinuousMode
-    ? readyCount === totalRoundPlayers
+  const waitingPlayerCount = Math.max(0, totalRoundPlayers - readyCount);
+  const roundRailStatusLabel = isContinuousMode
+    ? waitingPlayerCount === 0
       ? "All players ready"
-      : totalRoundPlayers - readyCount === 1
-        ? "Waiting on 1 player"
-        : `Ready for next hand: ${readyCount}/${totalRoundPlayers}`
+      : `Waiting on ${waitingPlayerCount} player${waitingPlayerCount === 1 ? "" : "s"}`
     : "Match complete";
   const roundStatusDetail =
     isContinuousMode && isReadyForNextRound ? "Your seat is locked for the next hand." : null;
   const countdownLabel = isContinuousMode ? `Next hand in ${roundCountdownSeconds ?? 30}s` : null;
-  const roundReadyInlineLabel =
-    countdownLabel && isContinuousMode ? `${countdownLabel} - ${roundStatusLabel}` : roundStatusLabel;
   const settlementInlineText = settlementSummary ? `${settlementTitle} - ${settlementSummary}` : settlementTitle;
   const winnerLine = winnerPlayer
     ? `${winnerPlayer.username}${winnerRoundNet !== null ? ` ${formatRoundDeltaAmount(winnerRoundNet, displayCurrency)}` : ""}`
@@ -1684,13 +1681,6 @@ const GameTable: React.FC = () => {
                     ) : null}
                   </div>
                 </div>
-                {isRoundEnd ? (
-                  <div className="pointer-events-none mt-1 max-w-[84vw] text-center">
-                    <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[11px] sm:text-sm"} font-medium text-white/74`}>
-                      {settlementInlineText}
-                    </div>
-                  </div>
-                ) : null}
               </div>
 
               {isRoundEnd ? (
@@ -1703,7 +1693,18 @@ const GameTable: React.FC = () => {
                 >
                   <div className={`flex flex-col ${isPhoneLandscapeLayout ? "items-center gap-1.5" : "items-end gap-2"}`}>
                     <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[11px]"} text-white/72`}>
-                      {roundReadyInlineLabel}
+                      {countdownLabel ? (
+                        <>
+                          {countdownLabel}
+                          {" • "}
+                          {roundRailStatusLabel}
+                        </>
+                      ) : (
+                        roundRailStatusLabel
+                      )}
+                    </div>
+                    <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[10px]"} text-white/54`}>
+                      {settlementInlineText}
                     </div>
                     {roundStatusDetail ? (
                       <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[10px]"} uppercase tracking-[0.16em] text-white/46`}>
