@@ -131,11 +131,11 @@ export const getRoundOutcomePresentation = (
         key: "tonk",
         tone: "emerald",
         eyebrow: "ROUND OVER",
-        headline: is41Win(state) ? "TONK 41" : "TONK CALLED",
+        headline: is41Win(state) ? "41 TRIPLE" : "SUPER LOW TRIPLE",
         secondary: amountText,
         explanation: is41Win(state)
           ? "Declared 41 for the triple-stake finish."
-          : "11 and under locked the hand at triple stakes.",
+          : "11 and under ended game with triple stakes.",
       };
     case "drop-caught":
       return {
@@ -144,14 +144,14 @@ export const getRoundOutcomePresentation = (
         eyebrow: "ROUND OVER",
         headline: "DROP CAUGHT",
         secondary: amountText,
-        explanation: "The fold attempt got punished before it could stand.",
+        explanation: "The DROP attempt got CAUGHT.",
       };
     case "drop-win":
       return {
         key: "drop-win",
         tone: "sky",
         eyebrow: "ROUND OVER",
-        headline: "DROP HOLDS",
+        headline: "DROPPED!!!",
         secondary: amountText,
         explanation: "The drop stood up and the hand ended on the spot.",
       };
@@ -160,7 +160,7 @@ export const getRoundOutcomePresentation = (
         key: "deck-out",
         tone: "slate",
         eyebrow: "ROUND OVER",
-        headline: "POINT WIN",
+        headline: "LOWEST HAND WINS",
         secondary: amountText,
         explanation: "Deck ran dry. Lowest hand on the table took the win.",
       };
