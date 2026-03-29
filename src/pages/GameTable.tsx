@@ -100,7 +100,6 @@ const GameTable: React.FC = () => {
     spread,
     hit,
     drop,
-    requestLeaveTable,
     putIn,
   } = useGameStore();
 
@@ -807,21 +806,6 @@ const GameTable: React.FC = () => {
         leaveTable(tableId, user._id, user.username);
         navigate("/tables");
       }
-    }
-  };
-
-  const handleRequestLeaveTable = () => {
-    if (isSpectator) {
-      navigate("/tables");
-      return;
-    }
-    if (tableId && user) {
-      if (gameState.status === "round-end") {
-        leaveTable(tableId, user._id, user.username);
-        navigate("/tables");
-        return;
-      }
-      requestLeaveTable(tableId, user._id);
     }
   };
 
@@ -1733,19 +1717,12 @@ const GameTable: React.FC = () => {
                 >
                   <div className={`flex flex-col items-center ${isPhoneLandscapeLayout ? "gap-1.5" : "gap-2"}`}>
                     {renderRevealLane()}
-                    <div className="flex items-center gap-2">
+                    <div className="pointer-events-auto flex items-center gap-2">
                       {isContinuousMode && !isSpectator ? (
                         <Button onClick={handlePutIn} variant="primary" size="sm" disabled={isReadyForNextRound}>
                           Run It Back
                         </Button>
                       ) : null}
-                      <Button
-                        onClick={isContinuousMode ? handleRequestLeaveTable : handleLeaveTable}
-                        variant="secondary"
-                        size="sm"
-                      >
-                        Leave
-                      </Button>
                     </div>
                     <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[11px]"} text-white/72`}>
                       {countdownLabel ? (
