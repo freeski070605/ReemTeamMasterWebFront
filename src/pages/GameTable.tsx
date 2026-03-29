@@ -24,6 +24,8 @@ import bgImage from '../assets/bg.png';
 import backCardImage from "../assets/cards/back.png";
 
 type TurnStatusBadge = "DRAWING" | "MUST DISCARD" | "HIT MODE" | "WAITING";
+type InlineFeedbackArea = "hand" | "discard" | "center" | "spreads" | "actions";
+type InlineFeedbackTone = "error" | "info";
 
 const CARD_RANK_ORDER: Array<CardType["rank"]> = [
   "Ace",
@@ -116,10 +118,16 @@ const GameTable: React.FC = () => {
   const [isCompactLandscape, setIsCompactLandscape] = useState(false);
   const [isUltraShortLandscape, setIsUltraShortLandscape] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
-  const [showGuidanceBanner, setShowGuidanceBanner] = useState(false);
+  const [, setShowGuidanceBanner] = useState(false);
   const [showGuidanceHelper, setShowGuidanceHelper] = useState(false);
   const [guidanceOverrideText, setGuidanceOverrideText] = useState<string | null>(null);
   const [guidanceOverrideHelper, setGuidanceOverrideHelper] = useState<string | null>(null);
+  const [inlineFeedback, setInlineFeedback] = useState<{
+    message: string;
+    tone: InlineFeedbackTone;
+    area: InlineFeedbackArea;
+  } | null>(null);
+  const [feedbackPulseArea, setFeedbackPulseArea] = useState<InlineFeedbackArea | null>(null);
   const [activityTick, setActivityTick] = useState(0);
   const lastAnimatedRoundKeyRef = useRef<string | null>(null);
   const hasInitializedLastActionRef = useRef(false);
@@ -127,6 +135,8 @@ const GameTable: React.FC = () => {
   const guidanceBannerTimeoutRef = useRef<number | null>(null);
   const guidanceHelperTimeoutRef = useRef<number | null>(null);
   const idleGuidanceTimeoutRef = useRef<number | null>(null);
+  const inlineFeedbackTimeoutRef = useRef<number | null>(null);
+  const feedbackPulseTimeoutRef = useRef<number | null>(null);
   const myTurnStartCountRef = useRef(0);
   const wasMyTurnRef = useRef(false);
   const previousTurnStepRef = useRef<"waiting" | "draw" | "discard">("waiting");
@@ -190,13 +200,25 @@ const GameTable: React.FC = () => {
   }, []);
 
   const showActionToast = useCallback(
-    (message: string, tone: "error" | "info" = "info") => {
-      const options = { position: "top-center" as const, autoClose: 2000, hideProgressBar: true };
-      if (tone === "error") {
-        toast.error(message, options);
-        return;
+    (message: string, tone: InlineFeedbackTone = "info", area: InlineFeedbackArea = "center") => {
+      setInlineFeedback({ message, tone, area });
+      setFeedbackPulseArea(area);
+
+      if (inlineFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(inlineFeedbackTimeoutRef.current);
       }
-      toast.info(message, options);
+
+      if (feedbackPulseTimeoutRef.current !== null) {
+        window.clearTimeout(feedbackPulseTimeoutRef.current);
+      }
+
+      inlineFeedbackTimeoutRef.current = window.setTimeout(() => {
+        setInlineFeedback((current) => (current?.message === message ? null : current));
+      }, tone === "error" ? 2200 : 1800);
+
+      feedbackPulseTimeoutRef.current = window.setTimeout(() => {
+        setFeedbackPulseArea((current) => (current === area ? null : current));
+      }, 560);
     },
     []
   );
@@ -323,6 +345,14 @@ const GameTable: React.FC = () => {
       if (idleGuidanceTimeoutRef.current !== null) {
         window.clearTimeout(idleGuidanceTimeoutRef.current);
         idleGuidanceTimeoutRef.current = null;
+      }
+      if (inlineFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(inlineFeedbackTimeoutRef.current);
+        inlineFeedbackTimeoutRef.current = null;
+      }
+      if (feedbackPulseTimeoutRef.current !== null) {
+        window.clearTimeout(feedbackPulseTimeoutRef.current);
+        feedbackPulseTimeoutRef.current = null;
       }
     };
   }, [clearGuidanceTimers]);
@@ -653,7 +683,7 @@ const GameTable: React.FC = () => {
     markActionActivity();
 
     if (selectedCards.length !== 1) {
-      showActionToast("Select exactly one card to discard.", "error");
+      showActionToast("Select exactly one card to discard.", "error", "hand");
       triggerGuidance({
         bannerText: "Select exactly 1 card to discard",
         helperText: "Then tap Discard.",
@@ -662,7 +692,7 @@ const GameTable: React.FC = () => {
     }
 
     if (isRestrictedDiscardCard(selectedCards[0])) {
-      showActionToast("Cannot discard this card this turn.", "error");
+      showActionToast("Cannot discard this card this turn.", "error", "hand");
       triggerGuidance({
         bannerText: "Cannot discard this card this turn.",
         helperText: "Select another card, then tap Discard.",
@@ -711,7 +741,7 @@ const GameTable: React.FC = () => {
 
     if (!hasDrawnThisTurn) {
       if (gameState.discardPile.length === 0) {
-        showActionToast("Discard pile is empty.", "error");
+        showActionToast("Discard pile is empty.", "error", "discard");
         triggerGuidance({
           bannerText: "Discard pile is empty.",
           helperText: "Draw from deck instead.",
@@ -743,7 +773,7 @@ const GameTable: React.FC = () => {
     markActionActivity();
 
     if (selectedCards.length < 3) {
-      showActionToast("Select at least 3 cards for a spread.", "error");
+      showActionToast("Select at least 3 cards for a spread.", "error", "hand");
       triggerGuidance({
         bannerText: "Select at least 3 cards.",
       });
@@ -759,14 +789,14 @@ const GameTable: React.FC = () => {
     markActionActivity();
 
     if (selectedCards.length !== 1) {
-      showActionToast("Select one card to hit with.", "error");
+      showActionToast("Select one card to hit with.", "error", "hand");
       triggerGuidance({
         bannerText: "Select exactly 1 card for Hit",
       });
       return;
     }
     setIsHitMode(true);
-    showActionToast("Select a spread to hit.");
+    showActionToast("Select a spread to hit.", "info", "spreads");
   };
 
   const executeHit = (targetPlayerId: string, targetSpreadIndex: number) => {
@@ -980,63 +1010,183 @@ const GameTable: React.FC = () => {
   const flowActorLabel = isMyTurn ? "Your Turn" : `${activeTurnPlayerName}'s Turn`;
   const activeTurnStepLabel = activeTurnHasDrawn ? "Discard" : "Draw";
   const isPhoneLandscapeLayout = isTouchDevice && isUltraShortLandscape;
-  const roundOutcomePositionClass = isPhoneLandscapeLayout ? "top-[25%]" : "top-[34%]";
-  const roundLowerStackPositionClass = isPhoneLandscapeLayout ? "top-[58%]" : "top-[59%]";
   const isHeadsUpTable = totalPlayers <= 2;
-  const topSeatPositionClass = isPhoneLandscapeLayout
-    ? isHeadsUpTable
-      ? "right-[18%] top-[11%]"
-      : "left-1/2 top-[9.5%] -translate-x-1/2"
-    : "top-2 left-[58%] -translate-x-1/2";
-  const topSeatAlign: "left" | "right" = "left";
-  const leftSeatPositionClass = isPhoneLandscapeLayout
-    ? "left-[3%] top-[40%] -translate-y-1/2"
-    : "left-[1.5%] top-1/2 -translate-y-1/2";
-  const rightSeatPositionClass = isPhoneLandscapeLayout
-    ? "right-[3%] top-[40%] -translate-y-1/2"
-    : "right-[1.5%] top-1/2 -translate-y-1/2";
-  const topSpreadPositionClass = isPhoneLandscapeLayout
-    ? isHeadsUpTable
-      ? "right-[8%] top-[34%] w-[24%] max-w-[210px]"
-      : "left-1/2 top-[24%] -translate-x-1/2 w-[36%] max-w-[260px]"
-    : "left-1/2 top-[28%] -translate-x-1/2 w-[34%] max-w-[300px]";
-  const leftSpreadPositionClass = isPhoneLandscapeLayout
-    ? "left-[11%] top-[36%] -translate-y-1/2 w-[24%] max-w-[210px]"
-    : "left-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]";
-  const rightSpreadPositionClass = isPhoneLandscapeLayout
-    ? "right-[11%] top-[36%] -translate-y-1/2 w-[24%] max-w-[210px]"
-    : "right-[18%] top-[36%] -translate-y-1/2 w-[23%] max-w-[210px]";
-  const mySpreadPositionClass = isPhoneLandscapeLayout
-    ? isHeadsUpTable
-      ? "left-1/2 bottom-[33%] -translate-x-1/2 w-[34%] max-w-[250px]"
-      : "left-1/2 bottom-[33%] -translate-x-1/2 w-[34%] max-w-[260px]"
-    : "left-1/2 bottom-[30%] -translate-x-1/2 w-[30%] max-w-[260px]";
+  const isThreeHandedTable = totalPlayers === 3;
+  const lastActionType = gameState.lastAction?.type ?? null;
+  const lastActionPayload = gameState.lastAction?.payload as Record<string, unknown> | undefined;
+  const lastActionTimestamp = gameState.lastAction?.timestamp ?? 0;
 
-  const contextBannerText = isSpectator
-    ? promoModeRequested
-      ? `Watching promo action: ${activeTurnPlayerName}.`
-      : `Spectating ${activeTurnPlayerName}.`
-    : isMyTurn
-    ? isDiscardStep
-      ? selectedCards.length === 1
-        ? selectedIllegalDiscardCard
-          ? "Select 1 card, then tap Discard"
-          : "Tap discard pile to finish turn."
-        : "Select 1 card, then tap Discard"
-      : "Draw from deck or discard pile"
-    : `You are waiting for ${activeTurnPlayerName}.`;
+  const contextBannerText = isRoundEnd
+    ? roundOutcome.secondary
+    : isSpectator
+      ? promoModeRequested
+        ? `Watching promo action: ${activeTurnPlayerName}.`
+        : `Spectating ${activeTurnPlayerName}.`
+      : isHitMode
+        ? "Choose a spread to hit"
+        : isMyTurn
+          ? isDiscardStep
+            ? selectedCards.length === 1
+              ? selectedIllegalDiscardCard
+                ? "Select another card to discard"
+                : "Choose 1 card to discard"
+              : "Choose 1 card to discard"
+            : "Draw a card to begin your turn"
+          : `Waiting for ${activeTurnPlayerName}.`;
 
   const discardHelperText = isDiscardStep
     ? selectedCards.length === 1
       ? selectedIllegalDiscardCard
-        ? "Cannot discard this card this turn."
-        : "Tap discard pile to finish turn."
-      : "Select exactly 1 card to discard"
-    : null;
+        ? "This pickup cannot be discarded this turn."
+        : "Tap the discard pile or flick the selected card upward."
+      : "Pick exactly 1 card from your hand."
+    : isHitMode
+      ? "Select a highlighted spread on the table."
+      : null;
   const guidanceBannerText = guidanceOverrideText ?? contextBannerText;
   const guidanceHelperText = guidanceOverrideHelper ?? discardHelperText;
-  const shouldShowGuidanceBanner = showGuidanceBanner && !!guidanceBannerText;
   const shouldShowGuidanceHelper = showGuidanceHelper && !!guidanceHelperText;
+  const handFeedback =
+    inlineFeedback?.area === "hand" || inlineFeedback?.area === "actions" ? inlineFeedback : null;
+  const centerFeedback =
+    inlineFeedback?.area === "center" ||
+    inlineFeedback?.area === "discard" ||
+    inlineFeedback?.area === "spreads"
+      ? inlineFeedback
+      : null;
+
+  const centerState = (() => {
+    if (isRoundEnd) {
+      if (gameState.roundEndedBy === "REEM") {
+        return {
+          eyebrow: winnerPlayer?.username ?? "Round Winner",
+          title: "REEM",
+          detail: roundOutcome.explanation,
+          tone: "burst" as const,
+        };
+      }
+
+      return {
+        eyebrow: "Round Over",
+        title: roundOutcome.headline,
+        detail: winnerLine,
+        tone: "idle" as const,
+      };
+    }
+
+    if (isHitMode) {
+      return {
+        eyebrow: "Action Required",
+        title: "Choose A Spread",
+        detail: "Select the run or set you want to hit.",
+        tone: "action" as const,
+      };
+    }
+
+    if (isSpectator) {
+      return {
+        eyebrow: promoModeRequested ? "Promo Table" : "Spectating",
+        title: flowActorLabel,
+        detail: activeTurnHasDrawn ? "Waiting for discard." : "Waiting for draw.",
+        tone: "waiting" as const,
+      };
+    }
+
+    if (isMyTurn && isDrawStep) {
+      return {
+        eyebrow: "Your Move",
+        title: "Your Turn",
+        detail: "Draw from the deck or pick up the discard.",
+        tone: "active" as const,
+      };
+    }
+
+    if (isMyTurn && isDiscardStep) {
+      return {
+        eyebrow: "Action Required",
+        title: "Choose A Discard",
+        detail:
+          selectedCards.length === 1
+            ? selectedIllegalDiscardCard
+              ? "That card cannot be discarded this turn."
+              : "Discard the selected card to end your turn."
+            : "Select exactly 1 card to discard.",
+        tone: "action" as const,
+      };
+    }
+
+    return {
+      eyebrow: "Table Flow",
+      title: flowActorLabel,
+      detail: activeTurnHasDrawn ? "Waiting for discard." : "Waiting for draw or discard pickup.",
+      tone: "waiting" as const,
+    };
+  })();
+
+  const centerToneClasses = {
+    active:
+      "border-amber-200/30 bg-[radial-gradient(circle_at_top,rgba(255,232,184,0.22),rgba(9,21,18,0.3)_58%,rgba(5,8,10,0.18))] text-amber-50 shadow-[0_0_34px_rgba(251,191,36,0.18)]",
+    action:
+      "border-amber-300/40 bg-[radial-gradient(circle_at_top,rgba(255,205,96,0.28),rgba(35,18,6,0.34)_58%,rgba(5,7,9,0.2))] text-amber-50 shadow-[0_0_42px_rgba(251,191,36,0.24)]",
+    waiting:
+      "border-cyan-200/20 bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.18),rgba(6,18,26,0.34)_58%,rgba(5,7,10,0.2))] text-slate-50 shadow-[0_0_28px_rgba(34,211,238,0.14)]",
+    idle:
+      "border-white/12 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.15),rgba(9,15,17,0.3)_58%,rgba(4,6,8,0.18))] text-white shadow-[0_0_28px_rgba(255,255,255,0.08)]",
+    burst:
+      "border-emerald-200/40 bg-[radial-gradient(circle_at_top,rgba(252,211,77,0.28),rgba(8,34,24,0.36)_48%,rgba(5,7,9,0.22))] text-amber-50 shadow-[0_0_52px_rgba(74,222,128,0.24)]",
+  } as const;
+
+  const deckIsAnimating = lastActionType === "drawCard" && lastActionPayload?.source === "deck";
+  const discardIsAnimating =
+    lastActionType === "discardCard" ||
+    (lastActionType === "drawCard" && lastActionPayload?.source === "discard");
+  const spreadsAreAnimating = lastActionType === "spread" || lastActionType === "hit" || lastActionType === "reem";
+  const showActionDock = !isSpectator && !hideCardsForPresentation && !isRoundEnd;
+  const topSeatPositionClass = isThreeHandedTable
+    ? isPhoneLandscapeLayout
+      ? "left-[26%] top-[6%] -translate-x-1/2"
+      : "left-[27%] top-[5.5%] -translate-x-1/2"
+    : isHeadsUpTable
+      ? isPhoneLandscapeLayout
+        ? "left-1/2 top-[6%] -translate-x-1/2"
+        : "left-1/2 top-[5.5%] -translate-x-1/2"
+      : isPhoneLandscapeLayout
+        ? "left-1/2 top-[5.5%] -translate-x-1/2"
+        : "left-1/2 top-[4.75%] -translate-x-1/2";
+  const leftSeatPositionClass = isPhoneLandscapeLayout
+    ? "left-[2.4%] top-[38%] -translate-y-1/2"
+    : "left-[2.5%] top-[39%] -translate-y-1/2";
+  const rightSeatPositionClass = isThreeHandedTable
+    ? isPhoneLandscapeLayout
+      ? "right-[26%] top-[6%]"
+      : "right-[27%] top-[5.5%]"
+    : isPhoneLandscapeLayout
+      ? "right-[2.4%] top-[38%] -translate-y-1/2"
+      : "right-[2.5%] top-[39%] -translate-y-1/2";
+  const topSpreadPositionClass = isThreeHandedTable
+    ? isPhoneLandscapeLayout
+      ? "left-[26%] top-[20%] -translate-x-1/2 w-[26%] max-w-[220px]"
+      : "left-[27%] top-[20%] -translate-x-1/2 w-[26%] max-w-[250px]"
+    : isHeadsUpTable
+      ? isPhoneLandscapeLayout
+        ? "left-1/2 top-[20%] -translate-x-1/2 w-[34%] max-w-[280px]"
+        : "left-1/2 top-[20%] -translate-x-1/2 w-[34%] max-w-[320px]"
+      : isPhoneLandscapeLayout
+        ? "left-1/2 top-[18%] -translate-x-1/2 w-[34%] max-w-[280px]"
+        : "left-1/2 top-[18.5%] -translate-x-1/2 w-[34%] max-w-[340px]";
+  const leftSpreadPositionClass = isPhoneLandscapeLayout
+    ? "left-[10%] top-[30%] w-[24%] max-w-[208px]"
+    : "left-[10.5%] top-[29%] w-[24%] max-w-[230px]";
+  const rightSpreadPositionClass = isThreeHandedTable
+    ? isPhoneLandscapeLayout
+      ? "right-[10%] top-[20%] w-[26%] max-w-[220px]"
+      : "right-[11%] top-[20%] w-[26%] max-w-[250px]"
+    : isPhoneLandscapeLayout
+      ? "right-[10%] top-[30%] w-[24%] max-w-[208px]"
+      : "right-[10.5%] top-[29%] w-[24%] max-w-[230px]";
+  const mySpreadPositionClass = isPhoneLandscapeLayout
+    ? "left-1/2 bottom-[31%] -translate-x-1/2 w-[42%] max-w-[340px]"
+    : "left-1/2 bottom-[29%] -translate-x-1/2 w-[42%] max-w-[460px]";
   const dropLockTurnsRemaining = currentPlayer?.hitLockCounter ?? 0;
 
   const canDrop = !!(
@@ -1095,31 +1245,38 @@ const GameTable: React.FC = () => {
   };
 
   const turnStatusClasses: Record<TurnStatusBadge, string> = {
-    DRAWING: "border-emerald-300/60 bg-emerald-400/15 text-emerald-200",
-    "MUST DISCARD": "border-amber-300/60 bg-amber-400/20 text-amber-100",
-    "HIT MODE": "border-fuchsia-300/60 bg-fuchsia-500/18 text-fuchsia-100",
-    WAITING: "border-white/20 bg-white/5 text-white/75",
+    DRAWING: "border-emerald-300/50 bg-emerald-400/12 text-emerald-100",
+    "MUST DISCARD": "border-amber-300/55 bg-amber-400/16 text-amber-50",
+    "HIT MODE": "border-fuchsia-300/55 bg-fuchsia-500/18 text-fuchsia-100",
+    WAITING: "border-white/12 bg-white/5 text-white/65",
   };
 
   const renderOpponentHand = (count: number, size: "sm" | "md" = "sm") => {
     if (count <= 0) {
-      return <div className="text-xs text-white/40">No cards</div>;
+      return <div className="text-[10px] uppercase tracking-[0.2em] text-white/32">Empty</div>;
     }
     const cardClass =
       size === "md"
-        ? "w-11 h-16"
+        ? "h-16 w-11"
         : isPhoneLandscapeLayout
-          ? "w-8 h-11"
-          : "w-9 h-14";
+          ? "h-11 w-8"
+          : "h-14 w-9";
     return (
-      <div className="relative">
+      <div className="relative flex items-center justify-center">
+        <div className="absolute left-1 top-1 h-full w-full rounded-lg bg-black/25 blur-sm" />
         <CardComponent
           suit="Spades"
           rank="Ace"
           isHidden
-          className={cardClass}
+          className={`${cardClass} relative z-[1]`}
         />
-        <div className="absolute -bottom-2 -right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full border border-white/10">
+        <CardComponent
+          suit="Hearts"
+          rank="Ace"
+          isHidden
+          className={`${cardClass} absolute left-1.5 top-1.5 opacity-85`}
+        />
+        <div className="absolute -bottom-1.5 -right-1.5 rounded-full border border-white/15 bg-black/80 px-2 py-0.5 text-[10px] font-semibold text-white shadow-[0_8px_16px_rgba(0,0,0,0.45)]">
           {count}
         </div>
       </div>
@@ -1129,7 +1286,8 @@ const GameTable: React.FC = () => {
   const renderSeatInfo = (
     player: typeof gameState.players[number] | null,
     className: string,
-    align: "left" | "right" = "left"
+    align: "left" | "right" = "left",
+    tiltClass = ""
   ) => {
     if (!player) return null;
     const isActive = gameState.players[gameState.currentPlayerIndex]?.userId === player.userId;
@@ -1140,35 +1298,48 @@ const GameTable: React.FC = () => {
     const shouldDimSeatLoser = !!roundSeatResult && !roundSeatResult.isWinner;
     const seatShellClass = isRoundEnd
       ? shouldHighlightSeatWinner
-        ? "border-emerald-300/75 bg-emerald-400/14 brightness-100 opacity-100 shadow-[0_0_28px_rgba(52,211,153,0.16)]"
-        : "border-white/12 bg-black/45 brightness-75 opacity-72"
+        ? "border-emerald-300/60 bg-emerald-400/12 shadow-[0_0_30px_rgba(52,211,153,0.18)]"
+        : "border-white/10 bg-black/45 opacity-76"
       : isActive
-        ? "border-yellow-400/80 bg-yellow-400/10 brightness-100 opacity-100"
-        : "border-white/10 bg-black/35 brightness-90 opacity-60";
+        ? "border-amber-300/70 bg-amber-300/10 shadow-[0_0_28px_rgba(251,191,36,0.18)]"
+        : "border-white/10 bg-black/32 opacity-78";
 
     return (
-      <div className={`absolute z-20 pointer-events-none ${className}`}>
+      <motion.div
+        className={`absolute z-30 pointer-events-none ${className}`}
+        initial={false}
+        animate={
+          isActive && !isRoundEnd
+            ? { scale: [1, 1.018, 1], y: [0, -2, 0] }
+            : { scale: 1, y: 0 }
+        }
+        transition={
+          isActive && !isRoundEnd
+            ? { duration: 2.8, repeat: Infinity, ease: "easeInOut" }
+            : { duration: 0.25 }
+        }
+      >
         <div
           className={`${
             isActive ? "active-seat" : "inactive-seat"
           } relative flex items-center gap-2 transition-all duration-300 ${
             align === "right" ? "flex-row-reverse text-right" : ""
-          }`}
+          } ${tiltClass}`}
         >
           {isActive && !isRoundEnd ? (
-            <div className="absolute -inset-1 rounded-2xl bg-amber-300/15 blur-xl" aria-hidden />
+            <div className="absolute -inset-2 rounded-[30px] bg-amber-300/16 blur-2xl" aria-hidden />
           ) : null}
           {shouldHighlightSeatWinner ? (
-            <div className="absolute -inset-2 rounded-[28px] bg-emerald-300/14 blur-2xl" aria-hidden />
+            <div className="absolute -inset-3 rounded-[36px] bg-emerald-300/18 blur-3xl" aria-hidden />
           ) : null}
-          {renderOpponentHand(getVisibleCardCount(player.userId, player.hand.length), "sm")}
           <div
-            className={`relative rounded-lg border transition-all duration-300 ${
-              isPhoneLandscapeLayout ? "px-1.5 py-1 min-w-[102px]" : "px-2 py-1 min-w-[118px]"
+            className={`relative rounded-[22px] border backdrop-blur-md transition-all duration-300 ${
+              isPhoneLandscapeLayout ? "min-w-[116px] px-2 py-1.5" : "min-w-[152px] px-3 py-2"
             } ${seatShellClass}`}
           >
-            <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse" : ""}`}>
-              <div className="relative">
+            <div className="absolute inset-0 rounded-[22px] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))]" />
+            <div className={`relative flex items-center gap-2.5 ${align === "right" ? "flex-row-reverse" : ""}`}>
+              <div className="relative flex-shrink-0">
                 <PlayerAvatar player={{ name: player.username, avatarUrl: player.avatarUrl }} size="sm" />
                 <TurnTimer
                   duration={turnDurationMs}
@@ -1179,10 +1350,10 @@ const GameTable: React.FC = () => {
                   className={isActive ? "animate-pulse" : ""}
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 {isRoundEnd ? (
                   <div
-                    className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-wide ${
+                    className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-[0.2em] ${
                       isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"
                     } ${
                       shouldHighlightSeatWinner
@@ -1196,21 +1367,23 @@ const GameTable: React.FC = () => {
                   </div>
                 ) : (
                   <div
-                    className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-wide ${
+                    className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-[0.2em] ${
                       isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"
                     } ${turnStatusClasses[turnStatus]}`}
                   >
                     {turnStatus}
                   </div>
                 )}
-                <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} text-white font-semibold leading-tight`}>
+                <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} truncate text-white font-semibold leading-tight`}>
                   {player.username}
                 </div>
-                <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} text-white/60 leading-tight`}>
-                  Cards: {getVisibleCardCount(player.userId, player.hand.length)}
-                </div>
-                <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} text-yellow-300/95 leading-tight`}>
+                <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} text-white/58 leading-tight`}>
                   {formatSeatBalance(seatBalance)}
+                </div>
+                <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} mt-0.5 text-white/42 leading-tight uppercase tracking-[0.14em]`}>
+                  {player.hitLockCounter > 0 && !isRoundEnd
+                    ? `Drop Locked ${player.hitLockCounter}`
+                    : `${getVisibleCardCount(player.userId, player.hand.length)} cards`}
                 </div>
                 {roundSeatResult ? (
                   <>
@@ -1233,10 +1406,13 @@ const GameTable: React.FC = () => {
                   </>
                 ) : null}
               </div>
+              <div className={`${align === "right" ? "order-first" : ""}`}>
+                {renderOpponentHand(getVisibleCardCount(player.userId, player.hand.length), "sm")}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   };
 
@@ -1246,7 +1422,6 @@ const GameTable: React.FC = () => {
     displayedBottomPlayer ? hand.slice(0, getVisibleCardCount(displayedBottomPlayer.userId, hand.length)) : [];
   const myTurnStatus = getTurnStatus(displayedBottomPlayer?.userId ?? user._id, true);
   const canUseFlickDiscard = !isSpectator && isTouchDevice && isDiscardReady;
-  const showSideActionStack = !isSpectator && isMyTurn && !hideCardsForPresentation;
   const isBottomSeatActive = isSpectator
     ? gameState.players[gameState.currentPlayerIndex]?.userId === displayedBottomPlayer?.userId
     : isMyTurn;
@@ -1266,24 +1441,25 @@ const GameTable: React.FC = () => {
   const shouldDimBottomLoser = !!bottomSeatRoundResult && !bottomSeatRoundResult.isWinner;
   const bottomSeatShellClass = isRoundEnd
     ? shouldHighlightBottomWinner
-      ? "border-emerald-300/75 bg-emerald-400/14 brightness-100 opacity-100 shadow-[0_0_30px_rgba(52,211,153,0.16)]"
-      : "border-white/12 bg-black/45 brightness-75 opacity-72"
+      ? "border-emerald-300/60 bg-emerald-400/12 shadow-[0_0_34px_rgba(52,211,153,0.18)]"
+      : "border-white/12 bg-black/45 opacity-78"
     : isBottomSeatActive
-      ? "border-yellow-400/80 bg-yellow-400/10 brightness-100 opacity-100"
-      : "border-white/10 bg-black/30 brightness-90 opacity-60";
+      ? "border-amber-300/70 bg-amber-300/10 shadow-[0_0_32px_rgba(251,191,36,0.2)]"
+      : "border-white/10 bg-black/30 opacity-85";
   const phoneHandCardClass =
     visibleHand.length >= 6
       ? "w-[2.2rem] h-[3.2rem]"
       : visibleHand.length >= 5
         ? "w-[2.4rem] h-[3.5rem]"
         : visibleHand.length >= 4
-          ? "w-[2.6rem] h-[3.8rem]"
-          : "w-[2.8rem] h-[4.1rem]";
+        ? "w-[2.6rem] h-[3.8rem]"
+        : "w-[2.8rem] h-[4.1rem]";
+  const handOverlapPx = isPhoneLandscapeLayout ? 14 : visibleHand.length >= 6 ? 18 : visibleHand.length >= 5 ? 16 : 12;
   const revealedSpreadGroups = isRoundEnd ? winnerPlayer?.spreads.map(sortSpreadCards) ?? [] : [];
 
   const renderSpreadZone = (
     player: typeof gameState.players[number] | null,
-    _label: string,
+    zone: "top" | "left" | "right" | "bottom",
     className: string
   ) => {
     if (hideCardsForPresentation) return null;
@@ -1291,38 +1467,66 @@ const GameTable: React.FC = () => {
     const sortedSpreads = player.spreads.map(sortSpreadCards);
     const isWinningSeat = isRoundEnd && player.userId === winnerPlayer?.userId;
     if (isRoundEnd && isWinningSeat) return null;
+    const isSideZone = zone === "left" || zone === "right";
+    const spreadLayoutClass =
+      sortedSpreads.length <= 1
+        ? "flex justify-center"
+        : isSideZone
+          ? "grid grid-cols-1"
+          : sortedSpreads.length === 2
+            ? "grid grid-cols-2"
+            : "grid grid-cols-2";
+    const zoneShellClass = isHitMode
+      ? `ring-1 ring-amber-300/30 ${feedbackPulseArea === "spreads" ? "rt-table-shake" : ""}`
+      : spreadsAreAnimating
+        ? "ring-1 ring-white/10"
+        : "";
 
     return (
-      <div className={`absolute z-10 pointer-events-none ${className}`}>
-        <div className="flex flex-wrap items-center justify-center gap-1.5">
+      <div className={`absolute z-20 pointer-events-none ${className}`}>
+        <div
+          className={`rounded-[28px] border border-white/8 bg-black/12 px-2 py-2 backdrop-blur-[2px] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ${zoneShellClass}`}
+        >
+          <div
+            className={`${spreadLayoutClass} items-start justify-center gap-2 ${isPhoneLandscapeLayout ? "min-h-[48px]" : "min-h-[58px]"}`}
+          >
           {sortedSpreads.map((spread, sIdx) => (
             <motion.div
               key={`${player.userId}-spread-${sIdx}`}
-              className={`flex ${isPhoneLandscapeLayout ? "-space-x-4" : "-space-x-5"} ${
-                isHitMode ? "cursor-pointer pointer-events-auto ring-2 ring-yellow-400 rounded-lg p-1 bg-yellow-400/10" : "pointer-events-none"
+              className={`relative flex min-h-[52px] items-end justify-center rounded-[22px] border px-2 pb-2 pt-3 ${
+                isHitMode
+                  ? "pointer-events-auto cursor-pointer border-amber-300/45 bg-amber-300/10 shadow-[0_0_22px_rgba(251,191,36,0.16)]"
+                  : "pointer-events-none border-white/8 bg-black/18"
               } ${
-                isWinningSeat ? "rounded-xl bg-emerald-300/8 p-1 ring-1 ring-emerald-300/35 shadow-[0_0_22px_rgba(52,211,153,0.16)]" : ""
+                feedbackPulseArea === "spreads" ? "rt-table-shake border-rose-300/45" : ""
               }`}
               onClick={() => isHitMode && executeHit(player.userId, sIdx)}
-              initial={{
-                opacity: 0,
-                y: player.userId === user._id ? 68 : -28,
-                scale: 0.84,
-              }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
+              initial={{ opacity: 0, y: zone === "bottom" ? 42 : -18, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: isHitMode ? 1.01 : 1 }}
               transition={{ type: "spring", stiffness: 270, damping: 20, delay: sIdx * 0.06 }}
             >
               {spread.map((card, cIdx) => (
                 <motion.div
                   key={cIdx}
+                  className="origin-bottom"
+                  style={{
+                    marginLeft: cIdx === 0 ? 0 : `-${isPhoneLandscapeLayout ? 14 : spread.length >= 5 ? 18 : 15}px`,
+                    zIndex: cIdx + 1,
+                  }}
                   initial={{
                     opacity: 0,
                     y: 20,
-                    x: (cIdx - (spread.length - 1) / 2) * 10,
-                    rotate: (cIdx - (spread.length - 1) / 2) * 5,
+                    x: (cIdx - (spread.length - 1) / 2) * 8,
+                    rotate: (cIdx - (spread.length - 1) / 2) * 6,
                     scale: 0.86,
                   }}
-                  animate={{ opacity: 1, y: 0, x: 0, rotate: 0, scale: 1 }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                    x: (cIdx - (spread.length - 1) / 2) * 2,
+                    rotate: (cIdx - (spread.length - 1) / 2) * 3.5,
+                    scale: 1,
+                  }}
                   transition={{
                     type: "spring",
                     stiffness: 320,
@@ -1333,12 +1537,21 @@ const GameTable: React.FC = () => {
                   <CardComponent
                     suit={card.suit}
                     rank={card.rank}
-                    className={isPhoneLandscapeLayout ? "w-8 h-11 text-[8px]" : "w-8 h-12 sm:w-9 sm:h-14 text-[9px]"}
+                    className={
+                      isPhoneLandscapeLayout
+                        ? spread.length >= 5
+                          ? "h-10 w-7"
+                          : "h-11 w-8"
+                        : spread.length >= 5
+                          ? "h-12 w-8 sm:h-14 sm:w-9"
+                          : "h-[3.75rem] w-9 sm:h-[4.25rem] sm:w-10"
+                    }
                   />
                 </motion.div>
               ))}
             </motion.div>
           ))}
+          </div>
         </div>
       </div>
     );
@@ -1349,16 +1562,14 @@ const GameTable: React.FC = () => {
 
     return (
       <div
-        className={`flex w-full items-start justify-center ${
-          revealedSpreadGroups.length > 1 ? "gap-5 sm:gap-8" : "gap-3"
+        className={`flex w-full flex-wrap items-start justify-center ${
+          revealedSpreadGroups.length > 1 ? "gap-3 sm:gap-5" : "gap-3"
         } ${isPhoneLandscapeLayout ? "max-w-[88%]" : "max-w-[72%]"}`}
       >
         {revealedSpreadGroups.map((spread, spreadIndex) => (
           <motion.div
             key={`reveal-lane-${spreadIndex}`}
-            className={`rounded-2xl px-2 py-1 ${
-              isPhoneLandscapeLayout ? "-space-x-4" : "-space-x-5"
-            } flex bg-emerald-300/8 ring-1 ring-emerald-300/30 shadow-[0_0_26px_rgba(52,211,153,0.15)]`}
+            className="flex items-end justify-center rounded-[24px] border border-emerald-200/30 bg-emerald-300/10 px-3 py-2 shadow-[0_0_28px_rgba(52,211,153,0.16)]"
             initial={{ opacity: 0, y: 24, scale: 0.94 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ type: "spring", stiffness: 260, damping: 24, delay: spreadIndex * 0.08 }}
@@ -1366,6 +1577,11 @@ const GameTable: React.FC = () => {
             {spread.map((card, cardIndex) => (
               <motion.div
                 key={`${card.rank}-${card.suit}-${cardIndex}`}
+                className="origin-bottom"
+                style={{
+                  marginLeft: cardIndex === 0 ? 0 : `-${isPhoneLandscapeLayout ? 14 : 18}px`,
+                  zIndex: cardIndex + 1,
+                }}
                 initial={{
                   opacity: 0,
                   y: 16,
@@ -1373,13 +1589,19 @@ const GameTable: React.FC = () => {
                   rotate: (cardIndex - (spread.length - 1) / 2) * 4,
                   scale: 0.9,
                 }}
-                animate={{ opacity: 1, y: 0, x: 0, rotate: 0, scale: 1 }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                  x: (cardIndex - (spread.length - 1) / 2) * 2,
+                  rotate: (cardIndex - (spread.length - 1) / 2) * 3.5,
+                  scale: 1,
+                }}
                 transition={{ type: "spring", stiffness: 300, damping: 24, delay: 0.03 * cardIndex }}
               >
                 <CardComponent
                   suit={card.suit}
                   rank={card.rank}
-                  className={isPhoneLandscapeLayout ? "w-8 h-11 text-[8px]" : "w-9 h-14 text-[9px]"}
+                  className={isPhoneLandscapeLayout ? "h-11 w-8" : "h-[4.25rem] w-10"}
                 />
               </motion.div>
             ))}
@@ -1403,6 +1625,8 @@ const GameTable: React.FC = () => {
           }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_20%,rgba(255,199,74,0.22),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_78%,rgba(32,98,65,0.18),transparent_40%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_48%,rgba(2,6,8,0.4)_100%)]" />
       </div>
 
       <div
@@ -1438,36 +1662,40 @@ const GameTable: React.FC = () => {
                 isPhoneLandscapeLayout
                   ? "w-full h-full rounded-[18px] border-[8px]"
                   : "aspect-[16/9] rounded-[28px] border-[12px] w-[96vw]"
-              } shadow-2xl overflow-hidden bg-black/20 ${isReem ? 'border-yellow-400 animate-pulse' : 'border-[#3b2c12]'}`}
+              } overflow-hidden border-[#3b2c12] shadow-[0_36px_70px_rgba(0,0,0,0.55)] ${isReem ? "rt-reem-burst border-yellow-300" : ""}`}
               style={isPhoneLandscapeLayout ? undefined : { maxWidth: `${tableMaxWidthPx}px` }}
             >
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.06),transparent_60%)]" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_52%,rgba(35,111,67,0.94),rgba(11,57,33,0.98)_48%,rgba(6,28,17,1)_100%)]" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.08),transparent_56%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_16%,transparent_82%,rgba(0,0,0,0.24))]" />
+              <div className="absolute inset-[10px] rounded-[20px] border border-white/8 shadow-[inset_0_0_40px_rgba(0,0,0,0.26)]" />
               <div
                 className={`absolute inset-0 transition-opacity duration-300 ${
                   isMyTurn
-                    ? "opacity-100 bg-[radial-gradient(circle_at_50%_54%,rgba(255,255,255,0.12),rgba(0,0,0,0.08)_46%,rgba(0,0,0,0.22)_100%)]"
-                    : "opacity-0"
+                    ? "opacity-100 bg-[radial-gradient(circle_at_50%_54%,rgba(255,245,204,0.1),rgba(0,0,0,0.05)_48%,rgba(0,0,0,0.24)_100%)]"
+                    : "opacity-55"
                 }`}
               />
               <div
                 className={`pointer-events-none absolute inset-0 transition-opacity duration-300 ${
                   isRoundEnd
-                    ? "opacity-100 bg-[radial-gradient(circle_at_50%_46%,rgba(255,236,179,0.08),rgba(0,0,0,0.08)_34%,rgba(0,0,0,0.2)_100%)]"
+                    ? "opacity-100 bg-[radial-gradient(circle_at_50%_46%,rgba(255,236,179,0.1),rgba(0,0,0,0.08)_34%,rgba(0,0,0,0.24)_100%)]"
                     : "opacity-0"
                 }`}
               />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_55%,transparent_0%,transparent_60%,rgba(0,0,0,0.28)_100%)]" />
               <div
-                className={`absolute z-20 flex items-center justify-between ${
+                className={`absolute z-30 flex items-center justify-between ${
                   isPhoneLandscapeLayout ? "top-2 left-2 right-2 gap-1.5" : "top-3 left-3 right-3 gap-2"
                 }`}
               >
                 <div
-                  className={`flex items-center bg-black/50 text-white rounded-full border border-white/10 backdrop-blur-sm min-w-0 ${
-                    isPhoneLandscapeLayout ? "gap-1 px-2 py-0.5" : "gap-2 px-2 py-1"
+                  className={`flex min-w-0 items-center rounded-full border border-white/12 bg-black/35 text-white backdrop-blur-md ${
+                    isPhoneLandscapeLayout ? "gap-1 px-2 py-1" : "gap-2 px-3 py-1.5"
                   }`}
                 >
                   <div className="relative flex-shrink-0">
-                    <div className="absolute -inset-1 rounded-full bg-yellow-400/20 blur-lg" />
+                    <div className="absolute -inset-1 rounded-full bg-amber-300/20 blur-lg" />
                     <img
                       src={logoSrc}
                       alt="ReemTeam logo"
@@ -1476,24 +1704,24 @@ const GameTable: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <div
-                      className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} font-bold tracking-wide truncate`}
+                      className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} font-bold uppercase tracking-[0.22em] truncate`}
                       style={{ fontFamily: displayFont }}
                     >
                       ReemTeam
                     </div>
                     {!isPhoneLandscapeLayout ? (
-                      <div className="text-[9px] text-white/60 uppercase tracking-[0.3em]">Tonk Arena</div>
+                      <div className="text-[9px] text-white/52 uppercase tracking-[0.28em]">Digital Table</div>
                     ) : null}
                   </div>
                 </div>
                 <div className={`flex items-center ${isPhoneLandscapeLayout ? "gap-1" : "gap-2"}`}>
                   <div
-                    className={`flex items-center bg-black/50 text-white rounded-full border border-white/10 backdrop-blur-sm ${
-                      isPhoneLandscapeLayout ? "gap-1 px-2 py-0.5 text-[10px]" : "gap-2 px-2 py-1 text-[10px]"
+                    className={`flex items-center bg-black/35 text-white rounded-full border border-white/12 backdrop-blur-md ${
+                      isPhoneLandscapeLayout ? "gap-1 px-2 py-1 text-[10px]" : "gap-2 px-3 py-1.5 text-[10px]"
                     }`}
                   >
                     {!isPhoneLandscapeLayout ? (
-                      <span className="uppercase tracking-widest text-[9px] text-white/60">Players</span>
+                      <span className="uppercase tracking-[0.24em] text-[9px] text-white/55">Players</span>
                     ) : null}
                     <span className="font-bold">
                       {isPhoneLandscapeLayout ? "P " : ""}
@@ -1501,12 +1729,12 @@ const GameTable: React.FC = () => {
                     </span>
                   </div>
                   <div
-                    className={`flex items-center bg-black/50 text-white rounded-full border border-white/10 backdrop-blur-sm ${
-                      isPhoneLandscapeLayout ? "gap-1 px-2 py-0.5 text-[10px]" : "gap-2 px-2 py-1 text-[10px]"
+                    className={`flex items-center bg-black/35 text-white rounded-full border border-white/12 backdrop-blur-md ${
+                      isPhoneLandscapeLayout ? "gap-1 px-2 py-1 text-[10px]" : "gap-2 px-3 py-1.5 text-[10px]"
                     }`}
                   >
                     {!isPhoneLandscapeLayout ? (
-                      <span className="uppercase tracking-widest text-[9px] text-white/60">Table Pot</span>
+                      <span className="uppercase tracking-[0.24em] text-[9px] text-white/55">Table Pot</span>
                     ) : null}
                     <span className="font-bold">{formatSeatBalance(gameState.pot)}</span>
                   </div>
@@ -1514,7 +1742,7 @@ const GameTable: React.FC = () => {
                     variant="secondary"
                     size="sm"
                     onClick={handleOpenHowToPlay}
-                    className={isPhoneLandscapeLayout ? "h-9 px-3 text-[11px]" : ""}
+                    className={isPhoneLandscapeLayout ? "h-9 px-3 text-[11px]" : "h-9"}
                   >
                     Rules
                   </Button>
@@ -1522,64 +1750,24 @@ const GameTable: React.FC = () => {
                     variant="danger"
                     size="sm"
                     onClick={handleLeaveTable}
-                    className={isPhoneLandscapeLayout ? "h-9 px-3 text-[11px]" : ""}
+                    className={isPhoneLandscapeLayout ? "h-9 px-3 text-[11px]" : "h-9"}
                   >
                     Leave
                   </Button>
                 </div>
               </div>
 
-              {!isPhoneLandscapeLayout && !isRoundEnd ? (
-                <div className="absolute right-3 top-14 z-30 pointer-events-none">
-                  <div className="max-w-[240px] rounded-lg border border-cyan-200/60 bg-black/72 px-3 py-2 text-right shadow-[0_0_18px_rgba(34,211,238,0.2)] backdrop-blur-sm">
-                    <div className="text-[10px] font-semibold text-cyan-100">{flowActorLabel}</div>
-                    <div className="mt-1 flex items-center justify-end gap-2 text-[10px] uppercase tracking-wide">
-                      <span
-                        className={`transition-all ${
-                          activeTurnStepLabel === "Draw"
-                            ? "text-cyan-100 drop-shadow-[0_0_10px_rgba(34,211,238,0.65)]"
-                            : "text-cyan-200/60"
-                        }`}
-                      >
-                        Draw
-                      </span>
-                      <div className="relative h-[2px] w-16 rounded-full bg-cyan-100/20">
-                        <div
-                          className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
-                            activeTurnStepLabel === "Draw" ? "w-1/3 bg-cyan-300" : "w-full bg-emerald-300"
-                          }`}
-                        />
-                      </div>
-                      <span
-                        className={`transition-all ${
-                          activeTurnStepLabel === "Discard"
-                            ? "text-emerald-100 drop-shadow-[0_0_10px_rgba(52,211,153,0.68)]"
-                            : "text-cyan-200/60"
-                        }`}
-                      >
-                        Discard
-                      </span>
-                    </div>
-                    {isMyTurn ? (
-                      <div className="mt-1 text-[9px] font-medium text-cyan-200/90">
-                        {isDiscardStep ? "Select 1 card, then tap Discard." : "Draw from deck or discard pile."}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
+              {renderSeatInfo(topPlayer, topSeatPositionClass, "left", isThreeHandedTable ? "-rotate-[3deg]" : "")}
+              {renderSeatInfo(leftPlayer, leftSeatPositionClass, "left", "-rotate-[4deg]")}
+              {renderSeatInfo(rightPlayer, rightSeatPositionClass, "right", isThreeHandedTable ? "rotate-[3deg]" : "rotate-[4deg]")}
 
-              {renderSeatInfo(topPlayer, topSeatPositionClass, topSeatAlign)}
-              {renderSeatInfo(leftPlayer, leftSeatPositionClass, "left")}
-              {renderSeatInfo(rightPlayer, rightSeatPositionClass, "right")}
-
-              {renderSpreadZone(topPlayer, "Top Spread", topSpreadPositionClass)}
-              {renderSpreadZone(leftPlayer, "Left Spread", leftSpreadPositionClass)}
-              {renderSpreadZone(rightPlayer, "Right Spread", rightSpreadPositionClass)}
-              {renderSpreadZone(currentPlayer ?? null, "Your Spread", mySpreadPositionClass)}
+              {renderSpreadZone(topPlayer, "top", topSpreadPositionClass)}
+              {renderSpreadZone(leftPlayer, "left", leftSpreadPositionClass)}
+              {renderSpreadZone(rightPlayer, "right", rightSpreadPositionClass)}
+              {renderSpreadZone(currentPlayer ?? null, "bottom", mySpreadPositionClass)}
 
               {showDealAnimation && (
-                <div className="absolute inset-0 z-30 pointer-events-none">
+                <div className="absolute inset-0 z-40 pointer-events-none">
                   {shufflePhase ? (
                     <div className="absolute left-1/2 top-[40%] -translate-x-1/2 -translate-y-1/2">
                       {Array.from({ length: 3 }).map((_, idx) => (
@@ -1639,92 +1827,189 @@ const GameTable: React.FC = () => {
                 </div>
               )}
 
-              {isRoundEnd ? (
-                <div
-                  className={`pointer-events-none absolute left-1/2 z-20 ${roundOutcomePositionClass} -translate-x-1/2 -translate-y-1/2`}
-                >
-                  <div className="flex max-w-[78vw] flex-col items-center text-center sm:max-w-[520px]">
-                    <div
-                      className={`font-black uppercase tracking-[0.18em] text-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.58)] ${
-                        isPhoneLandscapeLayout ? "text-lg" : "text-2xl sm:text-3xl"
-                      }`}
-                    >
-                      {roundOutcome.headline}
-                    </div>
-                    <div className={`${isPhoneLandscapeLayout ? "mt-2 text-[11px]" : "mt-3 text-sm sm:text-base"} font-semibold text-amber-100`}>
-                      {winnerLine}
-                    </div>
-                    <div className={`${isPhoneLandscapeLayout ? "mt-2 text-[9px]" : "mt-3 text-[11px] sm:text-sm"} text-white/72`}>
-                      {roundOutcome.explanation}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
               <div
-                className={`center-pile absolute left-1/2 ${
-                  isPhoneLandscapeLayout ? "top-[43%]" : "top-1/2"
-                } -translate-x-1/2 -translate-y-1/2 flex flex-col items-center ${
-                  isPhoneLandscapeLayout ? "gap-1.5" : "gap-2"
-                } transition-all duration-300 ${
-                  isRoundEnd
-                    ? "opacity-90 brightness-90"
-                    : isMyTurn
-                      ? "brightness-110"
-                      : "brightness-100"
-                }`}
+                className={`pointer-events-none absolute left-1/2 z-30 ${
+                  isPhoneLandscapeLayout ? "top-[26%]" : "top-[27%]"
+                } -translate-x-1/2 -translate-y-1/2`}
               >
-                <div className={`flex items-center ${isPhoneLandscapeLayout ? "gap-3" : "gap-4"}`}>
-                  <div className={`relative ${isPhoneLandscapeLayout ? "w-8 h-11" : "w-8 h-12 sm:w-10 sm:h-14"}`}>
-                    {!hideCardsForPresentation && gameState.deck.length > 0 && (
-                      <div
-                        className={`w-full h-full rounded-lg border border-white/20 shadow-xl flex items-center justify-center relative transition-transform ${deckPrimaryHighlightClass}`}
-                        style={{
-                          backgroundImage: `url(${backCardImage})`,
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                        }}
-                        onClick={handleDeckClick}
-                      >
-                      </div>
-                    )}
-                  </div>
-                  <div
-                    className={`relative ${isPhoneLandscapeLayout ? "w-8 h-11" : "w-8 h-12 sm:w-10 sm:h-14"}`}
-                    onClick={() => {
-                      if (!hideCardsForPresentation) handleDiscardPileClick();
-                    }}
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={`${centerState.title}-${centerState.detail}-${lastActionTimestamp}`}
+                    initial={{ opacity: 0, y: 12, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    transition={{ duration: 0.28, ease: "easeOut" }}
+                    className={`rounded-[30px] border px-4 py-3 text-center backdrop-blur-md ${
+                      isPhoneLandscapeLayout ? "min-w-[210px] max-w-[250px]" : "min-w-[300px] max-w-[360px]"
+                    } ${centerToneClasses[centerState.tone]}`}
                   >
-                    {!hideCardsForPresentation && gameState.discardPile.length > 0 ? (
-                      <div className={`relative transition-all ${discardPrimaryHighlightClass}`}>
-                        <CardComponent
-                          suit={gameState.discardPile[gameState.discardPile.length - 1].suit}
-                          rank={gameState.discardPile[gameState.discardPile.length - 1].rank}
-                          className={isPhoneLandscapeLayout ? "w-8 h-11" : "w-8 h-12 sm:w-10 sm:h-14"}
-                        />
-                      </div>
-                    ) : !hideCardsForPresentation ? (
-                      <div className={`w-full h-full border-2 border-dashed border-white/30 rounded-lg flex items-center justify-center text-white/40 relative ${discardPrimaryHighlightClass}`}>
-                        Discard
+                    <div className="text-[9px] uppercase tracking-[0.28em] text-white/62">{centerState.eyebrow}</div>
+                    <div
+                      className={`${isPhoneLandscapeLayout ? "mt-1 text-lg" : "mt-1 text-[1.9rem]"} font-black uppercase leading-none tracking-[0.16em] text-white`}
+                      style={{ fontFamily: displayFont }}
+                    >
+                      {centerState.title}
+                    </div>
+                    <div className={`${isPhoneLandscapeLayout ? "mt-1 text-[10px]" : "mt-1.5 text-[11px]"} text-white/72`}>
+                      {centerState.detail}
+                    </div>
+                    {!isRoundEnd ? (
+                      <div className="mt-2 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/60">
+                        <span className={activeTurnStepLabel === "Draw" ? "text-cyan-100" : "text-white/40"}>Draw</span>
+                        <div className="relative h-[2px] w-14 rounded-full bg-white/10">
+                          <div
+                            className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
+                              activeTurnStepLabel === "Draw" ? "w-1/3 bg-cyan-300" : "w-full bg-emerald-300"
+                            }`}
+                          />
+                        </div>
+                        <span className={activeTurnStepLabel === "Discard" ? "text-emerald-100" : "text-white/40"}>Discard</span>
                       </div>
                     ) : null}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+              <div
+                className={`absolute left-1/2 z-30 ${
+                  isPhoneLandscapeLayout ? "top-[48%]" : "top-[49%]"
+                } -translate-x-1/2 -translate-y-1/2`}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <div className={`flex items-center ${isPhoneLandscapeLayout ? "gap-2.5" : "gap-4"}`}>
+                    <motion.button
+                      type="button"
+                      onClick={handleDeckClick}
+                      animate={deckIsAnimating ? { y: [0, -6, 0], scale: [1, 1.05, 1], rotate: [0, -2, 0] } : undefined}
+                      transition={deckIsAnimating ? { duration: 0.42 } : undefined}
+                      className={`group relative rounded-[24px] border border-white/12 bg-black/30 p-2 backdrop-blur-sm transition-all ${
+                        feedbackPulseArea === "center" ? "rt-table-shake border-rose-300/45" : ""
+                      } ${deckPrimaryHighlightClass}`}
+                      aria-label="Draw from deck"
+                    >
+                      <div className={`relative ${isPhoneLandscapeLayout ? "h-11 w-8" : "h-14 w-10"}`}>
+                        <div
+                          className="absolute left-1 top-1 h-full w-full rounded-lg border border-white/10 opacity-65"
+                          style={{
+                            backgroundImage: `url(${backCardImage})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        <div
+                          className="absolute left-0.5 top-0.5 h-full w-full rounded-lg border border-white/15"
+                          style={{
+                            backgroundImage: `url(${backCardImage})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        <div
+                          className="relative h-full w-full rounded-lg border border-white/20 shadow-xl"
+                          style={{
+                            backgroundImage: `url(${backCardImage})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                      </div>
+                      <div className="mt-2 text-[9px] uppercase tracking-[0.22em] text-white/58">Deck</div>
+                      <div className="mt-0.5 text-center text-xs font-semibold text-white">{gameState.deck.length}</div>
+                    </motion.button>
+
+                    <motion.div
+                      animate={
+                        centerState.tone === "burst"
+                          ? {
+                              scale: [1, 1.06, 1],
+                              boxShadow: [
+                                "0 0 0 rgba(0,0,0,0)",
+                                "0 0 34px rgba(251,191,36,0.28)",
+                                "0 0 0 rgba(0,0,0,0)",
+                              ],
+                            }
+                          : centerState.tone === "action"
+                            ? { scale: [1, 1.02, 1] }
+                            : undefined
+                      }
+                      transition={{ duration: centerState.tone === "burst" ? 1.2 : 2.6 }}
+                      className={`relative rounded-full border border-white/12 bg-black/28 text-white shadow-[0_18px_34px_rgba(0,0,0,0.34)] backdrop-blur-md ${
+                        isPhoneLandscapeLayout ? "h-20 w-20" : "h-24 w-24"
+                      }`}
+                    >
+                      <div className="absolute inset-[7px] rounded-full border border-white/8" />
+                      <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,0.14),rgba(255,255,255,0.03)_58%,transparent_72%)]" />
+                      <div className="relative flex h-full w-full flex-col items-center justify-center">
+                        <img
+                          src={logoSrc}
+                          alt="ReemTeam logo"
+                          className={isPhoneLandscapeLayout ? "h-8 w-8 object-contain" : "h-10 w-10 object-contain"}
+                        />
+                        <div className="mt-1 text-[9px] uppercase tracking-[0.28em] text-white/55">Center</div>
+                      </div>
+                    </motion.div>
+
+                    <motion.button
+                      type="button"
+                      onClick={() => {
+                        if (!hideCardsForPresentation) handleDiscardPileClick();
+                      }}
+                      animate={discardIsAnimating ? { y: [0, -4, 0], scale: [1, 1.04, 1], rotate: [0, 2, 0] } : undefined}
+                      transition={discardIsAnimating ? { duration: 0.42 } : undefined}
+                      className={`group relative rounded-[24px] border border-white/12 bg-black/30 p-2 backdrop-blur-sm transition-all ${
+                        feedbackPulseArea === "discard" ? "rt-table-shake border-rose-300/45" : ""
+                      } ${discardPrimaryHighlightClass}`}
+                      aria-label="Discard pile"
+                    >
+                      <div className={`relative ${isPhoneLandscapeLayout ? "h-11 w-8" : "h-14 w-10"}`}>
+                        {!hideCardsForPresentation && gameState.discardPile.length > 0 ? (
+                          <CardComponent
+                            suit={gameState.discardPile[gameState.discardPile.length - 1].suit}
+                            rank={gameState.discardPile[gameState.discardPile.length - 1].rank}
+                            className={isPhoneLandscapeLayout ? "h-11 w-8" : "h-14 w-10"}
+                          />
+                        ) : !hideCardsForPresentation ? (
+                          <div className="flex h-full w-full items-center justify-center rounded-lg border border-dashed border-white/22 bg-black/25 text-[9px] uppercase tracking-[0.22em] text-white/42">
+                            Empty
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="mt-2 text-[9px] uppercase tracking-[0.22em] text-white/58">Discard</div>
+                      <div className="mt-0.5 text-center text-xs font-semibold text-white/85">{gameState.discardPile.length}</div>
+                    </motion.button>
                   </div>
+
+                  {centerFeedback ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`rounded-full border px-3 py-1 text-center text-[10px] font-semibold tracking-[0.16em] backdrop-blur-sm ${
+                        centerFeedback.tone === "error"
+                          ? "border-rose-300/35 bg-rose-500/16 text-rose-100"
+                          : "border-sky-300/25 bg-sky-400/12 text-sky-100"
+                      }`}
+                    >
+                      {centerFeedback.message}
+                    </motion.div>
+                  ) : null}
                 </div>
               </div>
 
               {isRoundEnd ? (
                 <div
-                  className={`absolute left-1/2 z-30 ${roundLowerStackPositionClass} -translate-x-1/2 pointer-events-none`}
+                  className={`pointer-events-none absolute left-1/2 z-20 ${
+                    isPhoneLandscapeLayout ? "top-[61%]" : "top-[58%]"
+                  } -translate-x-1/2`}
                 >
-                  <div className={`flex flex-col items-center ${isPhoneLandscapeLayout ? "gap-1.5" : "gap-2"}`}>
+                  <div className="flex flex-col items-center gap-2">
                     {renderRevealLane()}
-                    <div className="pointer-events-auto flex items-center gap-2">
+                    <div className="hidden pointer-events-auto items-center gap-2">
                       {isContinuousMode && !isSpectator ? (
                         <Button onClick={handlePutIn} variant="primary" size="sm" disabled={isReadyForNextRound}>
                           Run It Back
                         </Button>
                       ) : null}
                     </div>
-                    <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[11px]"} text-white/72`}>
+                    <div className={`hidden ${isPhoneLandscapeLayout ? "text-[9px]" : "text-[11px]"} text-white/72`}>
                       {countdownLabel ? (
                         <>
                           {countdownLabel}
@@ -1736,7 +2021,7 @@ const GameTable: React.FC = () => {
                       )}
                     </div>
                     {roundStatusDetail ? (
-                      <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[10px]"} uppercase tracking-[0.16em] text-white/46`}>
+                      <div className={`hidden ${isPhoneLandscapeLayout ? "text-[8px]" : "text-[10px]"} uppercase tracking-[0.16em] text-white/46`}>
                         {roundStatusDetail}
                       </div>
                     ) : null}
@@ -1745,32 +2030,33 @@ const GameTable: React.FC = () => {
               ) : null}
 
               <div
-                className={`seat absolute left-1/2 -translate-x-1/2 pointer-events-auto ${
+                className={`seat absolute left-1/2 z-40 -translate-x-1/2 pointer-events-auto ${
                   isPhoneLandscapeLayout
-                    ? "w-[99%] h-[160px] bottom-0"
+                    ? "bottom-0 h-[192px] w-[99%]"
                     : isCompactLandscape
-                      ? "w-[96%] max-w-[820px] h-[168px] bottom-1"
-                      : "w-[96%] max-w-[820px] h-[176px] bottom-2"
+                      ? "bottom-1 h-[214px] w-[96%] max-w-[930px]"
+                      : "bottom-2 h-[232px] w-[96%] max-w-[960px]"
                 }`}
               >
-                <div className={`flex w-full h-full ${isPhoneLandscapeLayout ? "items-end gap-1.5" : "items-end gap-2"}`}>
+                <div className={`flex h-full w-full ${isPhoneLandscapeLayout ? "items-end gap-2" : "items-end gap-3"}`}>
                   <div
                     className={`${
                       isBottomSeatActive ? "active-seat" : "inactive-seat"
-                    } relative rounded-lg border transition-all duration-300 ${
+                    } relative rounded-[26px] border backdrop-blur-md transition-all duration-300 ${
                       isPhoneLandscapeLayout
-                        ? "min-w-[128px] px-1.5 py-1 mb-1"
-                        : `min-w-[140px] px-2 py-2 ${isCompactLandscape ? "mb-4" : "mb-6"}`
+                        ? "mb-2 min-w-[148px] px-2.5 py-2"
+                        : "mb-3 min-w-[190px] px-3 py-3"
                     } ${bottomSeatShellClass}`}
                   >
+                    <div className="absolute inset-0 rounded-[26px] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))]" />
                     {isBottomSeatActive && !isRoundEnd ? (
-                      <div className="absolute -inset-1 rounded-2xl bg-amber-300/15 blur-xl" aria-hidden />
+                      <div className="absolute -inset-2 rounded-[30px] bg-amber-300/16 blur-2xl" aria-hidden />
                     ) : null}
                     {shouldHighlightBottomWinner ? (
-                      <div className="absolute -inset-2 rounded-[28px] bg-emerald-300/14 blur-2xl" aria-hidden />
+                      <div className="absolute -inset-3 rounded-[34px] bg-emerald-300/18 blur-3xl" aria-hidden />
                     ) : null}
-                    <div className={`flex items-center ${isPhoneLandscapeLayout ? "gap-1.5" : "gap-2"}`}>
-                      <div className="relative">
+                    <div className={`relative flex items-center ${isPhoneLandscapeLayout ? "gap-2" : "gap-3"}`}>
+                      <div className="relative flex-shrink-0">
                         <PlayerAvatar player={{ name: bottomSeatName, avatarUrl: bottomSeatAvatarUrl }} size="sm" />
                         <TurnTimer
                           duration={turnDurationMs}
@@ -1781,10 +2067,10 @@ const GameTable: React.FC = () => {
                           className={isBottomSeatActive ? "animate-pulse" : ""}
                         />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         {isRoundEnd ? (
                           <div
-                            className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-wide ${
+                            className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-[0.2em] ${
                               isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"
                             } ${
                               shouldHighlightBottomWinner
@@ -1798,7 +2084,7 @@ const GameTable: React.FC = () => {
                           </div>
                         ) : (
                           <div
-                            className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-wide ${
+                            className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-[0.2em] ${
                               isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"
                             } ${turnStatusClasses[myTurnStatus]}`}
                           >
@@ -1806,7 +2092,7 @@ const GameTable: React.FC = () => {
                           </div>
                         )}
                         {isPhoneLandscapeLayout && !isRoundEnd ? (
-                          <div className="mb-1 rounded-md border border-cyan-200/40 bg-black/35 px-1.5 py-1 text-cyan-100">
+                          <div className="mb-1 rounded-md border border-cyan-200/30 bg-black/28 px-1.5 py-1 text-cyan-100">
                             <div className="truncate text-[8px] font-semibold">{flowActorLabel}</div>
                             <div className="mt-0.5 flex items-center gap-1 text-[8px] uppercase tracking-wide">
                               <span
@@ -1837,14 +2123,14 @@ const GameTable: React.FC = () => {
                             </div>
                           </div>
                         ) : null}
-                        <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} text-white font-semibold leading-tight`}>
+                        <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} truncate text-white font-semibold leading-tight`}>
                           {bottomSeatName}
                         </div>
-                        <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} text-white/60 leading-tight`}>
-                          Cards: {visibleHand.length}
-                        </div>
-                        <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} text-yellow-300/95 leading-tight`}>
+                        <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} text-white/58 leading-tight`}>
                           {bottomSeatBalance}
+                        </div>
+                        <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} mt-0.5 text-white/42 leading-tight uppercase tracking-[0.14em]`}>
+                          {visibleHand.length} cards
                         </div>
                         {bottomSeatRoundResult ? (
                           <>
@@ -1870,7 +2156,7 @@ const GameTable: React.FC = () => {
                     </div>
                   </div>
 
-                  {showSideActionStack && (
+                  {false && showActionDock && (
                     <div
                       className={`actions pointer-events-auto self-end ${
                         isPhoneLandscapeLayout
@@ -1903,47 +2189,98 @@ const GameTable: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="flex-1 flex flex-col items-center justify-end">
-                    {shouldShowGuidanceBanner ? (
-                      <div
-                        className={`w-full rounded-lg border border-sky-300/30 bg-black/45 text-center font-medium text-sky-100 shadow-[0_0_18px_rgba(56,189,248,0.18)] pointer-events-none select-none ${
+                  <div className="flex-1 flex flex-col justify-end gap-2">
+                    <div
+                        className={`w-full rounded-[28px] border text-left font-medium backdrop-blur-md pointer-events-none select-none ${
+                          isRoundEnd
+                            ? "border-white/12 bg-black/38 text-white"
+                            : handFeedback?.tone === "error"
+                              ? "border-rose-300/35 bg-rose-500/10 text-rose-100"
+                              : isDiscardStep
+                                ? "border-amber-300/35 bg-amber-300/10 text-amber-50"
+                                : isMyTurn
+                                  ? "border-sky-300/28 bg-sky-400/8 text-sky-100"
+                                  : "border-white/10 bg-black/32 text-sky-100"
+                        } ${
                           isPhoneLandscapeLayout
-                            ? "mb-0.5 max-w-[460px] px-2 py-0.5 text-[9px]"
-                            : "mb-1 max-w-[520px] px-3 py-1.5 text-[11px]"
+                            ? "px-3 py-2 text-[10px]"
+                            : "px-4 py-3 text-[12px]"
                         }`}
                       >
-                        {guidanceBannerText}
+                        <div className="text-[9px] uppercase tracking-[0.28em] text-white/50">
+                          {isRoundEnd ? "Round Rail" : isMyTurn ? "Your Hand" : "Table Prompt"}
+                        </div>
+                        <div className={`${isPhoneLandscapeLayout ? "mt-1 text-[11px]" : "mt-1 text-sm"} font-semibold`}>
+                          {guidanceBannerText}
+                        </div>
+                        {isRoundEnd ? (
+                          <div className="mt-1 text-[10px] text-white/64">
+                            {countdownLabel ? `${countdownLabel} | ${roundRailStatusLabel}` : roundRailStatusLabel}
+                            {roundStatusDetail ? ` | ${roundStatusDetail}` : ""}
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
                     {shouldShowGuidanceHelper && !isPhoneLandscapeLayout ? (
                       <div
-                        className={`${isPhoneLandscapeLayout ? "mb-0.5 text-[9px]" : "mb-1 text-[10px]"} font-semibold pointer-events-none select-none ${
-                          selectedIllegalDiscardCard ? "text-rose-300" : "text-emerald-200"
+                        className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} px-2 font-semibold pointer-events-none select-none ${
+                          handFeedback?.tone === "error" || selectedIllegalDiscardCard ? "text-rose-300" : "text-emerald-200"
                         }`}
                       >
                         {guidanceHelperText}
                         {canUseFlickDiscard && !isPhoneLandscapeLayout ? " Or flick selected card toward discard pile." : ""}
                       </div>
                     ) : null}
+                    {showActionDock ? (
+                      <div className={isPhoneLandscapeLayout ? "w-full" : "w-full"}>
+                        <GameActions
+                          drop={{
+                            enabled: canDrop,
+                            reason: canDrop ? undefined : dropDisabledReason,
+                            isPrimary: canDrop && isDrawStep,
+                          }}
+                          spread={{
+                            enabled: canSpread,
+                            reason: canSpread ? undefined : spreadDisabledReason,
+                            isPrimary: canSpread,
+                          }}
+                          hit={{
+                            enabled: canHit,
+                            reason: canHit ? undefined : hitDisabledReason,
+                            isPrimary: canHit,
+                          }}
+                          onDrop={handleDrop}
+                          onSpread={handleSpread}
+                          onHit={handleHitClick}
+                          layout={isPhoneLandscapeLayout ? "mobile-dock" : "default"}
+                        />
+                      </div>
+                    ) : isRoundEnd && isContinuousMode && !isSpectator ? (
+                      <div className="flex justify-start">
+                        <Button onClick={handlePutIn} variant="primary" size="sm" disabled={isReadyForNextRound}>
+                          {isReadyForNextRound ? "Ready For Next Hand" : "Run It Back"}
+                        </Button>
+                      </div>
+                    ) : null}
                     <div
-                      className={`w-full flex flex-col items-center ${
-                        isPhoneLandscapeLayout
-                          ? "-translate-x-3 translate-y-0"
-                          : isCompactLandscape
-                            ? "-translate-x-10 translate-y-4"
-                            : "-translate-x-14 translate-y-6"
-                      }`}
+                      className="w-full flex flex-col items-center"
                     >
                       <div
-                        className={`hand relative w-full pointer-events-auto ${
-                          isPhoneLandscapeLayout ? "h-[86px] max-w-none px-1" : "h-28 max-w-[760px]"
+                        className={`hand relative w-full pointer-events-auto rounded-[30px] border px-3 py-3 shadow-[0_24px_42px_rgba(0,0,0,0.32)] backdrop-blur-md ${
+                          isRoundEnd
+                            ? "border-white/10 bg-black/28"
+                            : isDiscardStep
+                              ? "border-amber-300/32 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.2))]"
+                              : isMyTurn
+                                ? "border-sky-300/24 bg-[linear-gradient(180deg,rgba(125,211,252,0.06),rgba(0,0,0,0.18))]"
+                                : "border-white/10 bg-black/24"
+                        } ${feedbackPulseArea === "hand" ? "rt-table-shake" : ""} ${
+                          isPhoneLandscapeLayout ? "h-[96px] max-w-none" : "h-[118px] max-w-none"
                         }`}
                       >
+                        <div className="pointer-events-none absolute inset-x-6 top-0 h-10 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.1),transparent_70%)] blur-xl" />
                         <AnimatePresence>
                           <div
-                            className={`flex flex-nowrap items-end justify-center ${
-                              isPhoneLandscapeLayout ? "gap-1" : "gap-1 sm:gap-1.5"
-                            }`}
+                            className="flex flex-nowrap items-end justify-center overflow-visible px-1"
                           >
                             {visibleHand.map((card) => {
                               const isSelectedCard = selectedCards.some(
@@ -1953,20 +2290,35 @@ const GameTable: React.FC = () => {
                                 isSelectedCard && isDiscardStep && isRestrictedDiscardCard(card);
                               const enableFlickDrag =
                                 canUseFlickDiscard && isSelectedCard && !isIllegalDiscardSelection;
+                              const cardIndex = visibleHand.findIndex(
+                                (handCard) => handCard.rank === card.rank && handCard.suit === card.suit
+                              );
+                              const centerOffset = cardIndex - (visibleHand.length - 1) / 2;
+                              const fanLift = Math.abs(centerOffset) * (isPhoneLandscapeLayout ? 4 : 6);
+                              const baseRotate = centerOffset * (isPhoneLandscapeLayout ? 4 : 5);
 
                               return (
                                 <motion.div
                                   key={`${card.rank}-${card.suit}`}
-                                  className="card"
-                                  initial={{ y: 30, opacity: 0 }}
+                                  className="card origin-bottom"
+                                  style={{
+                                    marginLeft: cardIndex === 0 ? 0 : `-${handOverlapPx}px`,
+                                    zIndex: isSelectedCard ? 60 + cardIndex : cardIndex + 1,
+                                  }}
+                                  initial={{ y: 36, opacity: 0, rotate: 0 }}
                                   animate={{
-                                    y: 0,
-                                    scale: isSelectedCard ? 1.04 : 1,
+                                    y: isSelectedCard ? -(fanLift + (isPhoneLandscapeLayout ? 14 : 18)) : -fanLift,
+                                    rotate: isSelectedCard ? baseRotate * 0.6 : baseRotate,
+                                    scale: isSelectedCard ? 1.06 : 1,
                                     opacity: 1,
                                   }}
                                   exit={{ y: -20, opacity: 0 }}
-                                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                                  whileHover={isMyTurn ? { scale: 1.03 } : undefined}
+                                  transition={{ type: "spring", stiffness: 280, damping: 24 }}
+                                  whileHover={
+                                    isMyTurn
+                                      ? { y: -(fanLift + (isPhoneLandscapeLayout ? 10 : 14)), scale: 1.04 }
+                                      : undefined
+                                  }
                                   whileTap={isMyTurn ? { scale: 0.98 } : undefined}
                                 >
                                   <CardComponent
@@ -1974,7 +2326,7 @@ const GameTable: React.FC = () => {
                                     rank={card.rank}
                                     isSelected={isSelectedCard}
                                     onClick={isSpectator ? undefined : () => toggleCardSelection(card)}
-                                    className={isPhoneLandscapeLayout ? phoneHandCardClass : "w-11 h-16 sm:w-12 sm:h-[4.5rem]"}
+                                    className={isPhoneLandscapeLayout ? phoneHandCardClass : "h-[4.6rem] w-12 sm:h-[5rem] sm:w-[3.35rem]"}
                                     badgeText={
                                       isIllegalDiscardSelection
                                         ? "Cannot discard this card this turn."

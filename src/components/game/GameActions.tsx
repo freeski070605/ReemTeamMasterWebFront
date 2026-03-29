@@ -35,7 +35,7 @@ const GameActions: React.FC<GameActionsProps> = ({
         ? "flex w-full flex-col gap-1.5"
         : orientation === "vertical"
         ? "flex flex-col gap-2"
-        : "flex flex-wrap justify-center gap-2.5";
+        : "flex flex-wrap justify-start gap-2";
 
   const renderAction = (
     label: string,
@@ -54,12 +54,12 @@ const GameActions: React.FC<GameActionsProps> = ({
         title={!state.enabled ? state.reason : undefined}
         aria-label={!state.enabled && state.reason ? `${label}: ${state.reason}` : label}
         className={
-          `${layout === "mobile-dock" ? "w-full h-11 px-2 text-sm" : ""}${
-            layout === "side-stack" ? "w-full h-8 rounded-lg px-2 text-xs" : ""
+          `${layout === "mobile-dock" ? "h-11 w-full rounded-2xl px-2 text-sm" : ""}${
+            layout === "side-stack" ? "h-8 w-full rounded-lg px-2 text-xs" : ""
           } ${
             state.enabled && state.isPrimary
-              ? "ring-2 ring-amber-300/90 shadow-[0_0_18px_rgba(251,191,36,0.52)] animate-pulse"
-              : ""
+              ? "ring-2 ring-amber-300/80 shadow-[0_0_20px_rgba(251,191,36,0.34)]"
+              : "border-white/15 bg-black/35"
           }`
         }
       >
