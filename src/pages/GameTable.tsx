@@ -996,7 +996,20 @@ const GameTable: React.FC = () => {
   const flowActorLabel = isMyTurn ? "Your Turn" : `${activeTurnPlayerName}'s Turn`;
   const activeTurnStepLabel = activeTurnHasDrawn ? "Discard" : "Draw";
   const isPhoneLandscapeLayout = isTouchDevice && isUltraShortLandscape;
-  const roundOutcomePositionClass = isPhoneLandscapeLayout ? "top-[25%]" : "top-[34%]";
+  const roundOutcomePositionClass = isPhoneLandscapeLayout
+    ? isReem
+      ? "top-[19%]"
+      : "top-[25%]"
+    : isReem
+      ? "top-[27%]"
+      : "top-[34%]";
+  const roundActionRailPositionClass = isPhoneLandscapeLayout
+    ? isReem
+      ? "bottom-[5.8rem] left-1/2 -translate-x-1/2"
+      : "bottom-[7.2rem] left-1/2 -translate-x-1/2"
+    : isReem
+      ? "bottom-3 left-1/2 -translate-x-1/2"
+      : "bottom-5 left-1/2 -translate-x-1/2";
   const isHeadsUpTable = totalPlayers <= 2;
   const topSeatPositionClass = isPhoneLandscapeLayout
     ? isHeadsUpTable
@@ -1294,6 +1307,7 @@ const GameTable: React.FC = () => {
         : visibleHand.length >= 4
           ? "w-[2.6rem] h-[3.8rem]"
           : "w-[2.8rem] h-[4.1rem]";
+  const reemShowcaseSpreads = isReem ? winnerPlayer?.spreads.map(sortSpreadCards) ?? [] : [];
 
   const renderSpreadZone = (
     player: typeof gameState.players[number] | null,
@@ -1304,6 +1318,7 @@ const GameTable: React.FC = () => {
     if (!player || player.spreads.length === 0) return null;
     const sortedSpreads = player.spreads.map(sortSpreadCards);
     const isWinningSeat = isRoundEnd && player.userId === winnerPlayer?.userId;
+    if (isReem && isWinningSeat) return null;
 
     return (
       <div className={`absolute z-10 pointer-events-none ${className}`}>
@@ -1347,6 +1362,57 @@ const GameTable: React.FC = () => {
                     suit={card.suit}
                     rank={card.rank}
                     className={isPhoneLandscapeLayout ? "w-8 h-11 text-[8px]" : "w-8 h-12 sm:w-9 sm:h-14 text-[9px]"}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderReemShowcaseRow = () => {
+    if (!isReem || reemShowcaseSpreads.length === 0) return null;
+
+    return (
+      <div
+        className={`absolute left-1/2 z-20 w-full -translate-x-1/2 -translate-y-1/2 pointer-events-none ${
+          isPhoneLandscapeLayout ? "top-[66%]" : "top-[62%]"
+        }`}
+      >
+        <div
+          className={`mx-auto flex items-start justify-center ${
+            reemShowcaseSpreads.length > 1 ? "gap-5 sm:gap-8" : "gap-3"
+          } ${isPhoneLandscapeLayout ? "max-w-[86%]" : "max-w-[72%]"}`}
+        >
+          {reemShowcaseSpreads.map((spread, spreadIndex) => (
+            <motion.div
+              key={`reem-showcase-${spreadIndex}`}
+              className={`rounded-2xl px-2 py-1 ${
+                isPhoneLandscapeLayout ? "-space-x-4" : "-space-x-5"
+              } flex bg-emerald-300/8 ring-1 ring-emerald-300/30 shadow-[0_0_26px_rgba(52,211,153,0.15)]`}
+              initial={{ opacity: 0, y: 24, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 260, damping: 24, delay: spreadIndex * 0.08 }}
+            >
+              {spread.map((card, cardIndex) => (
+                <motion.div
+                  key={`${card.rank}-${card.suit}-${cardIndex}`}
+                  initial={{
+                    opacity: 0,
+                    y: 16,
+                    x: (cardIndex - (spread.length - 1) / 2) * 8,
+                    rotate: (cardIndex - (spread.length - 1) / 2) * 4,
+                    scale: 0.9,
+                  }}
+                  animate={{ opacity: 1, y: 0, x: 0, rotate: 0, scale: 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 24, delay: 0.03 * cardIndex }}
+                >
+                  <CardComponent
+                    suit={card.suit}
+                    rank={card.rank}
+                    className={isPhoneLandscapeLayout ? "w-8 h-11 text-[8px]" : "w-9 h-14 text-[9px]"}
                   />
                 </motion.div>
               ))}
@@ -1545,6 +1611,7 @@ const GameTable: React.FC = () => {
               {renderSpreadZone(leftPlayer, "Left Spread", leftSpreadPositionClass)}
               {renderSpreadZone(rightPlayer, "Right Spread", rightSpreadPositionClass)}
               {renderSpreadZone(currentPlayer ?? null, "Your Spread", mySpreadPositionClass)}
+              {renderReemShowcaseRow()}
 
               {showDealAnimation && (
                 <div className="absolute inset-0 z-30 pointer-events-none">
@@ -1681,11 +1748,7 @@ const GameTable: React.FC = () => {
 
               {isRoundEnd ? (
                 <div
-                  className={`absolute z-30 pointer-events-auto ${
-                    isPhoneLandscapeLayout
-                      ? "bottom-[7.2rem] left-1/2 -translate-x-1/2"
-                      : "bottom-5 left-1/2 -translate-x-1/2"
-                  }`}
+                  className={`absolute z-30 pointer-events-auto ${roundActionRailPositionClass}`}
                 >
                   <div className={`flex flex-col ${isPhoneLandscapeLayout ? "items-center gap-1.5" : "items-center gap-2"}`}>
                     <div className="flex items-center gap-2">
