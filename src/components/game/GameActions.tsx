@@ -30,22 +30,26 @@ const GameActions: React.FC<GameActionsProps> = ({
 }) => {
   const layoutClass =
     layout === "mobile-dock"
-      ? "grid w-full grid-cols-3 gap-2"
+      ? "grid w-full grid-cols-3 gap-1.5"
       : layout === "side-stack"
         ? "flex w-full flex-col gap-1.5"
         : orientation === "vertical"
-        ? "flex flex-col gap-2"
-        : "flex flex-wrap justify-start gap-2";
+        ? "flex flex-col gap-1.5"
+        : "flex flex-wrap justify-center gap-1.5";
 
   const renderAction = (
     label: string,
     state: ActionState,
     onClick: () => void
-  ) => (
+  ) => {
+    const isCompactLayout = layout === "mobile-dock" || layout === "side-stack";
+    const buttonVariant = state.enabled && state.isPrimary ? "secondary" : "ghost";
+
+    return (
     <div
       key={label}
       className={`relative group flex flex-col items-center ${
-        layout === "mobile-dock" || layout === "side-stack" ? "min-w-0 w-full" : "min-w-[84px]"
+        isCompactLayout ? "min-w-0 w-full" : "min-w-[74px]"
       }`}
     >
       <Button
@@ -53,13 +57,17 @@ const GameActions: React.FC<GameActionsProps> = ({
         disabled={!state.enabled}
         title={!state.enabled ? state.reason : undefined}
         aria-label={!state.enabled && state.reason ? `${label}: ${state.reason}` : label}
+        variant={buttonVariant}
+        size="sm"
         className={
-          `${layout === "mobile-dock" ? "h-11 w-full rounded-2xl px-2 text-sm" : ""}${
-            layout === "side-stack" ? "h-8 w-full rounded-lg px-2 text-xs" : ""
+          `${layout === "mobile-dock" ? "h-9 w-full rounded-full px-2 text-[11px] uppercase tracking-[0.18em]" : ""}${
+            layout === "side-stack" ? "h-8 w-full rounded-full px-2 text-[10px] uppercase tracking-[0.16em]" : ""
+          } ${
+            layout === "default" ? "h-8 rounded-full px-3 text-[10px] uppercase tracking-[0.18em]" : ""
           } ${
             state.enabled && state.isPrimary
-              ? "ring-2 ring-amber-300/80 shadow-[0_0_20px_rgba(251,191,36,0.34)]"
-              : "border-white/15 bg-black/35"
+              ? "border-amber-300/45 !bg-amber-200/12 text-amber-50 shadow-[0_0_16px_rgba(251,191,36,0.18)]"
+              : "border-white/12 !bg-black/18 text-white/76 hover:!bg-white/8"
           }`
         }
       >
@@ -71,7 +79,8 @@ const GameActions: React.FC<GameActionsProps> = ({
         </div>
       ) : null}
     </div>
-  );
+    );
+  };
 
   return (
     <div className={layoutClass}>
