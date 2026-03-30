@@ -1423,15 +1423,36 @@ const GameTable: React.FC = () => {
     : isBottomSeatActive
       ? "border-amber-300/42 bg-black/10 shadow-[0_0_20px_rgba(251,191,36,0.14)]"
       : "border-white/10 bg-black/8 opacity-85";
+  const bottomSeatSideColumnClass = isPhoneLandscapeLayout ? "w-[138px]" : "w-[170px]";
   const phoneHandCardClass =
     visibleHand.length >= 6
-      ? "w-[2.2rem] h-[3.2rem]"
+      ? "w-[2.45rem] h-[3.55rem]"
       : visibleHand.length >= 5
-        ? "w-[2.4rem] h-[3.5rem]"
+        ? "w-[2.65rem] h-[3.85rem]"
         : visibleHand.length >= 4
-        ? "w-[2.6rem] h-[3.8rem]"
-        : "w-[2.8rem] h-[4.1rem]";
-  const handOverlapPx = isPhoneLandscapeLayout ? 14 : visibleHand.length >= 6 ? 18 : visibleHand.length >= 5 ? 16 : 12;
+        ? "w-[2.85rem] h-[4.1rem]"
+        : "w-[3.05rem] h-[4.4rem]";
+  const desktopHandCardClass =
+    visibleHand.length >= 6
+      ? "h-[5.15rem] w-[3.45rem] sm:h-[5.55rem] sm:w-[3.7rem]"
+      : visibleHand.length >= 5
+        ? "h-[5.3rem] w-[3.55rem] sm:h-[5.7rem] sm:w-[3.85rem]"
+        : "h-[5.45rem] w-[3.65rem] sm:h-[5.9rem] sm:w-[3.95rem]";
+  const handOverlapPx = isPhoneLandscapeLayout
+    ? visibleHand.length >= 6
+      ? 16
+      : visibleHand.length >= 5
+        ? 15
+        : 13
+    : visibleHand.length >= 6
+      ? 22
+      : visibleHand.length >= 5
+        ? 19
+        : 15;
+  const handFanLiftStep = isPhoneLandscapeLayout ? 4.5 : 6.5;
+  const handRotateStep = isPhoneLandscapeLayout ? 4 : 5;
+  const handSelectedLiftPx = isPhoneLandscapeLayout ? 15 : 20;
+  const handHoverLiftPx = isPhoneLandscapeLayout ? 11 : 15;
   const revealedSpreadGroups = isRoundEnd ? winnerPlayer?.spreads.map(sortSpreadCards) ?? [] : [];
 
   const renderSpreadZone = (
@@ -1972,98 +1993,98 @@ const GameTable: React.FC = () => {
               <div
                 className={`seat absolute left-1/2 z-40 -translate-x-1/2 pointer-events-auto ${
                   isPhoneLandscapeLayout
-                    ? "bottom-0 h-[176px] w-[99%]"
+                    ? "bottom-0 h-[182px] w-[99%]"
                     : isCompactLandscape
-                      ? "bottom-1 h-[194px] w-[96%] max-w-[930px]"
-                      : "bottom-2 h-[208px] w-[96%] max-w-[960px]"
+                      ? "bottom-1 h-[204px] w-[96%] max-w-[930px]"
+                      : "bottom-2 h-[222px] w-[96%] max-w-[960px]"
                 }`}
               >
                 <div className={`flex h-full w-full ${isPhoneLandscapeLayout ? "items-end gap-2" : "items-end gap-3"}`}>
-                  <div
-                    className={`${
-                      isBottomSeatActive ? "active-seat" : "inactive-seat"
-                    } relative rounded-[22px] border transition-all duration-300 ${
-                      isPhoneLandscapeLayout
-                        ? "mb-2 min-w-[138px] px-2 py-2"
-                        : "mb-3 min-w-[170px] px-2.5 py-2.5"
-                    } ${bottomSeatShellClass}`}
-                  >
-                    {isBottomSeatActive && !isRoundEnd ? (
-                      <div className="absolute -inset-2 rounded-[24px] bg-amber-300/10 blur-xl" aria-hidden />
-                    ) : null}
-                    {shouldHighlightBottomWinner ? (
-                      <div className="absolute -inset-2 rounded-[26px] bg-emerald-300/12 blur-2xl" aria-hidden />
-                    ) : null}
-                    <div className={`relative flex items-center ${isPhoneLandscapeLayout ? "gap-2" : "gap-3"}`}>
-                      <div className="relative flex-shrink-0">
-                        <PlayerAvatar player={{ name: bottomSeatName, avatarUrl: bottomSeatAvatarUrl }} size="sm" />
-                        <TurnTimer
-                          duration={turnDurationMs}
-                          timeRemaining={isBottomSeatActive ? turnTimeRemainingMs : turnDurationMs}
-                          isActive={isBottomSeatActive}
-                          size={isPhoneLandscapeLayout ? 42 : 54}
-                          strokeWidth={isPhoneLandscapeLayout ? 2.6 : 3.5}
-                          className={isBottomSeatActive ? "animate-pulse" : ""}
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        {isRoundEnd ? (
-                          <div
-                            className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-[0.2em] ${
-                              isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"
-                            } ${
-                              shouldHighlightBottomWinner
-                                ? "border-emerald-200/40 bg-emerald-300/14 text-emerald-100"
-                                : shouldDimBottomLoser
-                                  ? "border-rose-200/35 bg-rose-400/12 text-rose-100"
-                                  : "border-white/12 bg-white/6 text-white/72"
-                            }`}
-                          >
-                            {bottomSeatRoundResult?.resultLabel ?? "Round End"}
-                          </div>
-                        ) : (
-                          <div
-                            className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-[0.2em] ${
-                              isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"
-                            } ${turnStatusClasses[myTurnStatus]}`}
-                          >
-                            {myTurnStatus}
-                          </div>
-                        )}
-                        <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} truncate text-white font-semibold leading-tight`}>
-                          {bottomSeatName}
+                  <div className={`${bottomSeatSideColumnClass} flex-shrink-0`}>
+                    <div
+                      className={`${
+                        isBottomSeatActive ? "active-seat" : "inactive-seat"
+                      } relative w-full rounded-[22px] border transition-all duration-300 ${
+                        isPhoneLandscapeLayout ? "mb-2 px-2 py-2" : "mb-3 px-2.5 py-2.5"
+                      } ${bottomSeatShellClass}`}
+                    >
+                      {isBottomSeatActive && !isRoundEnd ? (
+                        <div className="absolute -inset-2 rounded-[24px] bg-amber-300/10 blur-xl" aria-hidden />
+                      ) : null}
+                      {shouldHighlightBottomWinner ? (
+                        <div className="absolute -inset-2 rounded-[26px] bg-emerald-300/12 blur-2xl" aria-hidden />
+                      ) : null}
+                      <div className={`relative flex items-center ${isPhoneLandscapeLayout ? "gap-2" : "gap-3"}`}>
+                        <div className="relative flex-shrink-0">
+                          <PlayerAvatar player={{ name: bottomSeatName, avatarUrl: bottomSeatAvatarUrl }} size="sm" />
+                          <TurnTimer
+                            duration={turnDurationMs}
+                            timeRemaining={isBottomSeatActive ? turnTimeRemainingMs : turnDurationMs}
+                            isActive={isBottomSeatActive}
+                            size={isPhoneLandscapeLayout ? 42 : 54}
+                            strokeWidth={isPhoneLandscapeLayout ? 2.6 : 3.5}
+                            className={isBottomSeatActive ? "animate-pulse" : ""}
+                          />
                         </div>
-                        <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} text-white/58 leading-tight`}>
-                          {bottomSeatBalance}
-                        </div>
-                        <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} mt-0.5 text-white/42 leading-tight uppercase tracking-[0.14em]`}>
-                          {visibleHand.length} cards
-                        </div>
-                        {bottomSeatRoundResult ? (
-                          <>
+                        <div className="min-w-0">
+                          {isRoundEnd ? (
                             <div
-                              className={`mt-1 ${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} font-semibold leading-tight ${
+                              className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-[0.2em] ${
+                                isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"
+                              } ${
                                 shouldHighlightBottomWinner
-                                  ? "text-emerald-200"
+                                  ? "border-emerald-200/40 bg-emerald-300/14 text-emerald-100"
                                   : shouldDimBottomLoser
-                                    ? "text-rose-200"
-                                    : "text-white/75"
+                                    ? "border-rose-200/35 bg-rose-400/12 text-rose-100"
+                                    : "border-white/12 bg-white/6 text-white/72"
                               }`}
                             >
-                              {bottomSeatRoundResult.deltaLabel}
+                              {bottomSeatRoundResult?.resultLabel ?? "Round End"}
                             </div>
-                            <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} leading-tight ${
-                              shouldHighlightBottomWinner ? "text-emerald-100/92" : "text-white/58"
-                            }`}>
-                              {bottomSeatRoundResult.seatLabel}
+                          ) : (
+                            <div
+                              className={`mb-1 inline-flex rounded-full border px-2 py-0.5 font-semibold tracking-[0.2em] ${
+                                isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"
+                              } ${turnStatusClasses[myTurnStatus]}`}
+                            >
+                              {myTurnStatus}
                             </div>
-                          </>
-                        ) : null}
+                          )}
+                          <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} truncate text-white font-semibold leading-tight`}>
+                            {bottomSeatName}
+                          </div>
+                          <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} text-white/58 leading-tight`}>
+                            {bottomSeatBalance}
+                          </div>
+                          <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} mt-0.5 text-white/42 leading-tight uppercase tracking-[0.14em]`}>
+                            {visibleHand.length} cards
+                          </div>
+                          {bottomSeatRoundResult ? (
+                            <>
+                              <div
+                                className={`mt-1 ${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} font-semibold leading-tight ${
+                                  shouldHighlightBottomWinner
+                                    ? "text-emerald-200"
+                                    : shouldDimBottomLoser
+                                      ? "text-rose-200"
+                                      : "text-white/75"
+                                }`}
+                              >
+                                {bottomSeatRoundResult.deltaLabel}
+                              </div>
+                              <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} leading-tight ${
+                                shouldHighlightBottomWinner ? "text-emerald-100/92" : "text-white/58"
+                              }`}>
+                                {bottomSeatRoundResult.seatLabel}
+                              </div>
+                            </>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex-1 flex flex-col justify-end gap-2">
+                  <div className="min-w-0 flex-1 flex flex-col justify-end gap-2">
                     <div className="pointer-events-none select-none px-2 text-center">
                       <div
                         className={`font-semibold ${
@@ -2129,14 +2150,18 @@ const GameTable: React.FC = () => {
                         </Button>
                       </div>
                     ) : null}
-                    <div className="w-full flex flex-col items-center">
+                    <div
+                      className={`flex w-full flex-col items-center ${
+                        isPhoneLandscapeLayout ? "-translate-y-3" : isCompactLandscape ? "-translate-y-4" : "-translate-y-5"
+                      }`}
+                    >
                       <div
                         className={`hand relative w-full pointer-events-auto ${feedbackPulseArea === "hand" ? "rt-table-shake" : ""} ${
-                          isPhoneLandscapeLayout ? "h-[96px] max-w-none" : "h-[118px] max-w-none"
+                          isPhoneLandscapeLayout ? "h-[112px] max-w-none" : "h-[138px] max-w-none"
                         }`}
                       >
                         <div
-                          className={`pointer-events-none absolute inset-x-8 top-3 h-12 rounded-full blur-2xl ${
+                          className={`pointer-events-none absolute inset-x-8 top-4 h-14 rounded-full blur-2xl ${
                             isRoundEnd
                               ? "bg-[radial-gradient(circle,rgba(255,255,255,0.08),transparent_72%)]"
                               : isDiscardStep
@@ -2148,9 +2173,9 @@ const GameTable: React.FC = () => {
                         />
                         <AnimatePresence>
                           <div
-                            className="flex flex-nowrap items-end justify-center overflow-visible px-1 pt-4"
+                            className="flex flex-nowrap items-end justify-center overflow-visible px-1 pt-6"
                           >
-                            {visibleHand.map((card) => {
+                            {visibleHand.map((card, cardIndex) => {
                               const isSelectedCard = selectedCards.some(
                                 (c) => c.rank === card.rank && c.suit === card.suit
                               );
@@ -2158,12 +2183,9 @@ const GameTable: React.FC = () => {
                                 isSelectedCard && isDiscardStep && isRestrictedDiscardCard(card);
                               const enableFlickDrag =
                                 canUseFlickDiscard && isSelectedCard && !isIllegalDiscardSelection;
-                              const cardIndex = visibleHand.findIndex(
-                                (handCard) => handCard.rank === card.rank && handCard.suit === card.suit
-                              );
                               const centerOffset = cardIndex - (visibleHand.length - 1) / 2;
-                              const fanLift = Math.abs(centerOffset) * (isPhoneLandscapeLayout ? 4 : 6);
-                              const baseRotate = centerOffset * (isPhoneLandscapeLayout ? 4 : 5);
+                              const fanLift = Math.abs(centerOffset) * handFanLiftStep;
+                              const baseRotate = centerOffset * handRotateStep;
 
                               return (
                                 <motion.div
@@ -2175,7 +2197,7 @@ const GameTable: React.FC = () => {
                                   }}
                                   initial={{ y: 36, opacity: 0, rotate: 0 }}
                                   animate={{
-                                    y: isSelectedCard ? -(fanLift + (isPhoneLandscapeLayout ? 14 : 18)) : -fanLift,
+                                    y: isSelectedCard ? -(fanLift + handSelectedLiftPx) : -fanLift,
                                     rotate: isSelectedCard ? baseRotate * 0.6 : baseRotate,
                                     scale: isSelectedCard ? 1.06 : 1,
                                     opacity: 1,
@@ -2184,7 +2206,7 @@ const GameTable: React.FC = () => {
                                   transition={{ type: "spring", stiffness: 280, damping: 24 }}
                                   whileHover={
                                     isMyTurn
-                                      ? { y: -(fanLift + (isPhoneLandscapeLayout ? 10 : 14)), scale: 1.04 }
+                                      ? { y: -(fanLift + handHoverLiftPx), scale: 1.04 }
                                       : undefined
                                   }
                                   whileTap={isMyTurn ? { scale: 0.98 } : undefined}
@@ -2194,7 +2216,7 @@ const GameTable: React.FC = () => {
                                     rank={card.rank}
                                     isSelected={isSelectedCard}
                                     onClick={isSpectator ? undefined : () => toggleCardSelection(card)}
-                                    className={isPhoneLandscapeLayout ? phoneHandCardClass : "h-[4.6rem] w-12 sm:h-[5rem] sm:w-[3.35rem]"}
+                                    className={isPhoneLandscapeLayout ? phoneHandCardClass : desktopHandCardClass}
                                     badgeText={
                                       isIllegalDiscardSelection
                                         ? "Cannot discard this card this turn."
@@ -2212,6 +2234,8 @@ const GameTable: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
+                  <div className={`${bottomSeatSideColumnClass} pointer-events-none flex-shrink-0`} aria-hidden />
                 </div>
               </div>
             </div>
