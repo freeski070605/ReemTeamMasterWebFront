@@ -13,6 +13,7 @@ import { PlayingCard as CardComponent } from "../components/ui/Card";
 import PlayerAvatar from "../components/game/PlayerAvatar";
 import TurnTimer from "../components/game/TurnTimer";
 import GameActions from "../components/game/GameActions";
+import RtcParticleOverlay from "../components/game/RtcParticleOverlay";
 import { Button } from "../components/ui/Button";
 import {
   formatRoundDeltaAmount,
@@ -129,6 +130,8 @@ const GameTable: React.FC = () => {
   } | null>(null);
   const [feedbackPulseArea, setFeedbackPulseArea] = useState<InlineFeedbackArea | null>(null);
   const [activityTick, setActivityTick] = useState(0);
+  const tableRef = useRef<HTMLDivElement | null>(null);
+  const seatAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const lastAnimatedRoundKeyRef = useRef<string | null>(null);
   const hasInitializedLastActionRef = useRef(false);
   const lastObservedActionTimestampRef = useRef<number | null>(null);
@@ -222,6 +225,10 @@ const GameTable: React.FC = () => {
     },
     []
   );
+
+  const setSeatAnchorRef = useCallback((userId: string, node: HTMLDivElement | null) => {
+    seatAnchorRefs.current[userId] = node;
+  }, []);
 
   useEffect(() => {
     if (tableId && user) {
@@ -1269,7 +1276,10 @@ const GameTable: React.FC = () => {
                     aria-hidden
                   />
                 ) : null}
-                <div className="relative rounded-full">
+                <div
+                  ref={(node) => setSeatAnchorRef(player.userId, node)}
+                  className="relative rounded-full"
+                >
                   <PlayerAvatar player={{ name: player.username, avatarUrl: player.avatarUrl }} size="sm" />
                 </div>
                 <TurnTimer
@@ -1610,6 +1620,7 @@ const GameTable: React.FC = () => {
         >
           <div className="table-area relative w-full h-full flex items-center justify-center">
             <div
+              ref={tableRef}
               className={`table relative ${
                 isPhoneLandscapeLayout
                   ? "w-full h-full rounded-[18px] border-[8px]"
@@ -1714,6 +1725,16 @@ const GameTable: React.FC = () => {
               {renderSpreadZone(leftPlayer, "left", leftSpreadPositionClass)}
               {renderSpreadZone(rightPlayer, "right", rightSpreadPositionClass)}
               {renderSpreadZone(currentPlayer ?? null, "bottom", mySpreadPositionClass)}
+
+              <RtcParticleOverlay
+                gameState={gameState}
+                winnerPlayerId={winnerPlayer?.userId}
+                winnerRoundNet={winnerRoundNet}
+                tableRef={tableRef}
+                seatAnchorRefs={seatAnchorRefs}
+                displayFont={displayFont}
+                isPhoneLandscapeLayout={isPhoneLandscapeLayout}
+              />
 
               {showDealAnimation && (
                 <div className="absolute inset-0 z-40 pointer-events-none">
@@ -2020,9 +2041,12 @@ const GameTable: React.FC = () => {
                                 aria-hidden
                               />
                             ) : null}
-                            <div className="relative rounded-full">
-                              <PlayerAvatar player={{ name: bottomSeatName, avatarUrl: bottomSeatAvatarUrl }} size="sm" />
-                            </div>
+            <div
+              ref={(node) => setSeatAnchorRef(displayedBottomPlayer?.userId ?? user._id, node)}
+              className="relative rounded-full"
+            >
+              <PlayerAvatar player={{ name: bottomSeatName, avatarUrl: bottomSeatAvatarUrl }} size="sm" />
+            </div>
                             <TurnTimer
                               duration={turnDurationMs}
                               timeRemaining={isBottomSeatActive ? turnTimeRemainingMs : turnDurationMs}
