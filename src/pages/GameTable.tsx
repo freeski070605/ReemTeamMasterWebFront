@@ -860,9 +860,12 @@ const GameTable: React.FC = () => {
     return gameState.players[idx] ?? null;
   };
 
-  const topPlayer = seatAt(1);
-  const rightPlayer = seatAt(2);
-  const leftPlayer = seatAt(3);
+  const leftSeatOffset = totalPlayers >= 3 ? 1 : null;
+  const topSeatOffset = totalPlayers === 2 ? 1 : totalPlayers >= 3 ? 2 : null;
+  const rightSeatOffset = totalPlayers >= 4 ? 3 : null;
+  const leftPlayer = leftSeatOffset === null ? null : seatAt(leftSeatOffset);
+  const topPlayer = topSeatOffset === null ? null : seatAt(topSeatOffset);
+  const rightPlayer = rightSeatOffset === null ? null : seatAt(rightSeatOffset);
   const viewerSeatPlayer = seatAt(0);
   const totalPlayersInRound = Math.max(1, gameState.players.length);
   const cardsPerPlayerAtDeal = Math.max(
@@ -894,9 +897,13 @@ const GameTable: React.FC = () => {
       ((recipientPlayerIndex - localIndex) % totalPlayersInRound + totalPlayersInRound) %
       totalPlayersInRound;
 
-    if (seatOffset === 1) return { x: 0, y: -150 };
-    if (seatOffset === 2) return { x: 230, y: 20 };
-    if (seatOffset === 3) return { x: -230, y: 20 };
+    if (seatOffset === 1) {
+      return totalPlayersInRound >= 3 ? { x: -230, y: 20 } : { x: 0, y: -150 };
+    }
+
+    if (seatOffset === 2) return { x: 0, y: -150 };
+
+    if (seatOffset === 3) return { x: 230, y: 20 };
     return { x: 0, y: 145 };
   };
 
@@ -1127,48 +1134,32 @@ const GameTable: React.FC = () => {
     lastActionType === "discardCard" ||
     (lastActionType === "drawCard" && lastActionPayload?.source === "discard");
   const showActionDock = !isSpectator && !hideCardsForPresentation && !isRoundEnd;
-  const topSeatPositionClass = isThreeHandedTable
+  const topSeatPositionClass = isHeadsUpTable
     ? isPhoneLandscapeLayout
-      ? "left-[26%] top-[6%] -translate-x-1/2"
-      : "left-[27%] top-[5.5%] -translate-x-1/2"
-    : isHeadsUpTable
-      ? isPhoneLandscapeLayout
-        ? "left-1/2 top-[6%] -translate-x-1/2"
-        : "left-1/2 top-[5.5%] -translate-x-1/2"
-      : isPhoneLandscapeLayout
-        ? "left-1/2 top-[5.5%] -translate-x-1/2"
-        : "left-1/2 top-[4.75%] -translate-x-1/2";
+      ? "left-1/2 top-[6%] -translate-x-1/2"
+      : "left-1/2 top-[5.5%] -translate-x-1/2"
+    : isPhoneLandscapeLayout
+      ? "left-1/2 top-[5.5%] -translate-x-1/2"
+      : "left-1/2 top-[4.75%] -translate-x-1/2";
   const leftSeatPositionClass = isPhoneLandscapeLayout
     ? "left-[2.4%] top-[38%] -translate-y-1/2"
     : "left-[2.5%] top-[39%] -translate-y-1/2";
-  const rightSeatPositionClass = isThreeHandedTable
+  const rightSeatPositionClass = isPhoneLandscapeLayout
+    ? "right-[2.4%] top-[38%] -translate-y-1/2"
+    : "right-[2.5%] top-[39%] -translate-y-1/2";
+  const topSpreadPositionClass = isHeadsUpTable
     ? isPhoneLandscapeLayout
-      ? "right-[26%] top-[6%]"
-      : "right-[27%] top-[5.5%]"
+      ? "left-1/2 top-[20%] -translate-x-1/2 w-[34%] max-w-[280px]"
+      : "left-1/2 top-[20%] -translate-x-1/2 w-[34%] max-w-[320px]"
     : isPhoneLandscapeLayout
-      ? "right-[2.4%] top-[38%] -translate-y-1/2"
-      : "right-[2.5%] top-[39%] -translate-y-1/2";
-  const topSpreadPositionClass = isThreeHandedTable
-    ? isPhoneLandscapeLayout
-      ? "left-[26%] top-[20%] -translate-x-1/2 w-[26%] max-w-[220px]"
-      : "left-[27%] top-[20%] -translate-x-1/2 w-[26%] max-w-[250px]"
-    : isHeadsUpTable
-      ? isPhoneLandscapeLayout
-        ? "left-1/2 top-[20%] -translate-x-1/2 w-[34%] max-w-[280px]"
-        : "left-1/2 top-[20%] -translate-x-1/2 w-[34%] max-w-[320px]"
-      : isPhoneLandscapeLayout
-        ? "left-1/2 top-[18%] -translate-x-1/2 w-[34%] max-w-[280px]"
-        : "left-1/2 top-[18.5%] -translate-x-1/2 w-[34%] max-w-[340px]";
+      ? "left-1/2 top-[18%] -translate-x-1/2 w-[34%] max-w-[280px]"
+      : "left-1/2 top-[18.5%] -translate-x-1/2 w-[34%] max-w-[340px]";
   const leftSpreadPositionClass = isPhoneLandscapeLayout
     ? "left-[10%] top-[30%] w-[24%] max-w-[208px]"
     : "left-[10.5%] top-[29%] w-[24%] max-w-[230px]";
-  const rightSpreadPositionClass = isThreeHandedTable
-    ? isPhoneLandscapeLayout
-      ? "right-[10%] top-[20%] w-[26%] max-w-[220px]"
-      : "right-[11%] top-[20%] w-[26%] max-w-[250px]"
-    : isPhoneLandscapeLayout
-      ? "right-[10%] top-[30%] w-[24%] max-w-[208px]"
-      : "right-[10.5%] top-[29%] w-[24%] max-w-[230px]";
+  const rightSpreadPositionClass = isPhoneLandscapeLayout
+    ? "right-[10%] top-[30%] w-[24%] max-w-[208px]"
+    : "right-[10.5%] top-[29%] w-[24%] max-w-[230px]";
   const mySpreadPositionClass = isPhoneLandscapeLayout
     ? "left-1/2 bottom-[31%] -translate-x-1/2 w-[42%] max-w-[340px]"
     : "left-1/2 bottom-[29%] -translate-x-1/2 w-[42%] max-w-[460px]";
