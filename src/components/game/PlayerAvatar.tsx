@@ -22,13 +22,19 @@ const PlayerAvatar: React.FC<PlayerAvatarProps> = ({ player, size = 'md', showNa
   return (
     <div className="flex flex-col items-center">
       <div
-        className={`bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-full flex items-center justify-center text-white font-bold border-2 border-yellow-400/40 shadow-[0_8px_20px_rgba(0,0,0,0.4)] ${sizeClasses[size]}`}
+        className={`rounded-full border-2 border-yellow-400/40 bg-gradient-to-br from-neutral-800 to-neutral-900 p-[2px] shadow-[0_8px_20px_rgba(0,0,0,0.4)] ${sizeClasses[size]}`}
       >
-        {avatarSrc ? (
-          <img src={avatarSrc} alt={player.name} className="w-full h-full rounded-full object-cover" />
-        ) : (
-          player.name.substring(0, 2).toUpperCase()
-        )}
+        <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-black/28 ring-1 ring-white/8 shadow-[inset_0_1px_3px_rgba(255,255,255,0.14),inset_0_-10px_18px_rgba(0,0,0,0.24)]">
+          {avatarSrc ? (
+            <img
+              src={avatarSrc}
+              alt={player.name}
+              className="h-full w-full object-cover object-center"
+            />
+          ) : (
+            <span className="text-white font-bold">{player.name.substring(0, 2).toUpperCase()}</span>
+          )}
+        </div>
       </div>
       {showName && <div className="text-white font-semibold mt-2 text-sm tracking-wide">{player.name}</div>}
     </div>

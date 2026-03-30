@@ -1417,13 +1417,13 @@ const GameTable: React.FC = () => {
     ? gameState.players[gameState.currentPlayerIndex]?.userId === displayedBottomPlayer?.userId
     : isMyTurn;
   const bottomSeatName = isSpectator
-    ? displayedBottomPlayer?.username ?? "Promo AI"
+    ? displayedBottomPlayer?.username ?? "AI Player"
     : user.username;
   const bottomSeatAvatarUrl = isSpectator
     ? displayedBottomPlayer?.avatarUrl
     : user.avatarUrl;
   const bottomSeatBalance = isSpectator
-    ? "PROMO AI"
+    ? "TABLE AI"
     : balanceLoading
       ? "..."
       : formatSeatBalance(balance);
