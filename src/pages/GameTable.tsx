@@ -2132,7 +2132,7 @@ const GameTable: React.FC = () => {
               ) : null}
 
               <div
-                className={`seat absolute left-1/2 z-40 -translate-x-1/2 pointer-events-auto ${
+                className={`seat absolute left-1/2 z-40 -translate-x-1/2 pointer-events-none ${
                   isPhoneLandscapeLayout
                     ? "bottom-0 h-[210px] w-[99%]"
                     : isCompactLandscape
