@@ -1197,8 +1197,8 @@ const GameTable: React.FC = () => {
     },
     bottom: {
       positionClass: isPhoneLandscapeLayout
-        ? "left-1/2 bottom-[30%] -translate-x-1/2 w-[50%] max-w-[392px]"
-        : "left-1/2 bottom-[27.5%] -translate-x-1/2 w-[46%] max-w-[520px]",
+        ? "left-1/2 bottom-[28.5%] -translate-x-1/2 w-[50%] max-w-[392px]"
+        : "left-1/2 bottom-[26.2%] -translate-x-1/2 w-[46%] max-w-[520px]",
       laneClass: isPhoneLandscapeLayout ? "min-h-[68px] gap-2.5" : "min-h-[84px] gap-3.5",
     },
   };
@@ -1747,9 +1747,9 @@ const GameTable: React.FC = () => {
               ref={tableRef}
               className={`table relative ${
                 isPhoneLandscapeLayout
-                  ? "w-full h-full rounded-[18px] border-[8px]"
-                  : "aspect-[16/9] rounded-[28px] border-[12px] w-[96vw]"
-              } overflow-hidden border-[#3b2c12] shadow-[0_28px_54px_rgba(0,0,0,0.4)] ${isReem ? "rt-reem-burst border-yellow-300" : ""}`}
+                  ? "w-full h-full rounded-[18px] border border-black/18"
+                  : "aspect-[16/9] rounded-[28px] border border-black/18 w-[96vw]"
+              } overflow-hidden shadow-[0_28px_54px_rgba(0,0,0,0.4)] ${isReem ? "rt-reem-burst" : ""}`}
               style={isPhoneLandscapeLayout ? undefined : { maxWidth: `${tableMaxWidthPx}px` }}
             >
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_18%,transparent_82%,rgba(0,0,0,0.08))]" />
@@ -1773,9 +1773,9 @@ const GameTable: React.FC = () => {
                   isPhoneLandscapeLayout ? "top-2 left-2 right-2 gap-1.5" : "top-3 left-3 right-3 gap-2"
                 }`}
               >
-                <div className={`flex min-w-0 flex-col ${isPhoneLandscapeLayout ? "max-w-[48%]" : "max-w-[320px]"}`}>
+                <div className={`flex min-w-0 items-start ${isPhoneLandscapeLayout ? "max-w-[56%] gap-2" : "max-w-[430px] gap-3"}`}>
                   <div
-                    className={`flex min-w-0 items-center rounded-full border border-white/10 bg-black/22 text-white ${
+                    className={`flex min-w-0 flex-shrink-0 items-center rounded-full border border-white/10 bg-black/22 text-white ${
                       isPhoneLandscapeLayout ? "gap-1 px-2 py-1" : "gap-2 px-3 py-1.5"
                     }`}
                   >
@@ -1807,8 +1807,8 @@ const GameTable: React.FC = () => {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -6, scale: 0.98 }}
                         transition={{ duration: 0.24, ease: "easeOut" }}
-                        className={`pointer-events-none relative mt-2 overflow-hidden rounded-[18px] border px-3 py-2 text-white backdrop-blur-[10px] ${
-                          isPhoneLandscapeLayout ? "w-[210px] max-w-full" : "w-[278px]"
+                        className={`pointer-events-none relative overflow-hidden rounded-[18px] border px-3 py-2 text-white backdrop-blur-[10px] ${
+                          isPhoneLandscapeLayout ? "w-[190px] max-w-full" : "w-[292px]"
                         } ${routineHudToneClass}`}
                       >
                         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),transparent_45%)]" aria-hidden />
@@ -2307,8 +2307,8 @@ const GameTable: React.FC = () => {
                   <div
                     className="absolute z-10 -translate-x-1/2"
                     style={{
-                      left: isPhoneLandscapeLayout ? "56.5%" : "55.25%",
-                      bottom: isPhoneLandscapeLayout ? "-10px" : "-12px",
+                      left: isPhoneLandscapeLayout ? "54.8%" : "53.9%",
+                      bottom: isPhoneLandscapeLayout ? "-18px" : "-20px",
                       width: isPhoneLandscapeLayout ? "min(100%, 418px)" : "min(100%, 590px)",
                     }}
                   >
