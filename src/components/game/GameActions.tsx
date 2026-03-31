@@ -32,7 +32,7 @@ const GameActions: React.FC<GameActionsProps> = ({
     layout === "mobile-dock"
       ? "grid w-full grid-cols-3 gap-1.5"
       : layout === "side-stack"
-        ? "flex w-full flex-col gap-2"
+        ? "flex w-full flex-col gap-1.5"
         : orientation === "vertical"
         ? "flex flex-col gap-1.5"
         : "flex flex-wrap justify-center gap-1.5";
@@ -61,7 +61,7 @@ const GameActions: React.FC<GameActionsProps> = ({
           size="sm"
           className={
             `${layout === "mobile-dock" ? "h-9 w-full rounded-full px-2 text-[11px] uppercase tracking-[0.18em]" : ""}${
-              layout === "side-stack" ? "h-10 w-full rounded-[18px] px-3 text-[11px] font-semibold uppercase tracking-[0.16em]" : ""
+              layout === "side-stack" ? "h-9 w-full rounded-[16px] px-2.5 text-[10px] font-semibold uppercase tracking-[0.15em]" : ""
             } ${
               layout === "default" ? "h-8 rounded-full px-3 text-[10px] uppercase tracking-[0.18em]" : ""
             } ${

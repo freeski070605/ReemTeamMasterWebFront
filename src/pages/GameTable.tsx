@@ -1197,9 +1197,9 @@ const GameTable: React.FC = () => {
     },
     bottom: {
       positionClass: isPhoneLandscapeLayout
-        ? "left-1/2 bottom-[33%] -translate-x-1/2 w-[52%] max-w-[420px]"
-        : "left-1/2 bottom-[30.5%] -translate-x-1/2 w-[48%] max-w-[560px]",
-      laneClass: isPhoneLandscapeLayout ? "min-h-[78px] gap-3" : "min-h-[96px] gap-4",
+        ? "left-1/2 bottom-[30%] -translate-x-1/2 w-[50%] max-w-[392px]"
+        : "left-1/2 bottom-[27.5%] -translate-x-1/2 w-[46%] max-w-[520px]",
+      laneClass: isPhoneLandscapeLayout ? "min-h-[68px] gap-2.5" : "min-h-[84px] gap-3.5",
     },
   };
   const centerPileCardClass = isPhoneLandscapeLayout ? "h-[3.55rem] w-[2.55rem]" : "h-[4.7rem] w-[3.3rem]";
@@ -1212,6 +1212,12 @@ const GameTable: React.FC = () => {
     regular: isPhoneLandscapeLayout
       ? "h-[3.45rem] w-[2.45rem]"
       : "h-[4.95rem] w-[3.45rem] sm:h-[5.35rem] sm:w-[3.75rem]",
+    bottomCompact: isPhoneLandscapeLayout
+      ? "h-[2.95rem] w-[2.1rem]"
+      : "h-[4.1rem] w-[2.9rem] sm:h-[4.45rem] sm:w-[3.1rem]",
+    bottomRegular: isPhoneLandscapeLayout
+      ? "h-[3.15rem] w-[2.25rem]"
+      : "h-[4.4rem] w-[3.05rem] sm:h-[4.75rem] sm:w-[3.3rem]",
   };
   const dropLockTurnsRemaining = currentPlayer?.hitLockCounter ?? 0;
 
@@ -1501,7 +1507,7 @@ const GameTable: React.FC = () => {
     : isBottomSeatActive
       ? "border-amber-300/42 bg-black/10 shadow-[0_0_20px_rgba(251,191,36,0.14)]"
       : "border-white/10 bg-black/8 opacity-85";
-  const bottomSeatSideColumnClass = isPhoneLandscapeLayout ? "w-[152px]" : "w-[188px]";
+  const bottomSeatSideColumnClass = isPhoneLandscapeLayout ? "w-[148px]" : "w-[182px]";
   const phoneHandCardClass =
     visibleHand.length >= 6
       ? "w-[2.9rem] h-[4.25rem]"
@@ -1547,6 +1553,7 @@ const GameTable: React.FC = () => {
     const isWinningSeat = isRoundEnd && player.userId === winnerPlayer?.userId;
     if (isRoundEnd && isWinningSeat) return null;
     const isSideZone = zone === "left" || zone === "right";
+    const isBottomZone = zone === "bottom";
     const spreadLayoutClass =
       sortedSpreads.length <= 1
         ? "flex justify-center"
@@ -1580,7 +1587,19 @@ const GameTable: React.FC = () => {
                   key={cIdx}
                   className="origin-bottom"
                   style={{
-                    marginLeft: cIdx === 0 ? 0 : `-${isPhoneLandscapeLayout ? 16 : spread.length >= 5 ? 22 : 18}px`,
+                    marginLeft: cIdx === 0 ? 0 : `-${
+                      isBottomZone
+                        ? isPhoneLandscapeLayout
+                          ? 13
+                          : spread.length >= 5
+                            ? 18
+                            : 15
+                        : isPhoneLandscapeLayout
+                          ? 16
+                          : spread.length >= 5
+                            ? 22
+                            : 18
+                    }px`,
                     zIndex: cIdx + 1,
                   }}
                   initial={{
@@ -1607,7 +1626,15 @@ const GameTable: React.FC = () => {
                   <CardComponent
                     suit={card.suit}
                     rank={card.rank}
-                    className={spread.length >= 5 ? spreadCardClass.compact : spreadCardClass.regular}
+                    className={
+                      isBottomZone
+                        ? spread.length >= 5
+                          ? spreadCardClass.bottomCompact
+                          : spreadCardClass.bottomRegular
+                        : spread.length >= 5
+                          ? spreadCardClass.compact
+                          : spreadCardClass.regular
+                    }
                   />
                 </motion.div>
               ))}
@@ -1930,16 +1957,16 @@ const GameTable: React.FC = () => {
 
               {isRoundEnd ? (
                 <div
-                  className={`pointer-events-none absolute left-1/2 z-30 ${
-                    isPhoneLandscapeLayout ? "top-[12.5%]" : "top-[12.75%]"
-                  } -translate-x-1/2`}
+                  className={`pointer-events-none absolute left-1/2 z-40 ${
+                    isPhoneLandscapeLayout ? "top-[43.5%]" : "top-[42%]"
+                  } -translate-x-1/2 -translate-y-1/2`}
                 >
                   <motion.div
                     initial={{ opacity: 0, y: 14, scale: 0.94 }}
                     animate={{ opacity: 1, y: 0, scale: [0.97, 1.015, 1] }}
                     transition={{ duration: 0.5, ease: "easeOut" }}
                     className={`relative flex flex-col items-center overflow-hidden rounded-[26px] border px-4 py-3 text-center text-white backdrop-blur-[10px] ${
-                      isPhoneLandscapeLayout ? "w-[270px]" : "w-[430px]"
+                      isPhoneLandscapeLayout ? "w-[250px]" : "w-[395px]"
                     } ${roundMomentShellClass}`}
                   >
                     <motion.div
@@ -2107,10 +2134,10 @@ const GameTable: React.FC = () => {
               <div
                 className={`seat absolute left-1/2 z-40 -translate-x-1/2 pointer-events-auto ${
                   isPhoneLandscapeLayout
-                    ? "bottom-0 h-[202px] w-[99%]"
+                    ? "bottom-0 h-[210px] w-[99%]"
                     : isCompactLandscape
-                      ? "bottom-1 h-[236px] w-[96%] max-w-[940px]"
-                      : "bottom-2 h-[252px] w-[96%] max-w-[980px]"
+                      ? "bottom-1 h-[242px] w-[96%] max-w-[940px]"
+                      : "bottom-2 h-[258px] w-[96%] max-w-[980px]"
                 }`}
               >
                 <div className="relative h-full w-full">
@@ -2233,7 +2260,7 @@ const GameTable: React.FC = () => {
                     {showActionDock || (isRoundEnd && isContinuousMode && !isSpectator) ? (
                       <div
                         className={`pointer-events-auto flex flex-col ${
-                          isPhoneLandscapeLayout ? "w-[104px] gap-2 pb-2" : "w-[128px] gap-2.5 pb-3"
+                          isPhoneLandscapeLayout ? "w-[92px] gap-1.5 pb-2" : "w-[108px] gap-2 pb-3"
                         }`}
                       >
                         {showActionDock ? (
@@ -2278,16 +2305,17 @@ const GameTable: React.FC = () => {
                   </div>
 
                   <div
-                    className="absolute left-1/2 z-10 -translate-x-1/2"
+                    className="absolute z-10 -translate-x-1/2"
                     style={{
-                      bottom: isPhoneLandscapeLayout ? "2px" : "4px",
-                      width: isPhoneLandscapeLayout ? "min(100%, 452px)" : "min(100%, 640px)",
+                      left: isPhoneLandscapeLayout ? "56.5%" : "55.25%",
+                      bottom: isPhoneLandscapeLayout ? "-2px" : "0px",
+                      width: isPhoneLandscapeLayout ? "min(100%, 418px)" : "min(100%, 590px)",
                     }}
                   >
                     <div className="flex w-full flex-col items-center">
                       <div
                         className={`hand relative w-full pointer-events-auto ${feedbackPulseArea === "hand" ? "rt-table-shake" : ""} ${
-                          isPhoneLandscapeLayout ? "mt-1 h-[126px]" : "mt-1 h-[158px]"
+                          isPhoneLandscapeLayout ? "mt-1 h-[120px]" : "mt-1 h-[148px]"
                         }`}
                       >
                         <div
@@ -2302,7 +2330,7 @@ const GameTable: React.FC = () => {
                           }`}
                         />
                         <AnimatePresence>
-                          <div className={`flex flex-nowrap items-end justify-center overflow-visible ${isPhoneLandscapeLayout ? "px-1.5 pt-5" : "px-2 pt-6"}`}>
+                          <div className={`flex flex-nowrap items-end justify-center overflow-visible ${isPhoneLandscapeLayout ? "px-1.5 pt-4" : "px-2 pt-5"}`}>
                             {visibleHand.map((card, cardIndex) => {
                               const isSelectedCard = selectedCards.some(
                                 (c) => c.rank === card.rank && c.suit === card.suit
