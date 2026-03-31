@@ -955,22 +955,35 @@ const GameTable: React.FC = () => {
     const isWinner = placement?.rank === 1 || player.userId === gameState.roundWinnerId;
     const roundNet = getRoundNetForPlayer(gameState, player.userId);
     const handScore = gameState.handScores?.[player.userId];
+    const resolvedHandScore = handScore ?? (player.hand.length === 0 ? 0 : null);
     const resultLabel = isWinner ? getPlacementWinTypeLabel(gameState, placement?.winType) : "LOSS";
+    const statusLabel = isWinner
+      ? roundOutcome.headline
+      : gameState.roundEndedBy === "CAUGHT_DROP" && player.userId === gameState.caughtDroppingPlayerId
+        ? "CAUGHT DROP"
+        : resolvedHandScore === 0
+          ? "0 CARDS"
+          : resultLabel.toUpperCase();
 
     return {
       userId: player.userId,
       username: player.username,
       rank: placement?.rank ?? null,
       resultLabel,
-      scoreLabel: isWinner
-        ? `Score ${handScore ?? 0}`
-        : handScore !== undefined
-          ? `${handScore} in hand`
-          : "Score unavailable",
+      statusLabel,
+      scoreLabel:
+        resolvedHandScore === null
+          ? "Score unavailable"
+          : `${resolvedHandScore} in hand`,
+      detailLabel: isWinner
+        ? roundOutcome.explanation
+        : placement?.rank
+          ? `Rank ${placement.rank}`
+          : "Round settled",
       seatLabel: isWinner
         ? roundOutcome.headline
-        : handScore !== undefined
-          ? `${handScore} in hand`
+        : resolvedHandScore !== null
+          ? `${resolvedHandScore} in hand`
           : resultLabel,
       deltaLabel: roundNet === null ? "--" : formatRoundDeltaAmount(roundNet, displayCurrency),
       deltaValue: roundNet,
@@ -987,9 +1000,6 @@ const GameTable: React.FC = () => {
   const roundStatusDetail =
     isContinuousMode && isReadyForNextRound ? "Your seat is locked for the next hand." : null;
   const countdownLabel = isContinuousMode ? `Next hand in ${roundCountdownSeconds ?? 30}s` : null;
-  const winnerLine = winnerPlayer
-    ? `${winnerPlayer.username}${winnerRoundNet !== null ? ` ${formatRoundDeltaAmount(winnerRoundNet, displayCurrency)}` : ""}`
-    : roundOutcome.secondary;
   const isRoundEnd = gameState.status === "round-end";
 
   const activeTurnPlayer = gameState.players[gameState.currentPlayerIndex] ?? null;
@@ -1106,33 +1116,17 @@ const GameTable: React.FC = () => {
         : roundOutcome.tone === "rose"
           ? "text-rose-100 drop-shadow-[0_0_18px_rgba(251,113,133,0.42)]"
           : "text-white drop-shadow-[0_0_16px_rgba(255,255,255,0.28)]";
-  const roundMomentDeltaClass =
-    winnerRoundNet !== null && winnerRoundNet > 0
-      ? "text-emerald-200 drop-shadow-[0_0_18px_rgba(74,222,128,0.42)]"
-      : winnerRoundNet !== null && winnerRoundNet < 0
-        ? "text-rose-200 drop-shadow-[0_0_18px_rgba(251,113,133,0.4)]"
-        : roundOutcome.tone === "gold"
-          ? "text-amber-100 drop-shadow-[0_0_18px_rgba(251,191,36,0.42)]"
-          : "text-white";
-  const roundMomentShellClass =
-    roundOutcome.tone === "gold"
-      ? "border-amber-200/34 bg-[linear-gradient(160deg,rgba(74,44,8,0.82),rgba(19,13,8,0.72))] shadow-[0_28px_55px_rgba(120,71,7,0.34)]"
-      : roundOutcome.tone === "emerald"
-        ? "border-emerald-200/28 bg-[linear-gradient(160deg,rgba(15,67,48,0.82),rgba(7,20,16,0.72))] shadow-[0_28px_55px_rgba(5,150,105,0.24)]"
-        : roundOutcome.tone === "rose"
-          ? "border-rose-200/28 bg-[linear-gradient(160deg,rgba(86,23,41,0.84),rgba(24,9,14,0.72))] shadow-[0_28px_55px_rgba(190,24,93,0.28)]"
-          : "border-white/16 bg-[linear-gradient(160deg,rgba(24,28,36,0.84),rgba(8,10,15,0.72))] shadow-[0_28px_55px_rgba(0,0,0,0.3)]";
-  const roundMomentGlowClass =
-    roundOutcome.tone === "gold"
-      ? "bg-[radial-gradient(circle,rgba(251,191,36,0.3),rgba(251,191,36,0.08)_44%,transparent_76%)]"
-      : roundOutcome.tone === "emerald"
-        ? "bg-[radial-gradient(circle,rgba(74,222,128,0.26),rgba(74,222,128,0.08)_42%,transparent_76%)]"
-        : roundOutcome.tone === "rose"
-          ? "bg-[radial-gradient(circle,rgba(251,113,133,0.28),rgba(251,113,133,0.08)_42%,transparent_76%)]"
-          : "bg-[radial-gradient(circle,rgba(255,255,255,0.18),rgba(255,255,255,0.05)_42%,transparent_76%)]";
   const roundMomentMeta = `${countdownLabel ? `${countdownLabel} | ` : ""}${roundRailStatusLabel}${
     roundStatusDetail ? ` | ${roundStatusDetail}` : ""
   }`;
+  const roundStatusBannerClass =
+    roundOutcome.tone === "gold"
+      ? "border-amber-200/28 bg-[linear-gradient(135deg,rgba(69,45,11,0.84),rgba(16,12,9,0.7))] shadow-[0_18px_34px_rgba(120,71,7,0.24)]"
+      : roundOutcome.tone === "emerald"
+        ? "border-emerald-200/24 bg-[linear-gradient(135deg,rgba(15,66,46,0.82),rgba(8,18,15,0.72))] shadow-[0_18px_34px_rgba(5,150,105,0.2)]"
+        : roundOutcome.tone === "rose"
+          ? "border-rose-200/24 bg-[linear-gradient(135deg,rgba(87,22,40,0.82),rgba(20,9,14,0.72))] shadow-[0_18px_34px_rgba(190,24,93,0.22)]"
+          : "border-white/14 bg-[linear-gradient(135deg,rgba(18,24,31,0.82),rgba(8,11,16,0.72))] shadow-[0_18px_34px_rgba(0,0,0,0.24)]";
 
   const deckIsAnimating = lastActionType === "drawCard" && lastActionPayload?.source === "deck";
   const discardIsAnimating =
@@ -1197,14 +1191,13 @@ const GameTable: React.FC = () => {
     },
     bottom: {
       positionClass: isPhoneLandscapeLayout
-        ? "left-1/2 bottom-[28.5%] -translate-x-1/2 w-[50%] max-w-[392px]"
-        : "left-1/2 bottom-[26.2%] -translate-x-1/2 w-[46%] max-w-[520px]",
+        ? "left-1/2 bottom-[26.8%] -translate-x-1/2 w-[50%] max-w-[392px]"
+        : "left-1/2 bottom-[24.5%] -translate-x-1/2 w-[46%] max-w-[520px]",
       laneClass: isPhoneLandscapeLayout ? "min-h-[68px] gap-2.5" : "min-h-[84px] gap-3.5",
     },
   };
   const centerPileCardClass = isPhoneLandscapeLayout ? "h-[3.55rem] w-[2.55rem]" : "h-[4.7rem] w-[3.3rem]";
   const dealAnimationCardClass = isPhoneLandscapeLayout ? "h-[3.4rem] w-[2.4rem]" : "h-[4.45rem] w-[3.1rem]";
-  const revealCardClass = isPhoneLandscapeLayout ? "h-[3.45rem] w-[2.45rem]" : "h-[5.15rem] w-[3.62rem]";
   const spreadCardClass = {
     compact: isPhoneLandscapeLayout
       ? "h-[3.2rem] w-[2.25rem]"
@@ -1409,10 +1402,10 @@ const GameTable: React.FC = () => {
                         ? "border-emerald-200/40 bg-emerald-300/14 text-emerald-100"
                         : shouldDimSeatLoser
                           ? "border-rose-200/35 bg-rose-400/12 text-rose-100"
-                          : "border-white/12 bg-white/6 text-white/72"
+                        : "border-white/12 bg-white/6 text-white/72"
                     }`}
                   >
-                    {roundSeatResult?.resultLabel ?? "Round End"}
+                    {roundSeatResult?.statusLabel ?? "Round End"}
                   </div>
                 ) : (
                   <div
@@ -1449,6 +1442,16 @@ const GameTable: React.FC = () => {
                 {roundSeatResult ? (
                   <>
                     <div
+                      className={`mt-1 ${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} uppercase tracking-[0.18em] text-white/55 drop-shadow-[0_2px_8px_rgba(0,0,0,0.42)]`}
+                    >
+                      Hand Score
+                    </div>
+                    <div
+                      className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} font-semibold leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)]`}
+                    >
+                      {roundSeatResult.scoreLabel}
+                    </div>
+                    <div
                       className={`mt-1 ${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} font-semibold leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)] ${
                         shouldHighlightSeatWinner
                           ? "text-emerald-200"
@@ -1462,7 +1465,7 @@ const GameTable: React.FC = () => {
                     <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)] ${
                       shouldHighlightSeatWinner ? "text-emerald-100/92" : "text-white/58"
                     }`}>
-                      {roundSeatResult.seatLabel}
+                      {roundSeatResult.detailLabel}
                     </div>
                   </>
                 ) : null}
@@ -1538,6 +1541,47 @@ const GameTable: React.FC = () => {
   const handSelectedLiftPx = isPhoneLandscapeLayout ? 18 : 24;
   const handHoverLiftPx = isPhoneLandscapeLayout ? 12 : 18;
   const revealedSpreadGroups = isRoundEnd ? winnerPlayer?.spreads.map(sortSpreadCards) ?? [] : [];
+  const getSeatForPlayer = (playerId?: string | null): "top" | "left" | "right" | "bottom" | null => {
+    if (!playerId) return null;
+    if (topPlayer?.userId === playerId) return "top";
+    if (leftPlayer?.userId === playerId) return "left";
+    if (rightPlayer?.userId === playerId) return "right";
+    if (displayedBottomPlayer?.userId === playerId || currentPlayer?.userId === playerId || user?._id === playerId) {
+      return "bottom";
+    }
+    return null;
+  };
+  const winningSeat = getSeatForPlayer(winnerPlayer?.userId);
+  const revealSeatLayouts: Record<NonNullable<typeof winningSeat>, { containerClass: string; widthClass: string; alignClass: string }> = {
+    top: {
+      containerClass: isPhoneLandscapeLayout
+        ? "right-[19%] top-[19%]"
+        : "right-[18%] top-[18.5%]",
+      widthClass: isPhoneLandscapeLayout ? "max-w-[220px]" : "max-w-[300px]",
+      alignClass: "items-end text-right",
+    },
+    left: {
+      containerClass: isPhoneLandscapeLayout
+        ? "left-[16%] top-[48%] -translate-y-1/2"
+        : "left-[17.5%] top-[48%] -translate-y-1/2",
+      widthClass: isPhoneLandscapeLayout ? "max-w-[220px]" : "max-w-[300px]",
+      alignClass: "items-start text-left",
+    },
+    right: {
+      containerClass: isPhoneLandscapeLayout
+        ? "right-[16%] top-[48%] -translate-y-1/2"
+        : "right-[17.5%] top-[48%] -translate-y-1/2",
+      widthClass: isPhoneLandscapeLayout ? "max-w-[220px]" : "max-w-[300px]",
+      alignClass: "items-end text-right",
+    },
+    bottom: {
+      containerClass: isPhoneLandscapeLayout
+        ? "left-[20%] bottom-[21.5%]"
+        : "left-[19%] bottom-[18.75%]",
+      widthClass: isPhoneLandscapeLayout ? "max-w-[220px]" : "max-w-[320px]",
+      alignClass: "items-start text-left",
+    },
+  };
 
   const renderSpreadZone = (
     player: typeof gameState.players[number] | null,
@@ -1645,56 +1689,64 @@ const GameTable: React.FC = () => {
     );
   };
 
-  const renderRevealLane = () => {
-    if (revealedSpreadGroups.length === 0) return null;
+  const renderSeatOwnedReveal = () => {
+    if (revealedSpreadGroups.length === 0 || !winningSeat) return null;
+    const revealLayout = revealSeatLayouts[winningSeat];
 
     return (
-      <div
-        className={`flex w-full flex-wrap items-start justify-center ${
-          revealedSpreadGroups.length > 1 ? "gap-3.5 sm:gap-6" : "gap-3.5"
-        } ${isPhoneLandscapeLayout ? "max-w-[92%]" : "max-w-[78%]"}`}
-      >
-        {revealedSpreadGroups.map((spread, spreadIndex) => (
-          <motion.div
-            key={`reveal-lane-${spreadIndex}`}
-            className="flex items-end justify-center px-2 py-1.5"
-            initial={{ opacity: 0, y: 24, scale: 0.94 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 24, delay: spreadIndex * 0.08 }}
+      <div className={`pointer-events-none absolute z-30 ${revealLayout.containerClass}`}>
+        <div className={`flex flex-col ${revealLayout.alignClass}`}>
+          <div
+            className={`mb-2 inline-flex rounded-full border border-white/12 bg-black/24 px-2.5 py-1 text-[8px] font-semibold uppercase tracking-[0.24em] ${roundMomentHeadlineClass}`}
           >
-            {spread.map((card, cardIndex) => (
+            {isReem ? "Reem Reveal" : "Winning Reveal"}
+          </div>
+          <div
+            className={`flex flex-col gap-2 rounded-[20px] border border-white/10 bg-black/18 px-2.5 py-2 shadow-[0_18px_34px_rgba(0,0,0,0.2)] backdrop-blur-[6px] ${revealLayout.widthClass}`}
+          >
+            {revealedSpreadGroups.map((spread, spreadIndex) => (
               <motion.div
-                key={`${card.rank}-${card.suit}-${cardIndex}`}
-                className="origin-bottom"
-                style={{
-                  marginLeft: cardIndex === 0 ? 0 : `-${isPhoneLandscapeLayout ? 16 : 20}px`,
-                  zIndex: cardIndex + 1,
-                }}
-                initial={{
-                  opacity: 0,
-                  y: 16,
-                  x: (cardIndex - (spread.length - 1) / 2) * 8,
-                  rotate: (cardIndex - (spread.length - 1) / 2) * 4,
-                  scale: 0.9,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                  x: (cardIndex - (spread.length - 1) / 2) * 2,
-                  rotate: (cardIndex - (spread.length - 1) / 2) * 3.5,
-                  scale: 1,
-                }}
-                transition={{ type: "spring", stiffness: 300, damping: 24, delay: 0.03 * cardIndex }}
+                key={`reveal-lane-${spreadIndex}`}
+                className={`flex items-end ${winningSeat === "right" || winningSeat === "top" ? "justify-end" : "justify-start"}`}
+                initial={{ opacity: 0, y: 18, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ type: "spring", stiffness: 260, damping: 24, delay: spreadIndex * 0.08 }}
               >
-                <CardComponent
-                  suit={card.suit}
-                  rank={card.rank}
-                  className={revealCardClass}
-                />
+                {spread.map((card, cardIndex) => (
+                  <motion.div
+                    key={`${card.rank}-${card.suit}-${cardIndex}`}
+                    className="origin-bottom"
+                    style={{
+                      marginLeft: cardIndex === 0 ? 0 : `-${isPhoneLandscapeLayout ? 14 : 18}px`,
+                      zIndex: cardIndex + 1,
+                    }}
+                    initial={{
+                      opacity: 0,
+                      y: 14,
+                      x: (cardIndex - (spread.length - 1) / 2) * 6,
+                      rotate: (cardIndex - (spread.length - 1) / 2) * 3.5,
+                      scale: 0.92,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                      x: (cardIndex - (spread.length - 1) / 2) * 1.5,
+                      rotate: (cardIndex - (spread.length - 1) / 2) * 2.8,
+                      scale: 1,
+                    }}
+                    transition={{ type: "spring", stiffness: 300, damping: 24, delay: 0.03 * cardIndex }}
+                  >
+                    <CardComponent
+                      suit={card.suit}
+                      rank={card.rank}
+                      className={isPhoneLandscapeLayout ? "h-[3.2rem] w-[2.25rem]" : "h-[4.7rem] w-[3.25rem]"}
+                    />
+                  </motion.div>
+                ))}
               </motion.div>
             ))}
-          </motion.div>
-        ))}
+          </div>
+        </div>
       </div>
     );
   };
@@ -1747,8 +1799,8 @@ const GameTable: React.FC = () => {
               ref={tableRef}
               className={`table relative ${
                 isPhoneLandscapeLayout
-                  ? "w-full h-full rounded-[18px] border border-black/18"
-                  : "aspect-[16/9] rounded-[28px] border border-black/18 w-[96vw]"
+                  ? "w-full h-full rounded-[18px]"
+                  : "aspect-[16/9] rounded-[28px] w-[96vw]"
               } overflow-hidden shadow-[0_28px_54px_rgba(0,0,0,0.4)] ${isReem ? "rt-reem-burst" : ""}`}
               style={isPhoneLandscapeLayout ? undefined : { maxWidth: `${tableMaxWidthPx}px` }}
             >
@@ -1875,6 +1927,31 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
+              {isRoundEnd ? (
+                <div
+                  className={`pointer-events-none absolute left-1/2 z-30 -translate-x-1/2 ${
+                    isPhoneLandscapeLayout ? "top-[11%]" : "top-[10.5%]"
+                  }`}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    className={`flex items-center gap-3 rounded-full border px-4 py-2 text-white backdrop-blur-[8px] ${roundStatusBannerClass}`}
+                  >
+                    <div className={`text-[8px] font-semibold uppercase tracking-[0.26em] ${roundMomentHeadlineClass}`}>
+                      ROUND OVER
+                    </div>
+                    <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} font-semibold text-white`}>
+                      {roundOutcome.headline}
+                    </div>
+                    <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} text-white/70`}>
+                      {roundMomentMeta}
+                    </div>
+                  </motion.div>
+                </div>
+              ) : null}
+
               {renderSeatInfo(topPlayer, opponentSeatLayouts.top)}
               {renderSeatInfo(leftPlayer, opponentSeatLayouts.left)}
               {renderSeatInfo(rightPlayer, opponentSeatLayouts.right)}
@@ -1883,6 +1960,7 @@ const GameTable: React.FC = () => {
               {renderSpreadZone(leftPlayer, "left", spreadZoneLayouts.left)}
               {renderSpreadZone(rightPlayer, "right", spreadZoneLayouts.right)}
               {renderSpreadZone(currentPlayer ?? null, "bottom", spreadZoneLayouts.bottom)}
+              {renderSeatOwnedReveal()}
 
               <RtcParticleOverlay
                 gameState={gameState}
@@ -1955,61 +2033,6 @@ const GameTable: React.FC = () => {
                 </div>
               )}
 
-              {isRoundEnd ? (
-                <div
-                  className={`pointer-events-none absolute left-1/2 z-40 ${
-                    isPhoneLandscapeLayout ? "top-[43.5%]" : "top-[42%]"
-                  } -translate-x-1/2 -translate-y-1/2`}
-                >
-                  <motion.div
-                    initial={{ opacity: 0, y: 14, scale: 0.94 }}
-                    animate={{ opacity: 1, y: 0, scale: [0.97, 1.015, 1] }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                    className={`relative flex flex-col items-center overflow-hidden rounded-[26px] border px-4 py-3 text-center text-white backdrop-blur-[10px] ${
-                      isPhoneLandscapeLayout ? "w-[250px]" : "w-[395px]"
-                    } ${roundMomentShellClass}`}
-                  >
-                    <motion.div
-                      className={`absolute -inset-x-10 -inset-y-8 rounded-full blur-2xl ${roundMomentGlowClass}`}
-                      animate={{ opacity: [0.55, 0.95, 0.55], scale: [0.98, 1.04, 0.98] }}
-                      transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                      aria-hidden
-                    />
-                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent_42%,rgba(255,255,255,0.02))]" aria-hidden />
-                    <div
-                      className={`relative inline-flex rounded-full border px-2.5 py-1 font-semibold uppercase tracking-[0.24em] ${
-                        isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"
-                      } ${roundMomentHeadlineClass}`}
-                    >
-                      {roundOutcome.headline}
-                    </div>
-                    <div
-                      className={`relative mt-2 font-black uppercase leading-none tracking-[0.26em] text-amber-100 drop-shadow-[0_0_18px_rgba(251,191,36,0.55)] ${
-                        isPhoneLandscapeLayout ? "text-[18px]" : "text-[28px]"
-                      }`}
-                      style={{ fontFamily: displayFont }}
-                    >
-                      ROUND OVER
-                    </div>
-                    <motion.div
-                      className={`relative mt-2 font-black leading-none ${
-                        isPhoneLandscapeLayout ? "text-[15px]" : "text-[23px]"
-                      } ${roundMomentDeltaClass}`}
-                      animate={{ scale: [1, 1.04, 1] }}
-                      transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 0.8, ease: "easeInOut" }}
-                    >
-                      {winnerLine}
-                    </motion.div>
-                    <div
-                      className={`relative mt-2 max-w-[92%] font-medium leading-snug text-white/74 ${
-                        isPhoneLandscapeLayout ? "text-[8px]" : "text-[10px]"
-                      }`}
-                    >
-                      {roundMomentMeta}
-                    </div>
-                  </motion.div>
-                </div>
-              ) : null}
               <div
                 className={`pointer-events-auto absolute left-1/2 z-50 ${
                   isPhoneLandscapeLayout ? "top-[49%]" : "top-[50%]"
@@ -2121,16 +2144,6 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              {isRoundEnd ? (
-                <div
-                  className={`pointer-events-none absolute left-1/2 z-20 ${
-                    isPhoneLandscapeLayout ? "top-[61%]" : "top-[58%]"
-                  } -translate-x-1/2`}
-                >
-                  <div className="flex flex-col items-center gap-2">{renderRevealLane()}</div>
-                </div>
-              ) : null}
-
               <div
                 className={`seat absolute left-1/2 z-40 -translate-x-1/2 pointer-events-none ${
                   isPhoneLandscapeLayout
@@ -2197,10 +2210,10 @@ const GameTable: React.FC = () => {
                                     ? "border-emerald-200/40 bg-emerald-300/14 text-emerald-100"
                                     : shouldDimBottomLoser
                                       ? "border-rose-200/35 bg-rose-400/12 text-rose-100"
-                                      : "border-white/12 bg-white/6 text-white/72"
+                                    : "border-white/12 bg-white/6 text-white/72"
                                 }`}
                               >
-                                {bottomSeatRoundResult?.resultLabel ?? "Round End"}
+                                {bottomSeatRoundResult?.statusLabel ?? "Round End"}
                               </div>
                             ) : (
                               <div
@@ -2235,6 +2248,16 @@ const GameTable: React.FC = () => {
                             {bottomSeatRoundResult ? (
                               <>
                                 <div
+                                  className={`mt-1 ${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} uppercase tracking-[0.18em] text-white/55 drop-shadow-[0_2px_8px_rgba(0,0,0,0.42)]`}
+                                >
+                                  Hand Score
+                                </div>
+                                <div
+                                  className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} font-semibold leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)]`}
+                                >
+                                  {bottomSeatRoundResult.scoreLabel}
+                                </div>
+                                <div
                                   className={`mt-1 ${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} font-semibold leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)] ${
                                     shouldHighlightBottomWinner
                                       ? "text-emerald-200"
@@ -2248,7 +2271,7 @@ const GameTable: React.FC = () => {
                                 <div className={`${isPhoneLandscapeLayout ? "text-[8px]" : "text-[9px]"} leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)] ${
                                   shouldHighlightBottomWinner ? "text-emerald-100/92" : "text-white/58"
                                 }`}>
-                                  {bottomSeatRoundResult.seatLabel}
+                                  {bottomSeatRoundResult.detailLabel}
                                 </div>
                               </>
                             ) : null}
@@ -2307,8 +2330,8 @@ const GameTable: React.FC = () => {
                   <div
                     className="absolute z-10 -translate-x-1/2"
                     style={{
-                      left: isPhoneLandscapeLayout ? "54.8%" : "53.9%",
-                      bottom: isPhoneLandscapeLayout ? "-18px" : "-20px",
+                      left: isPhoneLandscapeLayout ? "52.9%" : "51.9%",
+                      bottom: isPhoneLandscapeLayout ? "-24px" : "-28px",
                       width: isPhoneLandscapeLayout ? "min(100%, 418px)" : "min(100%, 590px)",
                     }}
                   >
