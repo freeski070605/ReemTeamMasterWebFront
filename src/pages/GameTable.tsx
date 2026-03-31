@@ -2011,7 +2011,7 @@ const GameTable: React.FC = () => {
                 </div>
               ) : null}
               <div
-                className={`absolute left-1/2 z-30 ${
+                className={`pointer-events-auto absolute left-1/2 z-50 ${
                   isPhoneLandscapeLayout ? "top-[49%]" : "top-[50%]"
                 } -translate-x-1/2 -translate-y-1/2`}
               >
@@ -2308,7 +2308,7 @@ const GameTable: React.FC = () => {
                     className="absolute z-10 -translate-x-1/2"
                     style={{
                       left: isPhoneLandscapeLayout ? "56.5%" : "55.25%",
-                      bottom: isPhoneLandscapeLayout ? "-2px" : "0px",
+                      bottom: isPhoneLandscapeLayout ? "-10px" : "-12px",
                       width: isPhoneLandscapeLayout ? "min(100%, 418px)" : "min(100%, 590px)",
                     }}
                   >
