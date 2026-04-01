@@ -1149,8 +1149,8 @@ const GameTable: React.FC = () => {
     },
     left: {
       positionClass: isPhoneLandscapeLayout
-        ? "left-[2.4%] top-[39%] -translate-y-1/2"
-        : "left-[2.8%] top-[39.5%] -translate-y-1/2",
+        ? "left-[2.4%] top-[31.5%] -translate-y-1/2"
+        : "left-[2.8%] top-[32.5%] -translate-y-1/2",
       align: "left" as const,
       tiltClass: "-rotate-[4deg]",
       panelClass: isPhoneLandscapeLayout ? "min-w-[108px]" : "min-w-[128px]",
@@ -1158,8 +1158,8 @@ const GameTable: React.FC = () => {
     },
     right: {
       positionClass: isPhoneLandscapeLayout
-        ? "right-[2.4%] top-[39%] -translate-y-1/2"
-        : "right-[2.8%] top-[39.5%] -translate-y-1/2",
+        ? "right-[2.4%] top-[46.5%] -translate-y-1/2"
+        : "right-[2.8%] top-[46.75%] -translate-y-1/2",
       align: "right" as const,
       tiltClass: isThreeHandedTable ? "rotate-[3deg]" : "rotate-[4deg]",
       panelClass: isPhoneLandscapeLayout ? "min-w-[108px]" : "min-w-[128px]",
@@ -1170,17 +1170,17 @@ const GameTable: React.FC = () => {
     top: {
       positionClass: isHeadsUpTable
         ? isPhoneLandscapeLayout
-          ? "left-[43%] top-[19.5%] -translate-x-1/2 w-[44%] max-w-[356px]"
-          : "left-[43%] top-[19.5%] -translate-x-1/2 w-[43%] max-w-[430px]"
+          ? "left-[64%] top-[18.75%] -translate-x-1/2 w-[31%] max-w-[250px]"
+          : "left-[66%] top-[18.25%] -translate-x-1/2 w-[30%] max-w-[320px]"
         : isPhoneLandscapeLayout
-          ? "left-[40%] top-[18.75%] -translate-x-1/2 w-[42%] max-w-[340px]"
-          : "left-[39%] top-[18.5%] -translate-x-1/2 w-[41%] max-w-[450px]",
+          ? "left-[62%] top-[18%] -translate-x-1/2 w-[30%] max-w-[232px]"
+          : "left-[64%] top-[17.75%] -translate-x-1/2 w-[30%] max-w-[320px]",
       laneClass: isPhoneLandscapeLayout ? "min-h-[70px] gap-3" : "min-h-[88px] gap-4",
     },
     left: {
       positionClass: isPhoneLandscapeLayout
-        ? "left-[10.5%] top-[30.5%] w-[26%] max-w-[228px]"
-        : "left-[11%] top-[29.5%] w-[26%] max-w-[270px]",
+        ? "left-[8.75%] top-[40%] w-[24%] max-w-[214px]"
+        : "left-[9.5%] top-[40.5%] w-[24%] max-w-[248px]",
       laneClass: isPhoneLandscapeLayout ? "min-h-[66px] gap-2.5" : "min-h-[84px] gap-3",
     },
     right: {
