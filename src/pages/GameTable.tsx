@@ -1409,7 +1409,11 @@ const GameTable: React.FC = () => {
     WAITING: "border-white/14 bg-black/18 text-white/82 shadow-[0_10px_24px_rgba(0,0,0,0.18)] backdrop-blur-[2px]",
   };
 
-  const renderOpponentHand = (count: number, size: "sm" | "md" = "sm") => {
+  const renderOpponentHand = (
+    player: typeof gameState.players[number],
+    size: "sm" | "md" = "sm"
+  ) => {
+    const count = getVisibleCardCount(player.userId, player.hand.length);
     if (count <= 0) {
       return <div className="text-[10px] uppercase tracking-[0.2em] text-white/32">Empty</div>;
     }
@@ -1421,6 +1425,27 @@ const GameTable: React.FC = () => {
         : isPhoneLandscapeLayout
           ? "h-[3.15rem] w-[2.2rem]"
           : "h-[4.15rem] w-[2.9rem]";
+
+    if (isRoundEnd) {
+      const revealedHand = sortHandCards(player.hand);
+      return (
+        <div className="flex items-end justify-center">
+          {revealedHand.map((card, index) => (
+            <div
+              key={`${player.userId}-${card.rank}-${card.suit}-${index}`}
+              className="origin-bottom"
+              style={{
+                marginLeft: index === 0 ? 0 : `-${isPhoneLandscapeLayout ? 12 : 16}px`,
+                zIndex: index + 1,
+              }}
+            >
+              <CardComponent suit={card.suit} rank={card.rank} className={cardClass} />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     return (
       <div className="relative flex items-center justify-center">
         <CardComponent
@@ -1576,7 +1601,7 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
               <div className={`${layout.align === "right" ? "order-first" : ""}`}>
-                {renderOpponentHand(getVisibleCardCount(player.userId, player.hand.length), layout.handSize)}
+                {renderOpponentHand(player, layout.handSize)}
               </div>
             </div>
           </div>
@@ -1649,7 +1674,17 @@ const GameTable: React.FC = () => {
   const handRotateStep = isPhoneLandscapeLayout ? 4.5 : 5.5;
   const handSelectedLiftPx = isPhoneLandscapeLayout ? 18 : 24;
   const handHoverLiftPx = isPhoneLandscapeLayout ? 12 : 18;
-  const revealedSpreadGroups = isRoundEnd ? winnerPlayer?.spreads.map(sortSpreadCards) ?? [] : [];
+  const getRevealGroupsForPlayer = (player: typeof gameState.players[number] | null | undefined) => {
+    if (!player) return [];
+
+    const revealGroups = player.spreads.map(sortSpreadCards);
+    if (player.hand.length > 0) {
+      revealGroups.push(sortHandCards(player.hand));
+    }
+
+    return revealGroups;
+  };
+  const revealedWinnerGroups = isRoundEnd ? getRevealGroupsForPlayer(winnerPlayer) : [];
   const getSeatForPlayer = (playerId?: string | null): "top" | "left" | "right" | "bottom" | null => {
     if (!playerId) return null;
     if (topPlayer?.userId === playerId) return "top";
@@ -1775,7 +1810,7 @@ const GameTable: React.FC = () => {
     const isSeatWinner = player.userId === winnerPlayer?.userId;
     const showWinnerSummary = isSeatWinner && showWinnerSpotlight && !!roundSeatResult;
     const showLoserChip = !isSeatWinner && showLoserSettlementChips && !!roundSeatResult;
-    const showReveal = isSeatWinner && showWinnerSpotlight && revealedSpreadGroups.length > 0 && winningSeat === zone;
+    const showReveal = isSeatWinner && showWinnerSpotlight && revealedWinnerGroups.length > 0 && winningSeat === zone;
     if (!showWinnerSummary && !showLoserChip && !showReveal) return null;
 
     const contextShellClass = isSeatWinner
@@ -1861,7 +1896,7 @@ const GameTable: React.FC = () => {
               transition={{ type: "spring", stiffness: 250, damping: 24, delay: 0.08 }}
               className={`flex flex-col gap-2 rounded-[20px] border border-white/12 bg-black/24 px-3 py-2 shadow-[0_18px_34px_rgba(0,0,0,0.2)] backdrop-blur-[6px] ${layout.widthClass}`}
             >
-              {revealedSpreadGroups.map((spread, spreadIndex) => (
+              {revealedWinnerGroups.map((spread, spreadIndex) => (
                 <motion.div
                   key={`reveal-lane-${spreadIndex}`}
                   className={`flex items-end ${layout.cardsJustifyClass}`}
