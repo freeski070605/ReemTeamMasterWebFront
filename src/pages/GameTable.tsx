@@ -93,6 +93,9 @@ const getViewportSize = () => ({
   height: window.visualViewport?.height ?? window.innerHeight,
 });
 
+const DEFAULT_ROUND_READY_DURATION_MS = 30000;
+const PROMO_ROUND_READY_DURATION_MS = 20000;
+
 const readSafeAreaInset = (token: "--safe-area-top" | "--safe-area-right" | "--safe-area-bottom" | "--safe-area-left") => {
   const rawValue = getComputedStyle(document.documentElement).getPropertyValue(token);
   const parsed = Number.parseFloat(rawValue);
@@ -431,7 +434,13 @@ const GameTable: React.FC = () => {
       return;
     }
 
-    const roundRestartAt = gameState.roundReadyDeadline ?? ((gameState.lastAction?.timestamp ?? Date.now()) + 30000);
+    const fallbackRoundReadyDurationMs =
+      promoModeRequested || spectatorModeRequested
+        ? PROMO_ROUND_READY_DURATION_MS
+        : DEFAULT_ROUND_READY_DURATION_MS;
+    const roundRestartAt =
+      gameState.roundReadyDeadline ??
+      ((gameState.lastAction?.timestamp ?? Date.now()) + fallbackRoundReadyDurationMs);
 
     const updateCountdown = () => {
       const remaining = Math.max(0, Math.ceil((roundRestartAt - Date.now()) / 1000));
@@ -443,7 +452,7 @@ const GameTable: React.FC = () => {
     return () => {
       window.clearInterval(interval);
     };
-  }, [gameState?.status, gameState?.lastAction?.timestamp, gameState?.roundReadyDeadline]);
+  }, [gameState?.status, gameState?.lastAction?.timestamp, gameState?.roundReadyDeadline, promoModeRequested, spectatorModeRequested]);
 
   const roundAnimationPlan = (() => {
     if (!gameState) return null;
@@ -1069,7 +1078,13 @@ const GameTable: React.FC = () => {
     : "Match complete";
   const roundStatusDetail =
     isContinuousMode && isReadyForNextRound ? "Your seat is locked for the next hand." : null;
-  const countdownLabel = isContinuousMode ? `Next hand in ${roundCountdownSeconds ?? 30}s` : null;
+  const defaultRoundCountdownSeconds =
+    promoModeRequested || spectatorModeRequested
+      ? PROMO_ROUND_READY_DURATION_MS / 1000
+      : DEFAULT_ROUND_READY_DURATION_MS / 1000;
+  const countdownLabel = isContinuousMode
+    ? `Next hand in ${roundCountdownSeconds ?? defaultRoundCountdownSeconds}s`
+    : null;
   const isRoundEnd = gameState.status === "round-end";
   const roundPresentationKey = isRoundEnd
     ? [
