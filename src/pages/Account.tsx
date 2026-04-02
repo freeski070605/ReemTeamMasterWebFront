@@ -519,7 +519,7 @@ const Account: React.FC = () => {
           </div>
 
           <div className="account-reveal rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '200ms' }}>
-            <TransactionHistory embedded />
+            <TransactionHistory embedded pageSize={10} />
           </div>
         </div>
 
