@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { ChevronDown } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { createCheckout } from '../api/wallet';
 import { createRtcCheckout, getRtcBundles, RtcPurchaseBundle, requestRtcRefill } from '../api/rtc';
@@ -57,6 +58,7 @@ const Account: React.FC = () => {
   const [vipCheckoutLoading, setVipCheckoutLoading] = useState(false);
   const [vipCancelOpen, setVipCancelOpen] = useState(false);
   const [vipCanceling, setVipCanceling] = useState(false);
+  const [transactionsOpen, setTransactionsOpen] = useState(true);
   const {
     balance: usdBalance,
     loading: usdBalanceLoading,
@@ -519,7 +521,32 @@ const Account: React.FC = () => {
           </div>
 
           <div className="account-reveal rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '200ms' }}>
-            <TransactionHistory embedded />
+            <button
+              type="button"
+              onClick={() => setTransactionsOpen((current) => !current)}
+              aria-expanded={transactionsOpen}
+              className="flex w-full items-start justify-between gap-4 text-left"
+            >
+              <div>
+                <div className="text-xs uppercase tracking-[0.2em] text-white/50">Account Activity</div>
+                <h2 className="mt-2 text-2xl rt-page-title">Transaction History</h2>
+                <p className="mt-2 text-sm text-white/65">
+                  Review wallet deposits, payouts, and status changes in one place.
+                </p>
+              </div>
+              <span className="mt-1 inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.17em] text-white/70">
+                {transactionsOpen ? 'Collapse' : 'Expand'}
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform duration-200 ${transactionsOpen ? 'rotate-180' : ''}`}
+                />
+              </span>
+            </button>
+
+            {transactionsOpen && (
+              <div className="mt-5">
+                <TransactionHistory embedded showTitle={false} />
+              </div>
+            )}
           </div>
         </div>
 

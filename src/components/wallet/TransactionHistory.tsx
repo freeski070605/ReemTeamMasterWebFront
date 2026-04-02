@@ -5,9 +5,13 @@ import { Loader } from "../ui/Loader";
 
 type TransactionHistoryProps = {
   embedded?: boolean;
+  showTitle?: boolean;
 };
 
-const TransactionHistory: React.FC<TransactionHistoryProps> = ({ embedded = false }) => {
+const TransactionHistory: React.FC<TransactionHistoryProps> = ({
+  embedded = false,
+  showTitle = true,
+}) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +51,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ embedded = fals
 
   const content = (
     <>
-      <h2 className="text-lg font-semibold text-white mb-4 rt-page-title">Transaction History</h2>
+      {showTitle && (
+        <h2 className="text-lg font-semibold text-white mb-4 rt-page-title">Transaction History</h2>
+      )}
       {transactions.length === 0 ? (
         <div className="text-white/50 rounded-xl border border-white/10 bg-white/5 p-4">No transactions yet.</div>
       ) : (
