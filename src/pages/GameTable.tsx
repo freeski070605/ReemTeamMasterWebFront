@@ -1668,15 +1668,15 @@ const GameTable: React.FC = () => {
         : "h-[7.2rem] w-[4.95rem] sm:h-[7.65rem] sm:w-[5.25rem]";
   const handOverlapPx = isPhoneLandscapeLayout
     ? visibleHand.length >= 6
-      ? 13
+      ? 18
       : visibleHand.length >= 5
-        ? 11
-        : 9
+        ? 16
+        : 13
     : visibleHand.length >= 6
-      ? 19
+      ? 26
       : visibleHand.length >= 5
-        ? 17
-        : 14;
+        ? 23
+        : 19;
   const handFanLiftStep = isPhoneLandscapeLayout ? 6 : 8.25;
   const handRotateStep = isPhoneLandscapeLayout ? 3.75 : 4.75;
   const handSelectedLiftPx = isPhoneLandscapeLayout ? 24 : 32;
