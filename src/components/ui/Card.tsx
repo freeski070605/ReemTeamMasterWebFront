@@ -53,14 +53,17 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
   return (
     <motion.div
       className={cn(
-        'relative w-24 h-36 rounded-lg shadow-lg cursor-pointer select-none transition-transform overflow-hidden',
-        isSelected ? 'shadow-yellow-400/50 ring-4 ring-yellow-400' : '',
+        'relative w-24 h-36 overflow-hidden rounded-lg shadow-lg select-none transition-transform',
+        onClick || dragEnabled ? 'cursor-pointer' : 'cursor-default',
+        isSelected
+          ? 'ring-2 ring-amber-200/90 shadow-[0_0_0_1px_rgba(255,251,235,0.78),0_18px_34px_rgba(251,191,36,0.35)]'
+          : '',
         className
       )}
       onClick={onClick}
       style={style}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
+      whileHover={onClick || dragEnabled ? { scale: 1.05 } : undefined}
+      whileTap={onClick || dragEnabled ? { scale: 0.95 } : undefined}
       drag={dragEnabled}
       dragElastic={dragEnabled ? 0.24 : 0}
       dragMomentum={dragEnabled}
