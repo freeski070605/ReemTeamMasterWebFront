@@ -94,6 +94,44 @@ export interface AdminAuditRecord {
   createdAt: string;
 }
 
+export type AdminTournamentStatus = 'draft' | 'open' | 'locked' | 'in-progress' | 'completed' | 'cancelled';
+export type AdminTournamentEditableStatus = 'draft' | 'open' | 'locked' | 'cancelled';
+
+export interface AdminTournamentPayoutRule {
+  rank: number;
+  amount: number;
+  percentage?: number;
+}
+
+export interface AdminTournament {
+  _id: string;
+  contestId: string;
+  mode: string;
+  entryFee: number;
+  playerCount: number;
+  prizePool: number;
+  platformFee: number;
+  status: AdminTournamentStatus;
+  payoutStructure: AdminTournamentPayoutRule[];
+  participants: string[];
+  startedAt?: string | null;
+  endedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminTournamentMutationInput {
+  entryFee: number;
+  playerCount: number;
+  platformFee?: number;
+  status: AdminTournamentEditableStatus;
+  payoutStructure?: Array<{
+    rank: number;
+    amount?: number;
+    percentage?: number;
+  }>;
+}
+
 export interface AdminMetrics {
   generatedAt: string;
   users: {
@@ -209,7 +247,19 @@ export const adminApi = {
     return data;
   },
   getTournaments: async (status?: string) => {
-    const { data } = await client.get<{ tournaments: any[] }>('/admin/tournaments', { params: { status } });
+    const { data } = await client.get<{ tournaments: AdminTournament[] }>('/admin/tournaments', { params: { status } });
     return data.tournaments || [];
+  },
+  createTournament: async (payload: AdminTournamentMutationInput) => {
+    const { data } = await client.post<{ tournament: AdminTournament }>('/admin/tournaments', payload);
+    return data.tournament;
+  },
+  updateTournament: async (contestId: string, payload: AdminTournamentMutationInput) => {
+    const { data } = await client.put<{ tournament: AdminTournament }>(`/admin/tournaments/${contestId}`, payload);
+    return data.tournament;
+  },
+  deleteTournament: async (contestId: string) => {
+    const { data } = await client.delete<{ success: boolean; contestId: string }>(`/admin/tournaments/${contestId}`);
+    return data;
   },
 };

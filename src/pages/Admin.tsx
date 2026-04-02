@@ -23,6 +23,9 @@ import {
   AdminTable,
   AdminTableStatusFilter,
   AdminMetrics,
+  AdminTournament,
+  AdminTournamentEditableStatus,
+  AdminTournamentMutationInput,
   AdminUser,
   AdminWallet,
   AdminWalletSearchResult,
@@ -62,6 +65,20 @@ interface ConfirmState {
   onConfirm: (() => Promise<void>) | null;
 }
 
+interface TournamentPayoutDraft {
+  rank: number;
+  amount: string;
+  percentage: string;
+}
+
+interface TournamentEditorDraft {
+  entryFee: string;
+  playerCount: '2' | '3' | '4';
+  platformFee: string;
+  status: AdminTournamentEditableStatus;
+  payoutStructure: TournamentPayoutDraft[];
+}
+
 const SECTIONS: Array<{ id: AdminSection; label: string; icon: React.ReactNode }> = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
   { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" /> },
@@ -85,6 +102,40 @@ const INITIAL_LOADING: Record<AdminSection, boolean> = {
 };
 
 const getErrorMessage = (error: any, fallback: string) => error?.response?.data?.message || fallback;
+
+const buildPayoutDrafts = (
+  playerCount: number,
+  rules?: Array<{ rank: number; amount?: number | string; percentage?: number | string }>
+): TournamentPayoutDraft[] => {
+  return Array.from({ length: Math.max(2, Math.min(4, playerCount)) }, (_, index) => {
+    const rank = index + 1;
+    const rule = rules?.find((item) => item.rank === rank);
+    return {
+      rank,
+      amount: rule?.amount !== undefined ? String(rule.amount) : '',
+      percentage: rule?.percentage !== undefined ? String(rule.percentage) : '',
+    };
+  });
+};
+
+const createTournamentDraft = (): TournamentEditorDraft => ({
+  entryFee: '',
+  playerCount: '4',
+  platformFee: '0',
+  status: 'draft',
+  payoutStructure: buildPayoutDrafts(4),
+});
+
+const tournamentToDraft = (tournament: AdminTournament): TournamentEditorDraft => ({
+  entryFee: String(tournament.entryFee),
+  playerCount: String(tournament.playerCount) as '2' | '3' | '4',
+  platformFee: String(tournament.platformFee),
+  status:
+    tournament.status === 'in-progress' || tournament.status === 'completed'
+      ? 'locked'
+      : tournament.status,
+  payoutStructure: buildPayoutDrafts(tournament.playerCount, tournament.payoutStructure),
+});
 
 const formatCurrency = (value: number | null | undefined) => {
   if (typeof value !== 'number' || Number.isNaN(value)) {
@@ -243,6 +294,198 @@ const WalletAdjustModal: React.FC<{
   );
 };
 
+const TournamentEditorModal: React.FC<{
+  open: boolean;
+  draft: TournamentEditorDraft;
+  onChange: (next: TournamentEditorDraft) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  pending: boolean;
+  mode: 'create' | 'edit';
+  targetTournament: AdminTournament | null;
+}> = ({ open, draft, onChange, onClose, onSubmit, pending, mode, targetTournament }) => {
+  const playerCount = Number(draft.playerCount);
+  const entryFee = Number(draft.entryFee);
+  const platformFee = Number(draft.platformFee);
+  const prizePool = Number.isFinite(entryFee) && Number.isFinite(platformFee)
+    ? Math.max(0, Math.round((entryFee * playerCount - platformFee) * 100) / 100)
+    : null;
+  const payoutTotal = draft.payoutStructure.reduce((sum, rule) => {
+    const amount = Number(rule.amount);
+    return sum + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+  const hasParticipants = (targetTournament?.participants.length ?? 0) > 0;
+  const editableStatuses: AdminTournamentEditableStatus[] = hasParticipants
+    ? ['open', 'locked']
+    : ['draft', 'open', 'locked', 'cancelled'];
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[76] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="w-full max-w-4xl rounded-2xl border border-white/15 bg-[#0d1118] p-6 shadow-[0_30px_70px_rgba(0,0,0,0.55)]"
+            initial={{ opacity: 0, y: 14, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.97 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-white/45">
+                  {mode === 'create' ? 'New Tournament' : 'Edit Tournament'}
+                </div>
+                <h3 className="mt-2 text-2xl rt-page-title">
+                  {mode === 'create' ? 'Create Cash Crown Tournament' : targetTournament?.contestId || 'Update Tournament'}
+                </h3>
+                <p className="mt-2 text-sm text-white/70">
+                  Cash Crown tournaments use the USD contest lane. Joined tournaments keep their economics locked.
+                </p>
+              </div>
+              <div className="grid min-w-[220px] gap-2 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-white/70">
+                <div className="flex items-center justify-between">
+                  <span>Projected prize pool</span>
+                  <span className="text-white">{formatCurrency(prizePool)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Payout total</span>
+                  <span className="text-white">{formatCurrency(payoutTotal)}</span>
+                </div>
+                {targetTournament && (
+                  <div className="flex items-center justify-between">
+                    <span>Joined players</span>
+                    <span className="text-white">{targetTournament.participants.length}/{targetTournament.playerCount}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <Input
+                label="Entry Fee"
+                type="number"
+                min="0"
+                step="0.01"
+                value={draft.entryFee}
+                disabled={hasParticipants}
+                onChange={(event) => onChange({ ...draft, entryFee: event.target.value })}
+              />
+              <div>
+                <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/60">Status</label>
+                <select
+                  className="flex h-11 w-full rounded-xl border border-white/14 bg-black/35 px-3 py-2 text-sm text-white transition-colors focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  value={draft.status}
+                  onChange={(event) => onChange({ ...draft, status: event.target.value as AdminTournamentEditableStatus })}
+                >
+                  {editableStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/60">Player Count</label>
+                <select
+                  className="flex h-11 w-full rounded-xl border border-white/14 bg-black/35 px-3 py-2 text-sm text-white transition-colors focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  value={draft.playerCount}
+                  disabled={hasParticipants}
+                  onChange={(event) => {
+                    const nextPlayerCount = Number(event.target.value);
+                    onChange({
+                      ...draft,
+                      playerCount: event.target.value as '2' | '3' | '4',
+                      payoutStructure: buildPayoutDrafts(nextPlayerCount, draft.payoutStructure),
+                    });
+                  }}
+                >
+                  <option value="2">2 Players</option>
+                  <option value="3">3 Players</option>
+                  <option value="4">4 Players</option>
+                </select>
+              </div>
+
+              <Input
+                label="Platform Fee"
+                type="number"
+                min="0"
+                step="0.01"
+                value={draft.platformFee}
+                disabled={hasParticipants}
+                onChange={(event) => onChange({ ...draft, platformFee: event.target.value })}
+              />
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/45">Payout Rules</div>
+                  <p className="mt-1 text-sm text-white/65">Use fixed amounts, percentages, or a mix. Empty rows are ignored.</p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3">
+                {draft.payoutStructure.map((rule, index) => (
+                  <div key={rule.rank} className="grid gap-3 rounded-2xl border border-white/8 bg-black/20 p-4 md:grid-cols-[100px_1fr_1fr]">
+                    <div className="flex items-center text-sm text-white/70">Rank #{rule.rank}</div>
+                    <Input
+                      label="Amount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      disabled={hasParticipants}
+                      value={rule.amount}
+                      onChange={(event) => {
+                        const nextRules = [...draft.payoutStructure];
+                        nextRules[index] = { ...nextRules[index], amount: event.target.value };
+                        onChange({ ...draft, payoutStructure: nextRules });
+                      }}
+                    />
+                    <Input
+                      label="Percentage"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      disabled={hasParticipants}
+                      value={rule.percentage}
+                      onChange={(event) => {
+                        const nextRules = [...draft.payoutStructure];
+                        nextRules[index] = { ...nextRules[index], percentage: event.target.value };
+                        onChange({ ...draft, payoutStructure: nextRules });
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {hasParticipants && (
+              <div className="mt-4 rounded-xl border border-amber-300/30 bg-amber-300/10 p-3 text-xs text-amber-100">
+                Players have already joined this tournament, so entry fee, player count, platform fee, and payouts stay locked.
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="secondary" onClick={onClose} disabled={pending}>
+                Cancel
+              </Button>
+              <Button onClick={onSubmit} isLoading={pending}>
+                {mode === 'create' ? 'Create Tournament' : 'Save Changes'}
+              </Button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 const Admin: React.FC = () => {
   const { user } = useAuthStore();
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
@@ -269,7 +512,10 @@ const Admin: React.FC = () => {
   const [matchLookupId, setMatchLookupId] = useState('');
   const [matchDetails, setMatchDetails] = useState<any>(null);
 
-  const [tournaments, setTournaments] = useState<any[]>([]);
+  const [tournaments, setTournaments] = useState<AdminTournament[]>([]);
+  const [tournamentEditorOpen, setTournamentEditorOpen] = useState(false);
+  const [editingTournament, setEditingTournament] = useState<AdminTournament | null>(null);
+  const [tournamentDraft, setTournamentDraft] = useState<TournamentEditorDraft>(createTournamentDraft());
 
   const [auditPage, setAuditPage] = useState(1);
   const [auditActionFilter, setAuditActionFilter] = useState('');
@@ -485,6 +731,73 @@ const Admin: React.FC = () => {
   );
   const waitingTableCount = tables.length - liveTableCount;
 
+  const openTournamentEditor = (tournament?: AdminTournament) => {
+    if (tournament) {
+      setEditingTournament(tournament);
+      setTournamentDraft(tournamentToDraft(tournament));
+    } else {
+      setEditingTournament(null);
+      setTournamentDraft(createTournamentDraft());
+    }
+    setTournamentEditorOpen(true);
+  };
+
+  const closeTournamentEditor = () => {
+    if (actionPending) return;
+    setTournamentEditorOpen(false);
+    setEditingTournament(null);
+    setTournamentDraft(createTournamentDraft());
+  };
+
+  const buildTournamentPayload = (draft: TournamentEditorDraft): AdminTournamentMutationInput | null => {
+    const entryFee = Number(draft.entryFee);
+    const playerCount = Number(draft.playerCount);
+    const platformFee = Number(draft.platformFee);
+
+    if (!Number.isFinite(entryFee) || entryFee <= 0) {
+      toast.error('Entry fee must be greater than zero.');
+      return null;
+    }
+    if (![2, 3, 4].includes(playerCount)) {
+      toast.error('Player count must be 2, 3, or 4.');
+      return null;
+    }
+    if (!Number.isFinite(platformFee) || platformFee < 0) {
+      toast.error('Platform fee must be zero or greater.');
+      return null;
+    }
+    if (platformFee > entryFee * playerCount) {
+      toast.error('Platform fee cannot exceed the total collection.');
+      return null;
+    }
+
+    const payoutStructure = draft.payoutStructure
+      .map((rule) => {
+        const amount = rule.amount.trim() ? Number(rule.amount) : undefined;
+        const percentage = rule.percentage.trim() ? Number(rule.percentage) : undefined;
+        if (amount !== undefined && (!Number.isFinite(amount) || amount < 0)) {
+          throw new Error(`Rank ${rule.rank} amount must be zero or greater.`);
+        }
+        if (percentage !== undefined && (!Number.isFinite(percentage) || percentage < 0 || percentage > 100)) {
+          throw new Error(`Rank ${rule.rank} percentage must be between 0 and 100.`);
+        }
+        return {
+          rank: rule.rank,
+          amount,
+          percentage,
+        };
+      })
+      .filter((rule) => rule.amount !== undefined || rule.percentage !== undefined);
+
+    return {
+      entryFee,
+      playerCount,
+      platformFee,
+      status: draft.status,
+      payoutStructure,
+    };
+  };
+
   const handleBanToggle = async (target: AdminUser) => {
     await adminApi.setBanState(target.id, !target.isBanned);
     toast.success(target.isBanned ? 'User unbanned.' : 'User banned.');
@@ -590,6 +903,56 @@ const Admin: React.FC = () => {
     } finally {
       setSectionLoading('tables', false);
     }
+  };
+
+  const handleSaveTournament = async () => {
+    let payload: AdminTournamentMutationInput | null = null;
+
+    try {
+      payload = buildTournamentPayload(tournamentDraft);
+    } catch (error: any) {
+      toast.error(error?.message || 'Invalid tournament payout configuration.');
+      return;
+    }
+
+    if (!payload) {
+      return;
+    }
+
+    setActionPending(true);
+    try {
+      if (editingTournament) {
+        await adminApi.updateTournament(editingTournament.contestId, payload);
+        toast.success('Tournament updated.');
+      } else {
+        await adminApi.createTournament(payload);
+        toast.success('Tournament created.');
+      }
+
+      setTournamentEditorOpen(false);
+      setEditingTournament(null);
+      setTournamentDraft(createTournamentDraft());
+      setAuditPage(1);
+      await Promise.all([loadTournaments(), loadMetrics(), loadAudits(1, auditActionFilter, auditAdminFilter)]);
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, editingTournament ? 'Failed to update tournament.' : 'Failed to create tournament.'));
+    } finally {
+      setActionPending(false);
+    }
+  };
+
+  const handleDeleteTournament = (tournament: AdminTournament) => {
+    openConfirm(
+      'Delete Tournament',
+      `Delete ${tournament.contestId}? This also clears any table binding to this tournament.`,
+      async () => {
+        await adminApi.deleteTournament(tournament.contestId);
+        toast.success('Tournament deleted.');
+        setAuditPage(1);
+        await Promise.all([loadTournaments(), loadMetrics(), loadAudits(1, auditActionFilter, auditAdminFilter)]);
+      },
+      { danger: true, confirmLabel: 'Delete Tournament' }
+    );
   };
 
   const renderDashboard = () => {
@@ -1125,16 +1488,53 @@ const Admin: React.FC = () => {
     );
   };
   const renderTournaments = () => {
+    const draftCount = tournaments.filter((item) => item.status === 'draft').length;
+    const openCount = tournaments.filter((item) => item.status === 'open').length;
+    const liveCount = tournaments.filter((item) => item.status === 'locked' || item.status === 'in-progress').length;
+
     return (
       <section className="space-y-4">
-        <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-xl rt-page-title">Tournament Sessions</h3>
-            <p className="text-xs text-white/55">Cash Crown contest lifecycle overview.</p>
+        <div className="grid gap-4 lg:grid-cols-[1.35fr_0.95fr]">
+          <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl rt-page-title">Tournament Sessions</h3>
+                <p className="text-xs text-white/55">Create, adjust, and retire Cash Crown tournaments from one place.</p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="secondary" onClick={() => void loadTournaments()} isLoading={loading.tournaments}>
+                  Refresh
+                </Button>
+                <Button size="sm" onClick={() => openTournamentEditor()}>
+                  Create Tournament
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-white/45">Draft</div>
+                <div className="mt-2 text-3xl rt-page-title">{draftCount}</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-white/45">Open</div>
+                <div className="mt-2 text-3xl rt-page-title">{openCount}</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-white/45">Locked / Live</div>
+                <div className="mt-2 text-3xl rt-page-title">{liveCount}</div>
+              </div>
+            </div>
           </div>
-          <Button size="sm" variant="secondary" onClick={() => void loadTournaments()} isLoading={loading.tournaments}>
-            Refresh
-          </Button>
+
+          <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/45">Guardrails</div>
+            <div className="mt-3 space-y-2 text-sm text-white/65">
+              <div>Joined tournaments can still be opened or locked, but their buy-in math stays frozen.</div>
+              <div>Delete is reserved for tournaments with no participants so we do not orphan paid entries.</div>
+              <div>In-progress and completed tournaments stay view-only here and continue through the existing game flow.</div>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#0f1622]">
@@ -1145,26 +1545,53 @@ const Admin: React.FC = () => {
                 <th className="px-4 py-3">Entry Fee</th>
                 <th className="px-4 py-3">Players</th>
                 <th className="px-4 py-3">Prize Pool</th>
+                <th className="px-4 py-3">Platform Fee</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Payouts</th>
                 <th className="px-4 py-3">Created</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
-              {tournaments.map((item: any) => (
+              {tournaments.map((item) => {
+                const participantCount = item.participants?.length ?? 0;
+                const canEdit = item.status !== 'in-progress' && item.status !== 'completed';
+                const canDelete = participantCount === 0 && item.status !== 'in-progress' && item.status !== 'completed';
+                const payoutSummary = item.payoutStructure.length > 0
+                  ? item.payoutStructure.map((rule) => `#${rule.rank} ${formatCurrency(rule.amount)}`).join(' | ')
+                  : 'Winner-take-all';
+
+                return (
                 <tr key={item._id}>
-                  <td className="px-4 py-3 text-white">{item.contestId}</td>
+                  <td className="px-4 py-3">
+                    <div className="text-white">{item.contestId}</div>
+                    <div className="mt-1 text-xs text-white/45">{item.mode}</div>
+                  </td>
                   <td className="px-4 py-3 text-white/70">{formatCurrency(item.entryFee)}</td>
-                  <td className="px-4 py-3 text-white/70">{item.participants?.length ?? 0}/{item.playerCount}</td>
+                  <td className="px-4 py-3 text-white/70">{participantCount}/{item.playerCount}</td>
                   <td className="px-4 py-3 text-white/70">{formatCurrency(item.prizePool)}</td>
+                  <td className="px-4 py-3 text-white/70">{formatCurrency(item.platformFee)}</td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2.5 py-1 text-xs ${statusChipClass(item.status)}`}>{item.status}</span>
                   </td>
+                  <td className="px-4 py-3 text-xs text-white/60">{payoutSummary}</td>
                   <td className="px-4 py-3 text-white/60">{formatDate(item.createdAt)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => openTournamentEditor(item)} disabled={!canEdit}>
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="danger" onClick={() => handleDeleteTournament(item)} disabled={!canDelete}>
+                        Delete
+                      </Button>
+                    </div>
+                  </td>
                 </tr>
-              ))}
+                );
+              })}
               {tournaments.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-white/50">
+                  <td colSpan={9} className="px-4 py-10 text-center text-white/50">
                     No tournaments found.
                   </td>
                 </tr>
@@ -1399,6 +1826,17 @@ const Admin: React.FC = () => {
         onSubmit={() => void handleWalletAdjustment()}
         pending={actionPending}
         targetUserId={walletProfile?.user.id || walletLookupUserId}
+      />
+
+      <TournamentEditorModal
+        open={tournamentEditorOpen}
+        draft={tournamentDraft}
+        onChange={setTournamentDraft}
+        onClose={closeTournamentEditor}
+        onSubmit={() => void handleSaveTournament()}
+        pending={actionPending}
+        mode={editingTournament ? 'edit' : 'create'}
+        targetTournament={editingTournament}
       />
     </div>
   );
