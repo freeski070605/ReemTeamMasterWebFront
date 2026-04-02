@@ -349,7 +349,7 @@ const TableSelect: React.FC = () => {
   return (
     <div className="space-y-6">
       {isAdmin && (
-        <section className="rt-glass rounded-2xl p-2">
+        <section className="rt-landscape-compact-card rt-glass rounded-2xl p-2">
           <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
@@ -384,7 +384,7 @@ const TableSelect: React.FC = () => {
 
       {activeView === 'promo' ? (
         <section className="space-y-5">
-          <header className="rt-panel-strong rounded-3xl p-7">
+          <header className="rt-landscape-compact-card rt-panel-strong rounded-3xl p-7">
             <div className="text-xs uppercase tracking-[0.2em] text-amber-200/70">Admin Promo Capture</div>
             <h1 className="mt-2 text-4xl rt-page-title font-semibold">AI Content Table</h1>
             <p className="mt-2 max-w-3xl text-white/65">
@@ -421,7 +421,7 @@ const TableSelect: React.FC = () => {
             </div>
           </section>
 
-          <section className="rt-panel-strong rounded-2xl p-5">
+          <section className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="text-xs uppercase tracking-[0.2em] text-white/50">Current Room</div>
@@ -479,7 +479,7 @@ const TableSelect: React.FC = () => {
         </section>
       ) : (
         <>
-      <header className="rt-panel-strong rounded-3xl p-7">
+      <header className="rt-landscape-compact-card rt-panel-strong rounded-3xl p-7">
         <div className="text-xs uppercase tracking-[0.2em] text-white/50">Crib Lobby (Recommended Start)</div>
         <h1 className="mt-2 text-4xl rt-page-title font-semibold">Play Reem Team Cash Cribs</h1>
         <p className="mt-2 text-white/65">
@@ -531,7 +531,7 @@ const TableSelect: React.FC = () => {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rt-panel-strong rounded-2xl p-5">
+        <div className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-5">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Recent Players</div>
           {recentLoading && <div className="mt-3 text-sm text-white/60">Loading recent players...</div>}
           {!recentLoading && recentError && (
@@ -558,7 +558,7 @@ const TableSelect: React.FC = () => {
           )}
         </div>
 
-        <div className="rt-panel-strong rounded-2xl p-5">
+        <div className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-5">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Lobby Pulse</div>
           {lobbyFeed.length === 0 && (
             <div className="mt-3 text-sm text-white/60">Lobby updates will appear here.</div>
@@ -590,7 +590,7 @@ const TableSelect: React.FC = () => {
                 const stakeDisplay = getStakeDisplay(table.stake, table.mode);
 
                 return (
-                  <article key={table._id} className="rt-panel-strong rounded-2xl p-5">
+                  <article key={table._id} className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-5">
                     <div className="flex items-center justify-between">
                       <h3 className="text-xl rt-page-title">{tableName}</h3>
                       <span

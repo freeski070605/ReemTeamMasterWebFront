@@ -268,6 +268,50 @@ a {
   animation: rt-reem-burst 1.2s ease-out;
 }
 
+@media (orientation: landscape) and (max-height: 540px) {
+  .rt-site-header-row {
+    height: auto !important;
+    min-height: 3.4rem;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+  }
+
+  .rt-site-wordmark {
+    display: none;
+  }
+
+  .rt-site-main {
+    padding-top: 0.9rem !important;
+    padding-bottom: 1rem !important;
+  }
+
+  .rt-site-mobile-menu {
+    max-height: calc(var(--app-height) - 4.2rem - var(--safe-area-top));
+    overflow-y: auto;
+  }
+
+  .rt-site-footer {
+    margin-top: 1.75rem;
+    padding-top: 1rem;
+    padding-bottom: calc(1rem + var(--safe-area-bottom));
+  }
+
+  .rt-landscape-compact-card {
+    padding: 1rem !important;
+  }
+
+  .rt-landscape-tight-gap {
+    gap: 1rem !important;
+  }
+
+  .rt-auth-shell {
+    min-height: auto !important;
+    align-items: start !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .account-reveal,
   .account-aura,

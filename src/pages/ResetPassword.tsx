@@ -49,8 +49,8 @@ const ResetPassword: React.FC = () => {
 
   if (!token) {
     return (
-      <div className="min-h-[calc(100vh-12rem)] grid items-center py-6">
-        <section className="rt-panel-strong rounded-3xl p-8 max-w-2xl mx-auto w-full">
+      <div className="rt-auth-shell min-h-[calc(100vh-12rem)] grid items-center py-6">
+        <section className="rt-landscape-compact-card rt-panel-strong rounded-3xl p-8 max-w-2xl mx-auto w-full">
           <div className="text-sm uppercase tracking-[0.18em] text-white/55">Authentication</div>
           <h1 className="mt-2 rt-page-title text-3xl font-semibold">Reset Link Missing</h1>
           <p className="mt-3 text-white/70">
@@ -68,9 +68,9 @@ const ResetPassword: React.FC = () => {
   }
 
   return (
-    <div className="min-h-[calc(100vh-12rem)] grid items-center py-6">
+    <div className="rt-auth-shell min-h-[calc(100vh-12rem)] grid items-center py-6">
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="rt-panel-strong rounded-3xl p-8">
+        <section className="rt-landscape-compact-card rt-panel-strong rounded-3xl p-8">
           <div className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
             Account Recovery
           </div>
@@ -84,7 +84,7 @@ const ResetPassword: React.FC = () => {
           </div>
         </section>
 
-        <section className="rt-panel-strong rounded-3xl p-8">
+        <section className="rt-landscape-compact-card rt-panel-strong rounded-3xl p-8">
           <div className="text-sm uppercase tracking-[0.18em] text-white/55">Authentication</div>
           <div className="rt-page-title text-xl mt-1">Reset Password</div>
 

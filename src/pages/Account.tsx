@@ -334,7 +334,7 @@ const Account: React.FC = () => {
     <div className="relative space-y-6">
       <div className="pointer-events-none absolute -top-20 left-1/2 -z-10 h-72 w-72 -translate-x-1/2 rounded-full bg-amber-300/10 blur-3xl account-aura" />
 
-      <header className="account-reveal account-hero relative overflow-hidden rounded-[30px] border border-white/15 p-7 sm:p-9">
+      <header className="account-reveal account-hero rt-landscape-compact-card relative overflow-hidden rounded-[30px] border border-white/15 p-7 sm:p-9">
         <div className="account-hero-pattern pointer-events-none absolute inset-0 opacity-90" />
         <div className="relative z-10 grid gap-8 xl:grid-cols-[1.35fr_0.65fr]">
           <div>
@@ -390,9 +390,9 @@ const Account: React.FC = () => {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <section className="rt-landscape-tight-gap grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
-          <div className="account-reveal rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '80ms' }}>
+          <div className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '80ms' }}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs uppercase tracking-[0.2em] text-white/50">Deposit Wallet</div>
@@ -440,7 +440,7 @@ const Account: React.FC = () => {
             <p className="mt-3 text-xs text-white/50">Payments redirect to a secure hosted checkout.</p>
           </div>
 
-          <div className="account-reveal rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '140ms' }}>
+          <div className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '140ms' }}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs uppercase tracking-[0.2em] text-white/50">Reem Team Cash Wallet</div>
@@ -518,13 +518,13 @@ const Account: React.FC = () => {
             </p>
           </div>
 
-          <div className="account-reveal rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '200ms' }}>
+          <div className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '200ms' }}>
             <TransactionHistory embedded pageSize={10} />
           </div>
         </div>
 
         <div className="space-y-6">
-          <div className="account-reveal rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '110ms' }}>
+          <div className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '110ms' }}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs uppercase tracking-[0.2em] text-white/50">Player Identity</div>
@@ -603,7 +603,7 @@ const Account: React.FC = () => {
             </div>
           </div>
 
-          <div className="account-reveal rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '150ms' }}>
+          <div className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '150ms' }}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs uppercase tracking-[0.2em] text-white/50">VIP Membership</div>
@@ -664,7 +664,7 @@ const Account: React.FC = () => {
             )}
           </div>
 
-          <div className="account-reveal rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '170ms' }}>
+          <div className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '170ms' }}>
             <div className="text-xs uppercase tracking-[0.2em] text-white/50">Account Security</div>
             <h3 className="mt-2 text-xl rt-page-title">Credential-First Access</h3>
             <p className="mt-2 text-sm text-white/65">

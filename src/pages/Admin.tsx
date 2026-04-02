@@ -36,6 +36,7 @@ import { USER_ROLES, UserRole, roleAtLeast } from '../types/roles';
 
 type AdminSection =
   | 'dashboard'
+  | 'operations'
   | 'users'
   | 'wallets'
   | 'withdrawals'
@@ -81,9 +82,7 @@ interface TournamentEditorDraft {
 
 const SECTIONS: Array<{ id: AdminSection; label: string; icon: React.ReactNode }> = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
-  { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" /> },
-  { id: 'wallets', label: 'Wallets', icon: <Wallet className="h-4 w-4" /> },
-  { id: 'withdrawals', label: 'Withdrawals', icon: <BadgeDollarSign className="h-4 w-4" /> },
+  { id: 'operations', label: 'People & Funds', icon: <Wallet className="h-4 w-4" /> },
   { id: 'tables', label: 'Tables', icon: <Table className="h-4 w-4" /> },
   { id: 'tournaments', label: 'Tournaments', icon: <Trophy className="h-4 w-4" /> },
   { id: 'metrics', label: 'System Metrics', icon: <Activity className="h-4 w-4" /> },
@@ -92,6 +91,7 @@ const SECTIONS: Array<{ id: AdminSection; label: string; icon: React.ReactNode }
 
 const INITIAL_LOADING: Record<AdminSection, boolean> = {
   dashboard: false,
+  operations: false,
   users: false,
   wallets: false,
   withdrawals: false,
@@ -540,7 +540,7 @@ const Admin: React.FC = () => {
       return SECTIONS;
     }
     if (canFinance) {
-      return SECTIONS.filter((section) => section.id === 'wallets' || section.id === 'withdrawals');
+      return SECTIONS.filter((section) => section.id === 'operations');
     }
     return [];
   }, [canAdmin, canFinance]);
@@ -619,6 +619,7 @@ const Admin: React.FC = () => {
     try {
       const payload = await adminApi.getUser(id);
       setSelectedProfile(payload);
+      setWalletProfile(payload);
       setWalletLookupQuery(payload.user.username || payload.user.email);
       setWalletLookupUserId(payload.user.id);
     } catch (error: any) {
@@ -652,6 +653,7 @@ const Admin: React.FC = () => {
       const payload = await adminApi.getWallet(safeUserId);
       setWalletLookupUserId(safeUserId);
       setWalletProfile(payload);
+      setSelectedProfile(payload);
       setWalletLookupQuery(payload.user.username || payload.user.email);
     } catch (error: any) {
       toast.error(getErrorMessage(error, 'Failed to load wallet details.'));
@@ -659,6 +661,23 @@ const Admin: React.FC = () => {
       setSectionLoading('wallets', false);
     }
   }, []);
+
+  const runOperationsSearch = useCallback(async () => {
+    const query = userQuery.trim() || walletLookupQuery.trim();
+
+    setSectionLoading('operations', true);
+    try {
+      if (canAdmin) {
+        await loadUsers(query);
+      }
+      await searchWallets(query);
+      if (query) {
+        setWalletLookupQuery(query);
+      }
+    } finally {
+      setSectionLoading('operations', false);
+    }
+  }, [canAdmin, loadUsers, searchWallets, userQuery, walletLookupQuery]);
 
   const loadWithdrawals = useCallback(async (status: string) => {
     setSectionLoading('withdrawals', true);
@@ -955,6 +974,26 @@ const Admin: React.FC = () => {
     );
   };
 
+  const handleRefundTournament = (tournament: AdminTournament) => {
+    const participantCount = tournament.participants?.length ?? 0;
+    openConfirm(
+      'Refund And Delete Tournament',
+      `Refund paid entries, restore redeemed tickets, and delete ${tournament.contestId}? ${participantCount} participant${participantCount === 1 ? '' : 's'} will be removed from this crown.`,
+      async () => {
+        const result = await adminApi.refundTournament(tournament.contestId, {
+          deleteAfterRefund: true,
+          reason: 'Admin removed tournament from operations panel.',
+        });
+        toast.success(
+          `Tournament removed. Refunded ${formatCurrency(result.refundedAmount)} and restored ${result.restoredTicketCount} ticket${result.restoredTicketCount === 1 ? '' : 's'}.`
+        );
+        setAuditPage(1);
+        await Promise.all([loadTournaments(), loadMetrics(), loadAudits(1, auditActionFilter, auditAdminFilter)]);
+      },
+      { danger: true, confirmLabel: 'Refund + Delete' }
+    );
+  };
+
   const renderDashboard = () => {
     return (
       <section className="space-y-4">
@@ -1013,6 +1052,440 @@ const Admin: React.FC = () => {
               </div>
             </div>
           </article>
+        </div>
+      </section>
+    );
+  };
+
+  const renderOperations = () => {
+    const activeProfile = walletProfile || selectedProfile;
+
+    return (
+      <section className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-2xl border border-white/10 bg-[#121926] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/50">
+              {canAdmin ? 'Users Loaded' : 'Wallet Matches'}
+            </div>
+            <div className="mt-2 flex items-end justify-between gap-3">
+              <div className="text-3xl rt-page-title text-white">
+                {canAdmin ? users.length : walletSearchResults.length}
+              </div>
+              <Users className="h-5 w-5 text-cyan-200/75" />
+            </div>
+          </article>
+          <article className="rounded-2xl border border-white/10 bg-[#121926] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/50">Pending Withdrawals</div>
+            <div className="mt-2 flex items-end justify-between gap-3">
+              <div className="text-3xl rt-page-title text-white">
+                {withdrawals.filter((item) => item.status === 'pending').length}
+              </div>
+              <BadgeDollarSign className="h-5 w-5 text-amber-200/80" />
+            </div>
+          </article>
+          <article className="rounded-2xl border border-white/10 bg-[#121926] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/50">Pending Queue Value</div>
+            <div className="mt-2 flex items-end justify-between gap-3">
+              <div className="text-3xl rt-page-title text-white">{formatCurrency(pendingWithdrawalAmount)}</div>
+              <Wallet className="h-5 w-5 text-emerald-200/75" />
+            </div>
+          </article>
+          <article className="rounded-2xl border border-white/10 bg-[#121926] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/50">Selected USD Balance</div>
+            <div className="mt-2 flex items-end justify-between gap-3">
+              <div className="text-3xl rt-page-title text-white">
+                {activeProfile ? formatCurrency(activeProfile.wallet.usdBalance) : '--'}
+              </div>
+              <Shield className="h-5 w-5 text-white/55" />
+            </div>
+          </article>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[1.12fr_0.88fr]">
+          <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h3 className="text-xl rt-page-title">People And Wallet Lookup</h3>
+                <p className="text-xs text-white/55">
+                  Search usernames or emails, then jump straight into profile, wallet, and payout actions.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="secondary" onClick={() => void loadWithdrawals(withdrawalStatus)} isLoading={loading.withdrawals}>
+                  Refresh Queue
+                </Button>
+                <Button size="sm" onClick={() => void runOperationsSearch()} isLoading={loading.operations || loading.users || loading.wallets}>
+                  Search Workspace
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <div className="relative">
+                <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/60">
+                  Username Or Email
+                </label>
+                <Search className="pointer-events-none absolute left-3 top-[2.55rem] h-4 w-4 -translate-y-1/2 text-white/45" />
+                <input
+                  className="h-11 w-full rounded-xl border border-white/14 bg-black/35 pl-9 pr-3 text-sm text-white"
+                  placeholder="Find user or wallet"
+                  value={userQuery}
+                  onChange={(event) => {
+                    setUserQuery(event.target.value);
+                    setWalletLookupQuery(event.target.value);
+                  }}
+                />
+              </div>
+              <Button size="sm" variant="secondary" onClick={() => void runOperationsSearch()} isLoading={loading.operations || loading.users || loading.wallets}>
+                Search
+              </Button>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <Input
+                label="Direct User ID"
+                value={walletLookupUserId}
+                onChange={(event) => setWalletLookupUserId(event.target.value)}
+              />
+              <Button size="sm" onClick={() => void loadWalletProfile(walletLookupUserId)} isLoading={loading.wallets}>
+                Load Record
+              </Button>
+            </div>
+
+            {canAdmin && (
+              <div className="mt-5 overflow-x-auto rounded-2xl border border-white/10 bg-black/15">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-white/10 text-xs uppercase tracking-[0.14em] text-white/50">
+                    <tr>
+                      <th className="px-4 py-3">User</th>
+                      <th className="px-4 py-3">Role</th>
+                      <th className="px-4 py-3">Flags</th>
+                      <th className="px-4 py-3 text-right">Open</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10">
+                    {users.map((item) => (
+                      <tr key={item.id} className="hover:bg-white/[0.03]">
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-white">{item.username}</div>
+                          <div className="text-xs text-white/55">{item.email}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full px-2.5 py-1 text-xs ${roleBadgeClass(item.role)}`}>{item.role}</span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-white/70">
+                          {item.isBanned ? 'Banned' : 'Active'} / {item.isFrozen ? 'Frozen' : 'Live'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button size="sm" variant="secondary" onClick={() => void loadUserProfile(item.id)}>
+                            Open
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {users.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-white/50">
+                          No matching users loaded yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="mt-5 overflow-x-auto rounded-2xl border border-white/10 bg-black/15">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-white/10 text-xs uppercase tracking-[0.14em] text-white/50">
+                  <tr>
+                    <th className="px-4 py-3">Wallet Match</th>
+                    <th className="px-4 py-3">USD</th>
+                    <th className="px-4 py-3">RTC</th>
+                    <th className="px-4 py-3 text-right">Open</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {walletSearchResults.map((item) => (
+                    <tr key={item.user.id}>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-white">{item.user.username}</div>
+                        <div className="text-xs text-white/55">{item.user.email}</div>
+                      </td>
+                      <td className="px-4 py-3 text-white/75">{formatCurrency(item.wallet.usdBalance)}</td>
+                      <td className="px-4 py-3 text-white/75">{item.wallet.rtcBalance}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="secondary" onClick={() => void loadWalletProfile(item.user.id)}>
+                          Open
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {walletSearchResults.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-white/50">
+                        No wallet matches loaded yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xl rt-page-title">Selected Account</h3>
+                <p className="text-xs text-white/55">Profile controls, role visibility, and current wallet posture.</p>
+              </div>
+              {activeProfile && (
+                <span className={`rounded-full px-2.5 py-1 text-xs ${roleBadgeClass(activeProfile.user.role)}`}>
+                  {activeProfile.user.role}
+                </span>
+              )}
+            </div>
+
+            {!activeProfile ? (
+              <p className="mt-6 text-sm text-white/60">Load a user or wallet record to manage this space.</p>
+            ) : (
+              <div className="mt-4 space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-lg font-semibold text-white">{activeProfile.user.username}</div>
+                  <div className="text-xs text-white/55">{activeProfile.user.email}</div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-white/50">USD Wallet</div>
+                      <div className="mt-1 text-lg rt-page-title">{formatCurrency(activeProfile.wallet.usdBalance)}</div>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-white/50">Pending Withdrawals</div>
+                      <div className="mt-1 text-lg rt-page-title">{formatCurrency(activeProfile.wallet.pendingWithdrawals)}</div>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-white/50">RTC Wallet</div>
+                      <div className="mt-1 text-lg rt-page-title">{activeProfile.wallet.rtcBalance}</div>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-white/50">User ID</div>
+                      <div className="mt-1 break-all text-sm text-white/80">{activeProfile.user.id}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {canAdmin && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Button
+                      variant={activeProfile.user.isBanned ? 'secondary' : 'danger'}
+                      onClick={() =>
+                        openConfirm(
+                          activeProfile.user.isBanned ? 'Unban User' : 'Ban User',
+                          `${activeProfile.user.isBanned ? 'Restore' : 'Block'} ${activeProfile.user.username}?`,
+                          () => handleBanToggle(activeProfile.user),
+                          {
+                            danger: !activeProfile.user.isBanned,
+                            confirmLabel: activeProfile.user.isBanned ? 'Unban' : 'Ban',
+                          }
+                        )
+                      }
+                    >
+                      {activeProfile.user.isBanned ? 'Unban' : 'Ban'} User
+                    </Button>
+                    <Button
+                      variant={activeProfile.user.isFrozen ? 'secondary' : 'danger'}
+                      onClick={() =>
+                        openConfirm(
+                          activeProfile.user.isFrozen ? 'Unfreeze User' : 'Freeze User',
+                          `${activeProfile.user.isFrozen ? 'Unfreeze' : 'Freeze'} wallet and gameplay access for ${activeProfile.user.username}?`,
+                          () => handleFreezeToggle(activeProfile.user),
+                          {
+                            danger: !activeProfile.user.isFrozen,
+                            confirmLabel: activeProfile.user.isFrozen ? 'Unfreeze' : 'Freeze',
+                          }
+                        )
+                      }
+                    >
+                      {activeProfile.user.isFrozen ? 'Unfreeze' : 'Freeze'} User
+                    </Button>
+                  </div>
+                )}
+
+                {canAdmin && (
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div className="mb-2 text-xs uppercase tracking-[0.16em] text-white/50">Role Controls</div>
+                    <select
+                      className="h-11 w-full rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
+                      value={activeProfile.user.role}
+                      disabled={!isSuperAdmin}
+                      onChange={(event) => {
+                        const nextRole = event.target.value as UserRole;
+                        if (!isSuperAdmin) return;
+                        void handleRoleChange(activeProfile.user, nextRole);
+                      }}
+                    >
+                      {USER_ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))}
+                    </select>
+                    {!isSuperAdmin && <div className="mt-2 text-xs text-white/45">Only superadmin can change roles.</div>}
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-lg rt-page-title">Wallet Adjustments</h4>
+                      <p className="text-xs text-white/55">Balance changes are audited before and after.</p>
+                    </div>
+                    <Button size="sm" onClick={() => setWalletAdjustOpen(true)}>
+                      Adjust Wallet
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl rt-page-title">Recent Account Activity</h3>
+                <p className="text-xs text-white/55">The latest transaction history for the selected record.</p>
+              </div>
+              {activeProfile && (
+                <Button size="sm" variant="secondary" onClick={() => void loadWalletProfile(activeProfile.user.id)} isLoading={loading.wallets}>
+                  Refresh Record
+                </Button>
+              )}
+            </div>
+
+            {!activeProfile ? (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-5 text-sm text-white/60">
+                Transaction history appears here after you open a record.
+              </div>
+            ) : (
+              <div className="mt-4 overflow-x-auto rounded-2xl border border-white/10 bg-black/15">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-white/10 text-xs uppercase tracking-[0.14em] text-white/50">
+                    <tr>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">Amount</th>
+                      <th className="px-4 py-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10">
+                    {activeProfile.transactions?.map((txn: any) => (
+                      <tr key={txn._id}>
+                        <td className="px-4 py-3 text-white/70">{formatDate(txn.date || txn.createdAt)}</td>
+                        <td className="px-4 py-3 text-white">{txn.type}</td>
+                        <td className="px-4 py-3 text-white/80">
+                          {txn.currency === 'USD' ? formatCurrency(txn.amount) : txn.amount}
+                        </td>
+                        <td className="px-4 py-3 text-white/65">{txn.status}</td>
+                      </tr>
+                    ))}
+                    {(!activeProfile.transactions || activeProfile.transactions.length === 0) && (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-white/50">
+                          No transactions found for this record.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h3 className="text-xl rt-page-title">Withdrawal Queue</h3>
+                <p className="text-xs text-white/55">Review requests without leaving the people and funds workspace.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  className="h-10 rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
+                  value={withdrawalStatus}
+                  onChange={(event) => {
+                    const status = event.target.value;
+                    setWithdrawalStatus(status);
+                    void loadWithdrawals(status);
+                  }}
+                >
+                  <option value="pending">pending</option>
+                  <option value="approved">approved</option>
+                  <option value="rejected">rejected</option>
+                  <option value="all">all</option>
+                </select>
+                <Button size="sm" variant="secondary" onClick={() => void loadWithdrawals(withdrawalStatus)} isLoading={loading.withdrawals}>
+                  Refresh
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-x-auto rounded-2xl border border-white/10 bg-black/15">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-white/10 text-xs uppercase tracking-[0.14em] text-white/50">
+                  <tr>
+                    <th className="px-4 py-3">User</th>
+                    <th className="px-4 py-3">Amount</th>
+                    <th className="px-4 py-3">Method</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {withdrawals.map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-white">{item.username || item.userId}</div>
+                        <div className="text-xs text-white/55">{item.email}</div>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-amber-200">{formatCurrency(item.amount)}</td>
+                      <td className="px-4 py-3 text-white/65">{item.payoutMethod}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full px-2.5 py-1 text-xs ${statusChipClass(item.status)}`}>{item.status}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void loadWalletProfile(item.userId)}
+                          >
+                            Open
+                          </Button>
+                          {item.status === 'pending' && (
+                            <Button size="sm" variant="danger" onClick={() => handleWithdrawalAction(item, 'reject')}>
+                              Reject
+                            </Button>
+                          )}
+                          {item.status === 'pending' && (
+                            <Button size="sm" onClick={() => handleWithdrawalAction(item, 'approve')}>
+                              Approve
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {withdrawals.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-white/50">
+                        No withdrawals in this status.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
     );
@@ -1531,8 +2004,8 @@ const Admin: React.FC = () => {
             <div className="text-xs uppercase tracking-[0.18em] text-white/45">Guardrails</div>
             <div className="mt-3 space-y-2 text-sm text-white/65">
               <div>Joined tournaments can still be opened or locked, but their buy-in math stays frozen.</div>
-              <div>Delete is reserved for tournaments with no participants so we do not orphan paid entries.</div>
-              <div>In-progress and completed tournaments stay view-only here and continue through the existing game flow.</div>
+              <div>Refund plus delete restores paid USD entries and redeemed tournament tickets before the crown is removed.</div>
+              <div>Completed tournaments stay view-only so resolved payouts are never reversed from this panel.</div>
             </div>
           </div>
         </div>
@@ -1557,6 +2030,7 @@ const Admin: React.FC = () => {
                 const participantCount = item.participants?.length ?? 0;
                 const canEdit = item.status !== 'in-progress' && item.status !== 'completed';
                 const canDelete = participantCount === 0 && item.status !== 'in-progress' && item.status !== 'completed';
+                const canRefundAndDelete = participantCount > 0 && item.status !== 'completed';
                 const payoutSummary = item.payoutStructure.length > 0
                   ? item.payoutStructure.map((rule) => `#${rule.rank} ${formatCurrency(rule.amount)}`).join(' | ')
                   : 'Winner-take-all';
@@ -1581,6 +2055,11 @@ const Admin: React.FC = () => {
                       <Button size="sm" variant="secondary" onClick={() => openTournamentEditor(item)} disabled={!canEdit}>
                         Edit
                       </Button>
+                      {participantCount > 0 && (
+                        <Button size="sm" variant="danger" onClick={() => handleRefundTournament(item)} disabled={!canRefundAndDelete}>
+                          Refund + Delete
+                        </Button>
+                      )}
                       <Button size="sm" variant="danger" onClick={() => handleDeleteTournament(item)} disabled={!canDelete}>
                         Delete
                       </Button>
@@ -1740,6 +2219,7 @@ const Admin: React.FC = () => {
       return null;
     }
     if (activeSection === 'dashboard') return renderDashboard();
+    if (activeSection === 'operations') return renderOperations();
     if (activeSection === 'users') return renderUsers();
     if (activeSection === 'wallets') return renderWallets();
     if (activeSection === 'withdrawals') return renderWithdrawals();
@@ -1750,23 +2230,23 @@ const Admin: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-[78vh] overflow-hidden rounded-3xl border border-white/10 bg-[#090d14]">
+    <div className="rt-landscape-compact-card relative min-h-[78vh] overflow-visible rounded-3xl border border-white/10 bg-[#090d14] lg:overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(800px_360px_at_10%_0%,rgba(0,196,255,0.15),transparent_66%),radial-gradient(780px_340px_at_90%_6%,rgba(41,255,160,0.14),transparent_64%),linear-gradient(180deg,#070a11,#0b111a_55%,#070a11)]" />
       <div className="grid min-h-[78vh] lg:grid-cols-[260px_1fr]">
-        <aside className="border-r border-white/10 bg-[#0b111a]/85 p-4 backdrop-blur-xl">
+        <aside className="border-b border-white/10 bg-[#0b111a]/85 p-4 backdrop-blur-xl lg:border-b-0 lg:border-r">
           <div className="mb-6 rounded-2xl border border-white/10 bg-black/20 p-4">
             <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/70">Admin Ops</div>
             <h1 className="mt-2 text-2xl rt-page-title">Operations Panel</h1>
             <p className="mt-2 text-xs text-white/55">Secure controls for platform, funds, and live sessions.</p>
           </div>
 
-          <nav className="space-y-1">
+          <nav className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1 lg:overflow-visible lg:pb-0">
             {availableSections.map((section) => {
               const active = section.id === activeSection;
               return (
                 <button
                   key={section.id}
-                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
+                  className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm transition lg:w-full ${
                     active
                       ? 'bg-cyan-400/20 text-cyan-100 border border-cyan-300/35'
                       : 'text-white/70 hover:bg-white/5 hover:text-white'
@@ -1782,7 +2262,7 @@ const Admin: React.FC = () => {
         </aside>
 
         <main className="p-4 md:p-6">
-          <header className="mb-5 rounded-2xl border border-white/10 bg-[#0f1622] p-4">
+          <header className="rt-landscape-compact-card mb-5 rounded-2xl border border-white/10 bg-[#0f1622] p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-white/45">Active Section</div>
@@ -1795,6 +2275,13 @@ const Admin: React.FC = () => {
                 size="sm"
                 onClick={() => {
                   if (activeSection === 'dashboard' || activeSection === 'metrics') void loadMetrics();
+                  if (activeSection === 'operations') {
+                    void runOperationsSearch();
+                    void loadWithdrawals(withdrawalStatus);
+                    if ((walletProfile?.user.id || selectedProfile?.user.id || walletLookupUserId).trim()) {
+                      void loadWalletProfile(walletProfile?.user.id || selectedProfile?.user.id || walletLookupUserId);
+                    }
+                  }
                   if (activeSection === 'users') void loadUsers(userQuery);
                   if (activeSection === 'wallets') void loadWalletProfile(walletLookupUserId || walletProfile?.user.id || '');
                   if (activeSection === 'withdrawals') void loadWithdrawals(withdrawalStatus);

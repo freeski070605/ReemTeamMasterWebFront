@@ -106,7 +106,7 @@ const Home: React.FC = () => {
 
   return (
     <div className="space-y-10">
-      <section className="rt-panel-strong rounded-3xl p-8 md:p-10 overflow-hidden relative">
+      <section className="rt-landscape-compact-card rt-panel-strong rounded-3xl p-8 md:p-10 overflow-hidden relative">
         <div
           className="pointer-events-none absolute -right-16 -top-16 h-72 w-72 rounded-full blur-3xl"
           style={{ background: 'radial-gradient(circle, rgba(247,188,58,0.28), rgba(247,188,58,0))' }}
@@ -135,7 +135,7 @@ const Home: React.FC = () => {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="rt-glass rounded-2xl p-6">
+        <div className="rt-landscape-compact-card rt-glass rounded-2xl p-6">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">New to Tonk or ReemTeam?</div>
           <p className="mt-3 text-white/70">Before you jump in, make sure you understand the rules.</p>
           <div className="mt-6">
@@ -148,7 +148,7 @@ const Home: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="rt-panel-strong rounded-2xl p-6">
+        <div className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-6">
           <div className="text-xs uppercase tracking-[0.2em] text-white/55">Live Game Activity</div>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div className="rt-glass rounded-2xl p-4">
@@ -179,7 +179,7 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      <section className="rt-panel-strong rounded-2xl p-6">
+      <section className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-6">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="text-xs uppercase tracking-[0.2em] text-white/55">VIP Tables</div>
@@ -205,7 +205,7 @@ const Home: React.FC = () => {
       </section>
 
       <section className="grid gap-6 md:grid-cols-3">
-        <div className="rt-glass rounded-2xl p-6 space-y-4">
+        <div className="rt-landscape-compact-card rt-glass rounded-2xl p-6 space-y-4">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Where New Players Should Start</div>
           <div>
             <h2 className="rt-page-title text-2xl">Reem Team Cash Crib (Recommended)</h2>
@@ -224,7 +224,7 @@ const Home: React.FC = () => {
             <li>Building RTC</li>
           </ul>
         </div>
-        <div className="rt-glass rounded-2xl p-6 space-y-4">
+        <div className="rt-landscape-compact-card rt-glass rounded-2xl p-6 space-y-4">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Reem Team Cash Tournaments</div>
           <h2 className="rt-page-title text-2xl">Reem Team Cash Tournaments</h2>
           <p className="text-sm text-white/70">Structured tournaments played using RTC.</p>
@@ -235,7 +235,7 @@ const Home: React.FC = () => {
             <li>Some tournaments feed directly into Cash Crown events.</li>
           </ul>
         </div>
-        <div className="rt-glass rounded-2xl p-6 space-y-4">
+        <div className="rt-landscape-compact-card rt-glass rounded-2xl p-6 space-y-4">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Cash Crown Tournaments</div>
           <h2 className="rt-page-title text-2xl">Cash Crown Tournaments</h2>
           <p className="text-sm text-white/70">This is the main stage.</p>
@@ -253,7 +253,7 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      <section className="rt-panel-strong rounded-2xl p-6">
+      <section className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-6">
         <div>
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Featured Crib (Start Here)</div>
           <div className="mt-2 text-2xl rt-page-title">{featuredSummary.title}</div>

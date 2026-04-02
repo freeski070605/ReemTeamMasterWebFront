@@ -215,7 +215,7 @@ const ContestLobby: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <header className="rt-panel-strong rounded-3xl p-7">
+      <header className="rt-landscape-compact-card rt-panel-strong rounded-3xl p-7">
         <div className="text-xs uppercase tracking-[0.2em] text-white/50">Cash Crown Tournament Lobby</div>
         <h1 className="mt-2 text-4xl rt-page-title font-semibold">Join Cash Crown Tournaments</h1>
         <p className="mt-2 text-white/65">
@@ -230,15 +230,15 @@ const ContestLobby: React.FC = () => {
       </header>
 
       <section className="grid gap-4 sm:grid-cols-3">
-        <div className="rt-glass rounded-2xl p-4">
+        <div className="rt-landscape-compact-card rt-glass rounded-2xl p-4">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Open / Joined Tournaments</div>
           <div className="mt-2 text-3xl rt-page-title">{filteredContests.length}</div>
         </div>
-        <div className="rt-glass rounded-2xl p-4">
+        <div className="rt-landscape-compact-card rt-glass rounded-2xl p-4">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Redeemable Tickets</div>
           <div className="mt-2 text-3xl rt-page-title">{availableTickets.length}</div>
         </div>
-        <div className="rt-glass rounded-2xl p-4 flex flex-col justify-between">
+        <div className="rt-landscape-compact-card rt-glass rounded-2xl p-4 flex flex-col justify-between">
           <div className="text-xs uppercase tracking-[0.2em] text-white/50">Sync</div>
           <Button size="sm" variant="secondary" onClick={() => void fetchLobbyData()}>
             Refresh Tournaments
@@ -246,7 +246,7 @@ const ContestLobby: React.FC = () => {
         </div>
       </section>
 
-      <section className="rt-panel-strong rounded-2xl p-5">
+      <section className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-5">
         <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
@@ -282,7 +282,7 @@ const ContestLobby: React.FC = () => {
             const preferredTicketId = getPreferredTicketId(contest.contestId);
 
             return (
-              <article key={contest.contestId} className="rt-panel-strong rounded-2xl p-6">
+              <article key={contest.contestId} className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <div className="text-xs uppercase tracking-[0.18em] text-white/50">Crown ID</div>

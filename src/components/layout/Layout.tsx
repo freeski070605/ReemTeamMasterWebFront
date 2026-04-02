@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { Button } from '../ui/Button';
@@ -31,6 +31,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const showVipBadge = !!user?.isVip || vipStatus === 'PENDING';
   const vipBadgeLabel = vipStatus === 'PENDING' && !user?.isVip ? 'VIP Pending' : 'VIP';
 
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
   const navLinks = useMemo(
     () => {
       const links = [
@@ -58,7 +62,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   }
 
   return (
-    <div className="relative min-h-screen text-gray-100" style={safeAreaInsetStyle}>
+    <div className="rt-site-shell relative min-h-screen text-gray-100" style={safeAreaInsetStyle}>
       <div
         className="pointer-events-none fixed inset-0 -z-10"
         style={{
@@ -71,18 +75,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       />
       <div className="pointer-events-none fixed inset-0 -z-10 opacity-30 bg-[radial-gradient(circle_at_1px_1px,#ffffff_1px,transparent_0)] [background-size:30px_30px]" />
 
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0c0f14]/86 backdrop-blur-xl" style={safeAreaTopStyle}>
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+      <header className="rt-site-header sticky top-0 z-50 border-b border-white/10 bg-[#0c0f14]/86 backdrop-blur-xl" style={safeAreaTopStyle}>
+        <div className="rt-site-header-row mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex items-center gap-4">
             <Link to="/" className="flex items-center gap-3">
               <img src={logoSrc} alt="ReemTeam logo" className="h-9 w-9 object-contain" />
-              <span className="text-lg font-semibold tracking-wide text-white rt-page-title">
+              <span className="rt-site-wordmark text-lg font-semibold tracking-wide text-white rt-page-title">
                 ReemTeam
               </span>
             </Link>
 
             {isAuthenticated && (
-              <nav className="hidden md:flex items-center gap-1">
+              <nav className="hidden lg:flex items-center gap-1">
                 {navLinks.map((link) => {
                   const active = location.pathname === link.to;
                   return (
@@ -103,7 +107,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             )}
           </div>
 
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             {isAuthenticated ? (
               <>
                 <NavbarBalance />
@@ -138,7 +142,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
           <button
             type="button"
-            className="md:hidden rounded-lg border border-white/12 bg-white/5 px-3 py-2 text-xs text-white/80"
+            className="lg:hidden rounded-lg border border-white/12 bg-white/5 px-3 py-2 text-xs text-white/80"
             onClick={() => setMenuOpen((prev) => !prev)}
           >
             {menuOpen ? 'Close' : 'Menu'}
@@ -146,9 +150,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </div>
 
         {menuOpen && (
-          <div className="md:hidden border-t border-white/10 bg-[#0c0f14]/94 px-4 py-4">
+          <div className="rt-site-mobile-menu lg:hidden border-t border-white/10 bg-[#0c0f14]/94 px-4 py-4">
             {isAuthenticated ? (
               <div className="space-y-2">
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Active Profile</div>
+                  <div className="mt-1 text-sm text-white/85">{user?.username}</div>
+                </div>
                 {showVipBadge && (
                   <div className="rounded-xl border border-amber-300/35 bg-amber-300/10 px-3 py-2 text-center text-[11px] uppercase tracking-[0.18em] text-amber-200">
                     {vipBadgeLabel}
@@ -193,10 +201,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+      <main className="rt-site-main mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
       <InstallPromptBanner />
 
-      <footer className="mt-12 border-t border-white/10 bg-[#0b0d11]/85 py-6 text-center text-xs text-white/50">
+      <footer className="rt-site-footer mt-12 border-t border-white/10 bg-[#0b0d11]/85 py-6 text-center text-xs text-white/50">
         <div className="mx-auto max-w-7xl px-4">
           <div className="mb-3 flex flex-wrap items-center justify-center gap-4 text-white/60">
             <Link to="/privacy" className="hover:text-amber-200 transition-colors">

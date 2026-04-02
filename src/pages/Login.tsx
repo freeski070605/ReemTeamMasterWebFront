@@ -25,9 +25,9 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-12rem)] grid items-center py-6">
+    <div className="rt-auth-shell min-h-[calc(100vh-12rem)] grid items-center py-6">
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="rt-panel-strong rounded-3xl p-8">
+        <section className="rt-landscape-compact-card rt-panel-strong rounded-3xl p-8">
           <div className="flex items-center gap-3 mb-6">
             <img src={logoSrc} alt="ReemTeam logo" className="h-10 w-10 object-contain" />
             <div>
@@ -70,7 +70,7 @@ const Login: React.FC = () => {
             </Link>
           </p>
         </section>
-        <section className="rt-panel-strong rounded-3xl p-8">
+        <section className="rt-landscape-compact-card rt-panel-strong rounded-3xl p-8">
           <div className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
             ReemTeam Player Access
           </div>

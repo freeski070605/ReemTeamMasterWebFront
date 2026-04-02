@@ -120,6 +120,18 @@ export interface AdminTournament {
   updatedAt: string;
 }
 
+export interface AdminTournamentRefundResult {
+  message: string;
+  contestId: string;
+  deleted: boolean;
+  refundedAmount: number;
+  paidEntryCount: number;
+  refundedEntryCount: number;
+  restoredTicketCount: number;
+  alreadyRefundedCount: number;
+  contest: AdminTournament | null;
+}
+
 export interface AdminTournamentMutationInput {
   entryFee: number;
   playerCount: number;
@@ -260,6 +272,10 @@ export const adminApi = {
   },
   deleteTournament: async (contestId: string) => {
     const { data } = await client.delete<{ success: boolean; contestId: string }>(`/admin/tournaments/${contestId}`);
+    return data;
+  },
+  refundTournament: async (contestId: string, payload?: { deleteAfterRefund?: boolean; reason?: string }) => {
+    const { data } = await client.post<AdminTournamentRefundResult>(`/admin/tournaments/${contestId}/refund`, payload);
     return data;
   },
 };
