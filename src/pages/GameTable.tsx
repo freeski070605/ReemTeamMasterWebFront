@@ -1651,7 +1651,8 @@ const GameTable: React.FC = () => {
     : isBottomSeatActive
       ? "border-amber-300/42 bg-black/10 shadow-[0_0_20px_rgba(251,191,36,0.14)]"
       : "border-white/10 bg-black/8 opacity-85";
-  const bottomSeatSideColumnClass = isPhoneLandscapeLayout ? "w-[148px]" : "w-[182px]";
+  const showBottomSeatActions = showActionDock || (isRoundEnd && isContinuousMode && !isSpectator);
+  const bottomSeatSideColumnClass = isPhoneLandscapeLayout ? "w-[234px]" : "w-[286px]";
   const phoneHandCardClass =
     visibleHand.length >= 6
       ? "w-[3.2rem] h-[4.75rem]"
