@@ -16,6 +16,7 @@ interface GameActionsProps {
   onHit: () => void;
   orientation?: "horizontal" | "vertical";
   layout?: "default" | "mobile-dock" | "side-stack";
+  hideDisabled?: boolean;
 }
 
 const GameActions: React.FC<GameActionsProps> = ({
@@ -27,6 +28,7 @@ const GameActions: React.FC<GameActionsProps> = ({
   onHit,
   orientation = "horizontal",
   layout = "default",
+  hideDisabled = false,
 }) => {
   const layoutClass =
     layout === "mobile-dock"
@@ -84,9 +86,9 @@ const GameActions: React.FC<GameActionsProps> = ({
 
   return (
     <div className={layoutClass}>
-      {renderAction("Drop", drop, onDrop)}
-      {renderAction("Spread", spread, onSpread)}
-      {renderAction("Hit", hit, onHit)}
+      {!hideDisabled || drop.enabled ? renderAction("Drop", drop, onDrop) : null}
+      {!hideDisabled || spread.enabled ? renderAction("Spread", spread, onSpread) : null}
+      {!hideDisabled || hit.enabled ? renderAction("Hit", hit, onHit) : null}
     </div>
   );
 };
