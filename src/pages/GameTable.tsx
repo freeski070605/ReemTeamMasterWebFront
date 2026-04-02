@@ -595,7 +595,7 @@ const GameTable: React.FC = () => {
     !isSpectator &&
     gameState.players[gameState.currentPlayerIndex]?.userId === user._id
   );
-  const turnDurationMs = gameState?.turnDurationMs ?? 20_000;
+  const turnDurationMs = gameState?.turnDurationMs ?? 60_000;
   const turnTimeRemainingMs = Math.max(0, (gameState?.turnExpiresAt ?? Date.now()) - Date.now());
   const hasCurrentPlayer = !!currentPlayer;
   const hasDrawnThisTurn = !!(currentPlayer?.hasDrawnThisTurn ?? currentPlayer?.hasTakenActionThisTurn);
