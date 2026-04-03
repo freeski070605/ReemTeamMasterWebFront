@@ -692,10 +692,14 @@ const TableSelect: React.FC = () => {
         title="Create Private Table"
         confirmLabel={privateCreating ? 'Creating...' : 'Create Table'}
       >
-        <div className="space-y-5">
+        <div className="space-y-4 sm:space-y-5">
+          <p className="text-sm leading-6 text-white/70">
+            Build a private room in a few quick steps. Everything below is scrollable on mobile.
+          </p>
+
           <div>
             <div className="text-xs uppercase tracking-[0.18em] text-white/55">1. Choose Currency</div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
               {([
                 {
                   id: 'FREE_RTC_TABLE' as PrivateTableMode,
@@ -712,7 +716,7 @@ const TableSelect: React.FC = () => {
                   key={option.id}
                   type="button"
                   onClick={() => setPrivateMode(option.id)}
-                  className={`rounded-2xl border px-4 py-4 text-left transition ${
+                  className={`rounded-2xl border px-4 py-3.5 text-left transition ${
                     privateMode === option.id
                       ? 'border-amber-300/55 bg-amber-300/10 text-white'
                       : 'border-white/12 bg-white/[0.03] text-white/78 hover:border-white/28 hover:bg-white/[0.06]'
@@ -736,7 +740,7 @@ const TableSelect: React.FC = () => {
                     key={`${privateMode}-${stake}`}
                     type="button"
                     onClick={() => setPrivateStake(stake)}
-                    className={`rounded-full border px-4 py-2 text-sm transition ${
+                    className={`min-h-10 rounded-full border px-4 py-2 text-sm transition ${
                       isSelected
                         ? 'border-amber-300/55 bg-amber-300/12 text-amber-100'
                         : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30 hover:text-white'
@@ -757,7 +761,7 @@ const TableSelect: React.FC = () => {
                   key={seatCount}
                   type="button"
                   onClick={() => setPrivateMaxPlayers(seatCount)}
-                  className={`rounded-full border px-4 py-2 text-sm transition ${
+                  className={`min-h-10 rounded-full border px-4 py-2 text-sm transition ${
                     privateMaxPlayers === seatCount
                       ? 'border-amber-300/55 bg-amber-300/12 text-amber-100'
                       : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30 hover:text-white'
@@ -784,7 +788,7 @@ const TableSelect: React.FC = () => {
 
           <div className="rounded-2xl border border-white/12 bg-black/20 p-4">
             <div className="text-xs uppercase tracking-[0.18em] text-white/50">Private Table Summary</div>
-            <div className="mt-3 space-y-2 text-sm text-white/75">
+            <div className="mt-3 grid gap-2 text-sm text-white/75 sm:grid-cols-2">
               <div>Room type: {privateMode === 'PRIVATE_USD_TABLE' ? 'USD Private Table' : 'RTC Private Table'}</div>
               <div>Stake: {privateStakeDisplay.amount} {privateStakeDisplay.unit}</div>
               <div>Seats: {privateMaxPlayers} players</div>
