@@ -116,6 +116,7 @@ const GameTable: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const logoSrc = "/assets/logo.png";
   const displayFont = '"Oswald", "Gabarito", sans-serif';
   const {
     socket,
@@ -1414,6 +1415,7 @@ const GameTable: React.FC = () => {
     ? "top-2 left-2 right-2 gap-2"
     : "top-4 left-4 right-4 gap-4";
   const systemHudStackWidthClass = isPhoneLandscapeLayout ? "w-[300px] max-w-full" : "w-[430px] max-w-full";
+  const systemHudMessageWidthClass = isPhoneLandscapeLayout ? "w-[238px] max-w-full" : "w-[318px] max-w-full";
   const playerHudLayouts: Record<OpponentSeatZone, SeatHudLayout> = {
     top: {
       positionClass: isHeadsUpTable
@@ -2170,7 +2172,25 @@ const GameTable: React.FC = () => {
                       isPhoneLandscapeLayout ? "gap-1.5 px-2.5 py-1.5" : "gap-2.5 px-3.5 py-2"
                     }`}
                   >
-                    
+                    <div className="relative flex-shrink-0">
+                      <div className="absolute -inset-1 rounded-full bg-amber-300/20 blur-lg" />
+                      <img
+                        src={logoSrc}
+                        alt="ReemTeam logo"
+                        className={`relative object-contain ${isPhoneLandscapeLayout ? "h-5 w-5" : "h-6 w-6"}`}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <div
+                        className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} font-bold uppercase tracking-[0.22em] truncate`}
+                        style={{ fontFamily: displayFont }}
+                      >
+                        ReemTeam
+                      </div>
+                      {!isPhoneLandscapeLayout ? (
+                        <div className="text-[9px] uppercase tracking-[0.28em] text-white/52">Digital Table</div>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className={`ml-auto flex flex-col items-end gap-2 ${systemHudStackWidthClass}`}>
@@ -2216,7 +2236,7 @@ const GameTable: React.FC = () => {
                       </Button>
                     </div>
 
-                    <div className="flex w-full flex-col gap-2">
+                    <div className={`flex flex-col items-end gap-2 ${systemHudMessageWidthClass}`}>
                       <AnimatePresence initial={false}>
                         {routineHudMessage ? (
                           <motion.div
