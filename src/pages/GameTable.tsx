@@ -1414,26 +1414,25 @@ const GameTable: React.FC = () => {
   const globalHudBandClass = isPhoneLandscapeLayout
     ? "top-2 left-2 right-2 gap-2"
     : "top-4 left-4 right-4 gap-4";
-  const globalHudStatusWidthClass = isPhoneLandscapeLayout ? "w-[260px] max-w-full" : "w-[380px] max-w-full";
-  const globalHudMetaWidthClass = isPhoneLandscapeLayout ? "w-auto" : "min-w-[300px]";
+  const systemHudStackWidthClass = isPhoneLandscapeLayout ? "w-[300px] max-w-full" : "w-[430px] max-w-full";
   const playerHudLayouts: Record<OpponentSeatZone, SeatHudLayout> = {
     top: {
       positionClass: isHeadsUpTable
         ? isPhoneLandscapeLayout
-          ? "right-[8.5%] top-[14.25%] w-[31%] max-w-[228px]"
-          : "right-[10%] top-[13.5%] w-[27%] max-w-[292px]"
+          ? "left-1/2 top-[13.75%] -translate-x-1/2 w-[31%] max-w-[232px]"
+          : "left-1/2 top-[12.75%] -translate-x-1/2 w-[27%] max-w-[296px]"
         : isPhoneLandscapeLayout
-          ? "right-[9.25%] top-[13.5%] w-[29%] max-w-[214px]"
-          : "right-[11.5%] top-[12.75%] w-[25%] max-w-[278px]",
-      align: "right" as const,
-      tiltClass: isThreeHandedTable ? "rotate-[1.5deg]" : "rotate-[1deg]",
+          ? "left-1/2 top-[13.25%] -translate-x-1/2 w-[30%] max-w-[220px]"
+          : "left-1/2 top-[12.5%] -translate-x-1/2 w-[25%] max-w-[282px]",
+      align: "left" as const,
+      tiltClass: isThreeHandedTable ? "rotate-[0.5deg]" : "rotate-0",
       panelClass: "w-full",
       handSize: "md" as const,
     },
     left: {
       positionClass: isPhoneLandscapeLayout
-        ? "left-[0%] top-[22.25%] w-[23%] max-w-[176px]"
-        : "left-[0.25%] top-[20.75%] w-[22%] max-w-[216px]",
+        ? "left-[-0.25%] top-[17.75%] w-[22%] max-w-[170px]"
+        : "left-[-0.5%] top-[16.5%] w-[20.5%] max-w-[204px]",
       align: "left" as const,
       tiltClass: "-rotate-[2deg]",
       panelClass: "w-full",
@@ -1441,8 +1440,8 @@ const GameTable: React.FC = () => {
     },
     right: {
       positionClass: isPhoneLandscapeLayout
-        ? "right-[-0.75%] top-[48.25%] w-[22%] max-w-[172px]"
-        : "right-[-0.5%] top-[47.5%] w-[21%] max-w-[208px]",
+        ? "right-[0.35%] top-[35.5%] w-[21.5%] max-w-[170px]"
+        : "right-[0.65%] top-[34.25%] w-[20.5%] max-w-[204px]",
       align: "right" as const,
       tiltClass: isThreeHandedTable ? "rotate-[1.5deg]" : "rotate-[2deg]",
       panelClass: "w-full",
@@ -1482,17 +1481,17 @@ const GameTable: React.FC = () => {
   const seatContextLayouts: Record<SeatZone, SeatContextLayout> = {
     top: {
       positionClass: isPhoneLandscapeLayout
-        ? "right-[7.75%] top-[28.5%]"
-        : "right-[9%] top-[27.25%]",
+        ? "left-1/2 top-[23.5%] -translate-x-1/2"
+        : "left-1/2 top-[22.5%] -translate-x-1/2",
       winnerWidthClass: isPhoneLandscapeLayout ? "w-[216px]" : "w-[288px]",
       chipWidthClass: isPhoneLandscapeLayout ? "w-[128px]" : "w-[150px]",
-      alignClass: "items-end text-right",
-      cardsJustifyClass: "justify-end",
+      alignClass: "items-center text-center",
+      cardsJustifyClass: "justify-center",
     },
     left: {
       positionClass: isPhoneLandscapeLayout
-        ? "left-[0.25%] top-[32.75%]"
-        : "left-[0.25%] top-[31.25%]",
+        ? "left-[0.4%] top-[27.5%]"
+        : "left-[0.5%] top-[26.25%]",
       winnerWidthClass: isPhoneLandscapeLayout ? "w-[188px]" : "w-[222px]",
       chipWidthClass: isPhoneLandscapeLayout ? "w-[118px]" : "w-[136px]",
       alignClass: "items-start text-left",
@@ -1500,8 +1499,8 @@ const GameTable: React.FC = () => {
     },
     right: {
       positionClass: isPhoneLandscapeLayout
-        ? "right-[0.35%] top-[56.75%]"
-        : "right-[0.5%] top-[56.25%]",
+        ? "right-[0.5%] top-[45%]"
+        : "right-[0.85%] top-[43.5%]",
       winnerWidthClass: isPhoneLandscapeLayout ? "w-[188px]" : "w-[222px]",
       chipWidthClass: isPhoneLandscapeLayout ? "w-[118px]" : "w-[136px]",
       alignClass: "items-end text-right",
@@ -1993,7 +1992,11 @@ const GameTable: React.FC = () => {
     const compactChipClass =
       "border-white/12 bg-[linear-gradient(145deg,rgba(22,26,34,0.84),rgba(9,12,17,0.76))] shadow-[0_14px_28px_rgba(0,0,0,0.18)]";
     const compactDeltaClass = roundSeatResult?.isWinner ? "text-emerald-200" : "text-rose-200";
-    const justifyClass = layout.alignClass.includes("right") ? "justify-end" : "justify-start";
+    const justifyClass = layout.alignClass.includes("center")
+      ? "justify-center"
+      : layout.alignClass.includes("right")
+        ? "justify-end"
+        : "justify-start";
 
     return (
       <div className={`pointer-events-none absolute z-20 ${layout.positionClass}`}>
@@ -2162,7 +2165,7 @@ const GameTable: React.FC = () => {
               />
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_68%,rgba(0,0,0,0.12)_100%)]" />
               <div className={`absolute z-50 ${globalHudBandClass}`}>
-                <div className="mx-auto grid max-w-[1180px] grid-cols-[auto_1fr_auto] items-start gap-3">
+                <div className="mx-auto flex max-w-[1180px] items-start justify-between gap-3">
                   <div
                     className={`flex min-w-0 items-center rounded-full border border-white/10 bg-black/26 text-white shadow-[0_14px_28px_rgba(0,0,0,0.24)] backdrop-blur-[8px] ${
                       isPhoneLandscapeLayout ? "gap-1.5 px-2.5 py-1.5" : "gap-2.5 px-3.5 py-2"
@@ -2189,8 +2192,50 @@ const GameTable: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex justify-center">
-                    <div className={`flex flex-col items-center gap-2 ${globalHudStatusWidthClass}`}>
+                  <div className={`ml-auto flex flex-col items-end gap-2 ${systemHudStackWidthClass}`}>
+                    <div className={`flex ${isPhoneLandscapeLayout ? "flex-wrap justify-end gap-1.5" : "items-center justify-end gap-2"} w-full`}>
+                      <div
+                        className={`flex items-center rounded-full border border-white/10 bg-black/24 text-white shadow-[0_12px_26px_rgba(0,0,0,0.2)] ${
+                          isPhoneLandscapeLayout ? "gap-1 px-2 py-1 text-[10px]" : "gap-2 px-3 py-1.5 text-[10px]"
+                        }`}
+                      >
+                        {!isPhoneLandscapeLayout ? (
+                          <span className="text-[9px] uppercase tracking-[0.24em] text-white/55">Players</span>
+                        ) : null}
+                        <span className="font-bold">
+                          {isPhoneLandscapeLayout ? "P " : ""}
+                          {gameState.players.length}/{maxPlayers}
+                        </span>
+                      </div>
+                      <div
+                        className={`flex items-center rounded-full border border-white/10 bg-black/24 text-white shadow-[0_12px_26px_rgba(0,0,0,0.2)] ${
+                          isPhoneLandscapeLayout ? "gap-1 px-2 py-1 text-[10px]" : "gap-2 px-3 py-1.5 text-[10px]"
+                        }`}
+                      >
+                        {!isPhoneLandscapeLayout ? (
+                          <span className="text-[9px] uppercase tracking-[0.24em] text-white/55">Table Pot</span>
+                        ) : null}
+                        <span className="font-bold">{formatSeatBalance(gameState.pot)}</span>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleOpenHowToPlay}
+                        className={isPhoneLandscapeLayout ? "h-9 px-3 text-[11px]" : "h-9"}
+                      >
+                        Rules
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={handleLeaveTable}
+                        className={isPhoneLandscapeLayout ? "h-9 px-3 text-[11px]" : "h-9"}
+                      >
+                        Leave
+                      </Button>
+                    </div>
+
+                    <div className="flex w-full flex-col gap-2">
                       <AnimatePresence initial={false}>
                         {routineHudMessage ? (
                           <motion.div
@@ -2266,48 +2311,6 @@ const GameTable: React.FC = () => {
                         ) : null}
                       </AnimatePresence>
                     </div>
-                  </div>
-
-                  <div className={`flex ${isPhoneLandscapeLayout ? "flex-wrap justify-end gap-1.5" : "items-center justify-end gap-2"} ${globalHudMetaWidthClass}`}>
-                    <div
-                      className={`flex items-center rounded-full border border-white/10 bg-black/24 text-white shadow-[0_12px_26px_rgba(0,0,0,0.2)] ${
-                        isPhoneLandscapeLayout ? "gap-1 px-2 py-1 text-[10px]" : "gap-2 px-3 py-1.5 text-[10px]"
-                      }`}
-                    >
-                      {!isPhoneLandscapeLayout ? (
-                        <span className="text-[9px] uppercase tracking-[0.24em] text-white/55">Players</span>
-                      ) : null}
-                      <span className="font-bold">
-                        {isPhoneLandscapeLayout ? "P " : ""}
-                        {gameState.players.length}/{maxPlayers}
-                      </span>
-                    </div>
-                    <div
-                      className={`flex items-center rounded-full border border-white/10 bg-black/24 text-white shadow-[0_12px_26px_rgba(0,0,0,0.2)] ${
-                        isPhoneLandscapeLayout ? "gap-1 px-2 py-1 text-[10px]" : "gap-2 px-3 py-1.5 text-[10px]"
-                      }`}
-                    >
-                      {!isPhoneLandscapeLayout ? (
-                        <span className="text-[9px] uppercase tracking-[0.24em] text-white/55">Table Pot</span>
-                      ) : null}
-                      <span className="font-bold">{formatSeatBalance(gameState.pot)}</span>
-                    </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleOpenHowToPlay}
-                      className={isPhoneLandscapeLayout ? "h-9 px-3 text-[11px]" : "h-9"}
-                    >
-                      Rules
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={handleLeaveTable}
-                      className={isPhoneLandscapeLayout ? "h-9 px-3 text-[11px]" : "h-9"}
-                    >
-                      Leave
-                    </Button>
                   </div>
                 </div>
               </div>
