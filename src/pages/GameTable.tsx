@@ -2171,25 +2171,7 @@ const GameTable: React.FC = () => {
                       isPhoneLandscapeLayout ? "gap-1.5 px-2.5 py-1.5" : "gap-2.5 px-3.5 py-2"
                     }`}
                   >
-                    <div className="relative flex-shrink-0">
-                      <div className="absolute -inset-1 rounded-full bg-amber-300/20 blur-lg" />
-                      <img
-                        src={logoSrc}
-                        alt="ReemTeam logo"
-                        className={`relative object-contain ${isPhoneLandscapeLayout ? "h-5 w-5" : "h-6 w-6"}`}
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <div
-                        className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} font-bold uppercase tracking-[0.22em] truncate`}
-                        style={{ fontFamily: displayFont }}
-                      >
-                        ReemTeam
-                      </div>
-                      {!isPhoneLandscapeLayout ? (
-                        <div className="text-[9px] uppercase tracking-[0.28em] text-white/52">Digital Table</div>
-                      ) : null}
-                    </div>
+                    
                   </div>
 
                   <div className={`ml-auto flex flex-col items-end gap-2 ${systemHudStackWidthClass}`}>
@@ -2583,35 +2565,7 @@ const GameTable: React.FC = () => {
                       </div>
                     </motion.button>
 
-                    <motion.div
-                      animate={
-                        isRoundEnd
-                          ? {
-                              scale: [1, 1.06, 1],
-                              boxShadow: [
-                                "0 0 0 rgba(0,0,0,0)",
-                                "0 0 34px rgba(251,191,36,0.3)",
-                                "0 0 0 rgba(0,0,0,0)",
-                              ],
-                            }
-                          : isMyTurn
-                            ? { scale: [1, 1.02, 1] }
-                            : undefined
-                      }
-                      transition={{ duration: isRoundEnd ? 1.2 : 2.6 }}
-                      className="relative text-white"
-                    >
-                      <div className="relative flex flex-col items-center justify-center">
-                        <img
-                          src={logoSrc}
-                          alt="ReemTeam logo"
-                          className={isPhoneLandscapeLayout ? "h-7 w-7 object-contain" : "h-9 w-9 object-contain"}
-                        />
-                        <div className="mt-1 text-[7px] uppercase tracking-[0.26em] text-white/58 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
-                          ReemTeam
-                        </div>
-                      </div>
-                    </motion.div>
+                    
 
                     <motion.button
                       type="button"
