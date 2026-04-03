@@ -8,6 +8,8 @@ interface ModalProps {
   onConfirm: () => void;
   title: string;
   children: React.ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -16,6 +18,8 @@ export const Modal: React.FC<ModalProps> = ({
   onConfirm,
   title,
   children,
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
 }) => {
   if (!isOpen) return null;
 
@@ -26,9 +30,9 @@ export const Modal: React.FC<ModalProps> = ({
         <div className="text-white/75 text-sm">{children}</div>
         <div className="flex justify-end gap-2 mt-6">
           <Button onClick={onClose} variant="secondary">
-            Cancel
+            {cancelLabel}
           </Button>
-          <Button onClick={onConfirm}>Confirm</Button>
+          <Button onClick={onConfirm}>{confirmLabel}</Button>
         </div>
       </Card>
     </div>

@@ -16,7 +16,6 @@ import { quickSeat, createPrivateTable } from '../api/tables';
 import { createInvite } from '../api/invites';
 import { getRecentPlayers, RecentPlayer } from '../api/users';
 import PlayerAvatar from '../components/game/PlayerAvatar';
-import { Input } from '../components/ui/Input';
 import { createVipCheckout } from '../api/vip';
 import { adminApi, AdminTable } from '../api/admin';
 import { roleAtLeast } from '../types/roles';
@@ -27,6 +26,11 @@ import {
   getStakeTierHeading,
   getTableDisplayName,
 } from '../branding/modeCopy';
+
+type PrivateTableMode = 'FREE_RTC_TABLE' | 'PRIVATE_USD_TABLE';
+
+const DEFAULT_PRIVATE_RTC_STAKES = [1, 5, 10, 25, 50];
+const PRIVATE_USD_STAKES = [5, 10, 20, 50, 100];
 
 const TableSelect: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
@@ -39,8 +43,10 @@ const TableSelect: React.FC = () => {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [quickSeatLoading, setQuickSeatLoading] = useState(false);
   const [privateModalOpen, setPrivateModalOpen] = useState(false);
+  const [privateMode, setPrivateMode] = useState<PrivateTableMode>('FREE_RTC_TABLE');
   const [privateStake, setPrivateStake] = useState<number>(1);
   const [privateMaxPlayers, setPrivateMaxPlayers] = useState<number>(4);
+  const [privateHostNote, setPrivateHostNote] = useState('');
   const [privateCreating, setPrivateCreating] = useState(false);
   const [vipModalOpen, setVipModalOpen] = useState(false);
   const [vipCheckoutLoading, setVipCheckoutLoading] = useState(false);
@@ -117,8 +123,7 @@ const TableSelect: React.FC = () => {
   const handleCreateInvite = async (table: Table) => {
     try {
       const invite = await createInvite({ tableId: table._id });
-      const inviteUrl = `${window.location.origin}/invite/${invite.code}`;
-      const copied = await copyToClipboard(inviteUrl);
+      const copied = await copyToClipboard(invite.inviteUrl);
       trackEvent('invite_created', { tableId: table._id });
       toast.success(copied ? 'Invite link copied.' : 'Invite created.');
     } catch (err: any) {
@@ -133,10 +138,14 @@ const TableSelect: React.FC = () => {
     }
     setPrivateCreating(true);
     try {
-      const result = await createPrivateTable({ stake: privateStake, maxPlayers: privateMaxPlayers });
-      const inviteUrl = `${window.location.origin}/invite/${result.inviteCode}`;
-      const copied = await copyToClipboard(inviteUrl);
-      trackEvent('private_table_created', { tableId: result.table._id });
+      const result = await createPrivateTable({
+        mode: privateMode,
+        stake: privateStake,
+        maxPlayers: privateMaxPlayers,
+        hostNote: privateHostNote.trim() || undefined,
+      });
+      const copied = await copyToClipboard(result.inviteUrl);
+      trackEvent('private_table_created', { tableId: result.table._id, mode: privateMode, stake: privateStake });
       toast.success(copied ? 'Private table created. Invite link copied.' : 'Private table created.');
       setPrivateModalOpen(false);
       navigate(`/game/${result.table._id}?inviteCode=${encodeURIComponent(result.inviteCode)}`);
@@ -298,14 +307,28 @@ const TableSelect: React.FC = () => {
   }, [rtcTables]);
 
   useEffect(() => {
-    if (rtcTables.length === 0) {
-      return;
+    const nextOptions = privateMode === 'PRIVATE_USD_TABLE'
+      ? PRIVATE_USD_STAKES
+      : Array.from(new Set(rtcTables.map((table) => table.stake))).sort((a, b) => a - b);
+    const safeOptions = nextOptions.length > 0 ? nextOptions : DEFAULT_PRIVATE_RTC_STAKES;
+    if (!safeOptions.includes(privateStake)) {
+      setPrivateStake(safeOptions[0]);
     }
-    const stakes = Array.from(new Set(rtcTables.map((table) => table.stake))).sort((a, b) => a - b);
-    if (!stakes.includes(privateStake)) {
-      setPrivateStake(stakes[0]);
-    }
-  }, [rtcTables, privateStake]);
+  }, [privateMode, privateStake, rtcTables]);
+
+  const privateRtcStakeOptions = useMemo(() => {
+    const options = Array.from(new Set(rtcTables.map((table) => table.stake))).sort((a, b) => a - b);
+    return options.length > 0 ? options : DEFAULT_PRIVATE_RTC_STAKES;
+  }, [rtcTables]);
+
+  const activePrivateStakeOptions = privateMode === 'PRIVATE_USD_TABLE'
+    ? PRIVATE_USD_STAKES
+    : privateRtcStakeOptions;
+
+  const privateStakeDisplay = useMemo(
+    () => getStakeDisplay(privateStake, privateMode),
+    [privateMode, privateStake]
+  );
 
   const metrics = useMemo(() => {
     const active = rtcTables.filter((table) => table.status === 'in-game').length;
@@ -656,6 +679,7 @@ const TableSelect: React.FC = () => {
           onClose={() => setIsModalOpen(false)}
           onConfirm={handleConfirmJoin}
           title={`Pull up to ${getTableDisplayName(selectedTable)}?`}
+          confirmLabel="Join Table"
         >
           <p>Start a Reem Team Cash crib at {getStakeTierHeading(selectedTable.stake, selectedTable.mode)}.</p>
         </Modal>
@@ -666,25 +690,112 @@ const TableSelect: React.FC = () => {
         onClose={() => setPrivateModalOpen(false)}
         onConfirm={handleCreatePrivate}
         title="Create Private Table"
+        confirmLabel={privateCreating ? 'Creating...' : 'Create Table'}
       >
-        <div className="space-y-4">
-          <Input
-            label="Stake Tier"
-            type="number"
-            min={1}
-            value={privateStake}
-            onChange={(event) => setPrivateStake(Number(event.target.value))}
-          />
-          <Input
-            label="Max Players (2-4)"
-            type="number"
-            min={2}
-            max={4}
-            value={privateMaxPlayers}
-            onChange={(event) => setPrivateMaxPlayers(Number(event.target.value))}
-          />
+        <div className="space-y-5">
+          <div>
+            <div className="text-xs uppercase tracking-[0.18em] text-white/55">1. Choose Currency</div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {([
+                {
+                  id: 'FREE_RTC_TABLE' as PrivateTableMode,
+                  title: 'RTC Private Table',
+                  body: 'Invite-only crib using Reem Team Cash. Same stake ladder as the main crib lobby.',
+                },
+                {
+                  id: 'PRIVATE_USD_TABLE' as PrivateTableMode,
+                  title: 'USD Private Table',
+                  body: 'Invite-only cash table in USD with fixed stakes of $5, $10, $20, $50, or $100.',
+                },
+              ]).map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setPrivateMode(option.id)}
+                  className={`rounded-2xl border px-4 py-4 text-left transition ${
+                    privateMode === option.id
+                      ? 'border-amber-300/55 bg-amber-300/10 text-white'
+                      : 'border-white/12 bg-white/[0.03] text-white/78 hover:border-white/28 hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <div className="text-sm font-semibold">{option.title}</div>
+                  <div className="mt-1 text-xs text-white/62">{option.body}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs uppercase tracking-[0.18em] text-white/55">2. Choose Stake</div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {activePrivateStakeOptions.map((stake) => {
+                const display = getStakeDisplay(stake, privateMode);
+                const isSelected = privateStake === stake;
+                return (
+                  <button
+                    key={`${privateMode}-${stake}`}
+                    type="button"
+                    onClick={() => setPrivateStake(stake)}
+                    className={`rounded-full border px-4 py-2 text-sm transition ${
+                      isSelected
+                        ? 'border-amber-300/55 bg-amber-300/12 text-amber-100'
+                        : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30 hover:text-white'
+                    }`}
+                  >
+                    {display.amount}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs uppercase tracking-[0.18em] text-white/55">3. Choose Seats</div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[2, 3, 4].map((seatCount) => (
+                <button
+                  key={seatCount}
+                  type="button"
+                  onClick={() => setPrivateMaxPlayers(seatCount)}
+                  className={`rounded-full border px-4 py-2 text-sm transition ${
+                    privateMaxPlayers === seatCount
+                      ? 'border-amber-300/55 bg-amber-300/12 text-amber-100'
+                      : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30 hover:text-white'
+                  }`}
+                >
+                  {seatCount} Players
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/55">
+              Host Note (Optional)
+            </label>
+            <textarea
+              value={privateHostNote}
+              onChange={(event) => setPrivateHostNote(event.target.value.slice(0, 160))}
+              rows={3}
+              placeholder="Example: Starting as soon as 4 are in."
+              className="w-full rounded-2xl border border-white/14 bg-black/35 px-3 py-3 text-sm text-white placeholder:text-white/40 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-amber-300"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-white/12 bg-black/20 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/50">Private Table Summary</div>
+            <div className="mt-3 space-y-2 text-sm text-white/75">
+              <div>Room type: {privateMode === 'PRIVATE_USD_TABLE' ? 'USD Private Table' : 'RTC Private Table'}</div>
+              <div>Stake: {privateStakeDisplay.amount} {privateStakeDisplay.unit}</div>
+              <div>Seats: {privateMaxPlayers} players</div>
+              <div>Access: Invite-only</div>
+              <div>No AI players will be added to this room.</div>
+              <div>{privateMode === 'PRIVATE_USD_TABLE' ? 'Guests need enough USD balance to join.' : 'Guests need enough RTC balance to join.'}</div>
+            </div>
+          </div>
+
           <p className="text-xs text-white/60">
-            We&apos;ll copy the invite link and seat you instantly.
+            We&apos;ll copy the invite link and seat you instantly so you can host from inside the room.
           </p>
           {privateCreating && <p className="text-xs text-white/70">Creating private table...</p>}
         </div>
@@ -695,13 +806,14 @@ const TableSelect: React.FC = () => {
         onClose={() => setVipModalOpen(false)}
         onConfirm={handleVipCheckout}
         title="VIP Subscription Required"
+        confirmLabel={vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP'}
       >
         <div className="space-y-3">
           <p>Private tables are reserved for VIP members.</p>
           <ul className="list-disc pl-5 text-sm text-white/70 space-y-1">
-            <li>Launch private cribs with custom stakes</li>
-            <li>Private invite links for your table</li>
-            <li>Priority seat access when you host</li>
+            <li>Host private RTC or USD tables with clear preset stakes</li>
+            <li>Private invite links that take your guests straight to the right room</li>
+            <li>Human-only hosted rooms with no AI auto-fill</li>
           </ul>
           <p className="text-sm text-white/70">$4.99/mo. Cancel anytime.</p>
           {vipCheckoutLoading && <p className="text-xs text-white/70">Starting VIP checkout...</p>}

@@ -607,9 +607,9 @@ const Account: React.FC = () => {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs uppercase tracking-[0.2em] text-white/50">VIP Membership</div>
-                <h2 className="mt-2 text-2xl rt-page-title">Private Cribs + Priority Seat</h2>
+                <h2 className="mt-2 text-2xl rt-page-title">Private RTC + USD Tables</h2>
                 <p className="mt-2 text-sm text-white/65">
-                  VIP membership keeps private tables on lock and fast lanes into live games.
+                  VIP membership unlocks private hosted tables with clear RTC and USD stake options, invite-only access, and human-only seats.
                 </p>
               </div>
               <span className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.17em] ${vipBadgeClass}`}>
@@ -624,9 +624,9 @@ const Account: React.FC = () => {
             </div>
 
             <ul className="mt-4 space-y-2 text-sm text-white/70 list-disc pl-5">
-              <li>Launch private tables with custom stakes</li>
-              <li>Private invite links for your crew</li>
-              <li>Priority seat access when you host</li>
+              <li>Launch private RTC tables using the same stake ladder as the crib lobby</li>
+              <li>Host private USD tables at $5, $10, $20, $50, or $100</li>
+              <li>Share invite links that open the right room with a clear join page</li>
             </ul>
 
             <div className="mt-5 flex flex-wrap gap-3">
@@ -694,6 +694,7 @@ const Account: React.FC = () => {
         onClose={() => setVipCancelOpen(false)}
         onConfirm={handleVipCancel}
         title="Cancel VIP Membership?"
+        confirmLabel={vipCanceling ? 'Canceling...' : 'Cancel VIP'}
       >
         <div className="space-y-2">
           <p>

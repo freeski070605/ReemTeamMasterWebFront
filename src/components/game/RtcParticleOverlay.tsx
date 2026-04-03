@@ -632,6 +632,7 @@ const RtcParticleOverlay: React.FC<RtcParticleOverlayProps> = ({
   useEffect(() => {
     if (
       gameState.mode === "USD_CONTEST" ||
+      gameState.mode === "PRIVATE_USD_TABLE" ||
       gameState.status !== "round-end" ||
       !winnerPlayerId
     ) {
@@ -878,7 +879,7 @@ const RtcParticleOverlay: React.FC<RtcParticleOverlayProps> = ({
     };
   }, [resetVisuals]);
 
-  if (gameState.mode === "USD_CONTEST") {
+  if (gameState.mode === "USD_CONTEST" || gameState.mode === "PRIVATE_USD_TABLE") {
     return null;
   }
 

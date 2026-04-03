@@ -171,7 +171,8 @@ const GameTable: React.FC = () => {
   const wasMyTurnRef = useRef(false);
   const previousTurnStepRef = useRef<"waiting" | "draw" | "discard">("waiting");
   const maxPlayers = 4;
-  const walletCurrency = gameState?.mode === "USD_CONTEST" ? "usd" : "rtc";
+  const walletCurrency =
+    gameState?.mode === "USD_CONTEST" || gameState?.mode === "PRIVATE_USD_TABLE" ? "usd" : "rtc";
   const {
     balance,
     loading: balanceLoading,

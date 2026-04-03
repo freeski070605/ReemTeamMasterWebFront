@@ -14,6 +14,11 @@ const MODE_COPY: Record<GameMode, ModeCopyEntry> = {
     badge: 'Crib',
     description: 'Reem Team Cash games with continuous hands and between-round seat rotation.',
   },
+  PRIVATE_USD_TABLE: {
+    label: 'Private Cash Table',
+    badge: 'Private Cash',
+    description: 'Invite-only USD table hosted by a VIP player with human-only seats.',
+  },
   RTC_TOURNAMENT: {
     label: 'Reem Team Cash Tournament',
     badge: 'Reem Team Cash Tournament',
@@ -59,7 +64,7 @@ export const getStakeDisplay = (
   stakeTier: number,
   mode?: GameMode
 ): { amount: string; unit: string } => {
-  if (resolveMode(mode) === 'USD_CONTEST') {
+  if (resolveMode(mode) === 'USD_CONTEST' || resolveMode(mode) === 'PRIVATE_USD_TABLE') {
     return {
       amount: `$${stakeTier}`,
       unit: 'Cash Buy-In',
@@ -77,6 +82,10 @@ export const getStakeTierHeading = (stakeTier: number, mode?: GameMode): string 
     return `$${stakeTier} Tournament Tier`;
   }
 
+  if (resolveMode(mode) === 'PRIVATE_USD_TABLE') {
+    return `$${stakeTier} Private Cash Table`;
+  }
+
   return `${formatRtcStake(stakeTier)} Tier`;
 };
 
@@ -85,11 +94,22 @@ export const getTableDisplayName = (table: Pick<Table, '_id' | 'name' | 'mode' |
   const normalizedName = table.name?.trim();
 
   const suffix = table._id.slice(-4).toUpperCase();
+  if ((table as Table).isPrivate && normalizedName) {
+    return normalizedName;
+  }
+
   if (mode === 'USD_CONTEST') {
     if (normalizedName) {
       return normalizedName;
     }
     return `Cash Crown Tournament ${suffix}`;
+  }
+
+  if (mode === 'PRIVATE_USD_TABLE') {
+    if (normalizedName) {
+      return normalizedName;
+    }
+    return `Private Cash Table ${suffix}`;
   }
 
   if (typeof table.stake === 'number' && Number.isFinite(table.stake)) {

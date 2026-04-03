@@ -12,11 +12,24 @@ export interface InviteResolveResponse {
   expiresAt?: string;
   maxUses?: number;
   uses?: number;
+  table?: {
+    tableId: string;
+    name: string;
+    mode: string;
+    stake: number;
+    currentPlayerCount: number;
+    maxPlayers: number;
+    isPrivate: boolean;
+    status: 'waiting' | 'in-game';
+    hostName: string;
+    hostNote?: string | null;
+  } | null;
 }
 
 export interface InviteAcceptResponse {
   tableId?: string;
   purpose: 'table' | 'lobby';
+  table?: InviteResolveResponse['table'];
 }
 
 export const createInvite = async (payload: {

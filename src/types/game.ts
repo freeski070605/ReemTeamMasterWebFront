@@ -1,6 +1,6 @@
 export type CardSuit = 'Hearts' | 'Diamonds' | 'Clubs' | 'Spades';
 export type CardRank = 'Ace' | '2' | '3' | '4' | '5' | '6' | '7' | 'Jack' | 'Queen' | 'King';
-export type GameMode = 'FREE_RTC_TABLE' | 'RTC_TOURNAMENT' | 'RTC_SATELLITE' | 'USD_CONTEST';
+export type GameMode = 'FREE_RTC_TABLE' | 'PRIVATE_USD_TABLE' | 'RTC_TOURNAMENT' | 'RTC_SATELLITE' | 'USD_CONTEST';
 export type RoundEndType = 'REGULAR' | 'REEM' | 'AUTO_TRIPLE' | 'CAUGHT_DROP' | 'DECK_EMPTY';
 export type PlacementWinType = RoundEndType | 'LOSS';
 

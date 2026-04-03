@@ -216,7 +216,8 @@ export const buildRoundDeltaMessage = (
     return null;
   }
 
-  const currency: RoundDisplayCurrency = state.mode === "USD_CONTEST" ? "USD" : "RTC";
+  const currency: RoundDisplayCurrency =
+    state.mode === "USD_CONTEST" || state.mode === "PRIVATE_USD_TABLE" ? "USD" : "RTC";
   const parts = state.players
     .filter((player) => !player.isAI)
     .map((player) => {
