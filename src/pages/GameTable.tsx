@@ -1474,8 +1474,8 @@ const GameTable: React.FC = () => {
     },
     bottom: {
       positionClass: isPhoneLandscapeLayout
-        ? "left-1/2 bottom-[29%] -translate-x-1/2 w-[52%] max-w-[410px]"
-        : "left-1/2 bottom-[27%] -translate-x-1/2 w-[52%] max-w-[620px]",
+        ? "left-1/2 bottom-[18%] -translate-x-1/2 w-[52%] max-w-[410px]"
+        : "left-1/2 bottom-[17%] -translate-x-1/2 w-[52%] max-w-[620px]",
       laneClass: isPhoneLandscapeLayout ? "min-h-[72px] gap-2.5" : "min-h-[90px] gap-3.5",
     },
   };
