@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/authStore';
-import { createCheckout } from '../api/wallet';
+import { AccountStats, createCheckout, getAccountStats } from '../api/wallet';
 import { createRtcCheckout, getRtcBundles, RtcPurchaseBundle, requestRtcRefill } from '../api/rtc';
 import { cancelVipSubscription, createVipCheckout } from '../api/vip';
 import TransactionHistory from '../components/wallet/TransactionHistory';
@@ -57,6 +57,9 @@ const Account: React.FC = () => {
   const [vipCheckoutLoading, setVipCheckoutLoading] = useState(false);
   const [vipCancelOpen, setVipCancelOpen] = useState(false);
   const [vipCanceling, setVipCanceling] = useState(false);
+  const [accountStats, setAccountStats] = useState<AccountStats | null>(null);
+  const [accountStatsLoading, setAccountStatsLoading] = useState(true);
+  const [accountStatsError, setAccountStatsError] = useState<string | null>(null);
   const {
     balance: usdBalance,
     loading: usdBalanceLoading,
@@ -166,6 +169,24 @@ const Account: React.FC = () => {
   useEffect(() => {
     void refreshVipStatus();
   }, [refreshVipStatus]);
+
+  const fetchAccountStats = useCallback(async () => {
+    try {
+      setAccountStatsLoading(true);
+      setAccountStatsError(null);
+      const nextStats = await getAccountStats();
+      setAccountStats(nextStats);
+    } catch (error: any) {
+      setAccountStats(null);
+      setAccountStatsError(error?.response?.data?.message || 'Failed to load account stats.');
+    } finally {
+      setAccountStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchAccountStats();
+  }, [fetchAccountStats]);
 
   const handleRtcPurchase = async (bundleId: string) => {
     setPurchasingBundleId(bundleId);
@@ -392,6 +413,83 @@ const Account: React.FC = () => {
 
       <section className="rt-landscape-tight-gap grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
+          <div className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '60ms' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-[0.2em] text-white/50">Player Stats</div>
+                <h2 className="mt-2 text-2xl rt-page-title">Lifetime Account Numbers</h2>
+                <p className="mt-2 text-sm text-white/65">
+                  A quick read on what this account has earned and how it has performed across ReemTeam tables.
+                </p>
+              </div>
+              <span className="rounded-full border border-white/14 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.17em] text-white/70">
+                {accountStatsLoading ? 'Syncing' : 'Live Summary'}
+              </span>
+            </div>
+
+            {accountStatsError ? <p className="mt-4 text-sm text-red-300">{accountStatsError}</p> : null}
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="account-stat-tile rounded-2xl p-4">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/55">RTC Earned</div>
+                <div className="mt-2 text-2xl rt-page-title">
+                  {accountStatsLoading ? '...' : formatRtcBalance(accountStats?.rtcEarned ?? 0)}
+                </div>
+              </div>
+              <div className="account-stat-tile rounded-2xl p-4">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/55">USD Earned</div>
+                <div className="mt-2 text-2xl rt-page-title">
+                  {accountStatsLoading ? '...' : formatUsdBalance(accountStats?.usdEarned ?? 0)}
+                </div>
+              </div>
+              <div className="account-stat-tile rounded-2xl p-4">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/55">Total Reems</div>
+                <div className="mt-2 text-2xl rt-page-title">
+                  {accountStatsLoading ? '...' : (accountStats?.totalReems ?? 0).toLocaleString('en-US')}
+                </div>
+              </div>
+              <div className="account-stat-tile rounded-2xl p-4">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/55">Total Wins</div>
+                <div className="mt-2 text-2xl rt-page-title">
+                  {accountStatsLoading ? '...' : (accountStats?.totalWins ?? 0).toLocaleString('en-US')}
+                </div>
+              </div>
+              <div className="account-stat-tile rounded-2xl p-4">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/55">Matches Played</div>
+                <div className="mt-2 text-2xl rt-page-title">
+                  {accountStatsLoading ? '...' : (accountStats?.matchesPlayed ?? 0).toLocaleString('en-US')}
+                </div>
+              </div>
+              <div className="account-stat-tile rounded-2xl p-4">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/55">Win Rate</div>
+                <div className="mt-2 text-2xl rt-page-title">
+                  {accountStatsLoading ? '...' : `${(accountStats?.winRate ?? 0).toFixed(1)}%`}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Biggest USD Payout</div>
+                <div className="mt-2 text-lg rt-page-title text-white">
+                  {accountStatsLoading ? '...' : formatUsdBalance(accountStats?.biggestUsdPayout ?? 0)}
+                </div>
+                <div className="mt-1 text-xs text-white/55">
+                  Net USD: {accountStatsLoading ? '...' : formatUsdBalance(accountStats?.usdNet ?? 0)}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Biggest RTC Payout</div>
+                <div className="mt-2 text-lg rt-page-title text-white">
+                  {accountStatsLoading ? '...' : formatRtcBalance(accountStats?.biggestRtcPayout ?? 0)}
+                </div>
+                <div className="mt-1 text-xs text-white/55">
+                  Net RTC: {accountStatsLoading ? '...' : formatRtcBalance(accountStats?.rtcNet ?? 0)}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-2xl p-6" style={{ animationDelay: '80ms' }}>
             <div className="flex items-start justify-between gap-3">
               <div>

@@ -2,6 +2,18 @@ import { Transaction } from "../types/transaction";
 import client from "./client";
 
 export type WalletCurrency = "usd" | "rtc";
+export interface AccountStats {
+  matchesPlayed: number;
+  totalWins: number;
+  totalReems: number;
+  winRate: number;
+  usdEarned: number;
+  rtcEarned: number;
+  usdNet: number;
+  rtcNet: number;
+  biggestUsdPayout: number;
+  biggestRtcPayout: number;
+}
 
 export const getTransactionHistory = async (currency?: WalletCurrency): Promise<Transaction[]> => {
   const { data } = await client.get<Transaction[]>("/wallet/transactions", {
@@ -15,6 +27,11 @@ export const getWalletBalance = async (currency: WalletCurrency = "usd"): Promis
     params: { currency },
   });
   return data.balance;
+};
+
+export const getAccountStats = async (): Promise<AccountStats> => {
+  const { data } = await client.get<AccountStats>("/wallet/account-stats");
+  return data;
 };
 
 export const requestWithdrawal = async (params: {
