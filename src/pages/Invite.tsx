@@ -6,6 +6,7 @@ import { Loader } from '../components/ui/Loader';
 import { trackEvent } from '../api/analytics';
 import { getModeLabel, getStakeDisplay } from '../branding/modeCopy';
 import { useAuthStore } from '../store/authStore';
+import { buildInviteJoinPath } from '../utils/authRedirect';
 
 const Invite: React.FC = () => {
   const { code } = useParams<{ code: string }>();
@@ -25,6 +26,7 @@ const Invite: React.FC = () => {
     return getStakeDisplay(inviteTable.stake, inviteTable.mode as any);
   }, [inviteTable]);
   const roomStatusLabel = inviteTable?.status === 'in-game' ? 'Hand Live' : 'Waiting For Players';
+  const joinPath = buildInviteJoinPath(invite?.tableId ?? inviteTable?.tableId, code);
 
   useEffect(() => {
     if (!code) return;
@@ -45,7 +47,7 @@ const Invite: React.FC = () => {
   const handleAccept = async () => {
     if (!code) return;
     if (!isAuthenticated) {
-      navigate('/login', { state: { from: location } });
+      navigate('/login', { state: { from: location, postAuthRedirect: joinPath } });
       return;
     }
     setAccepting(true);
@@ -54,7 +56,7 @@ const Invite: React.FC = () => {
       trackEvent('invite_accepted', { code });
       const tableId = accept.tableId || invite?.tableId;
       if (tableId) {
-        navigate(`/game/${tableId}?inviteCode=${encodeURIComponent(code)}`);
+        navigate(buildInviteJoinPath(tableId, code));
       } else {
         navigate('/tables');
       }
@@ -153,6 +155,14 @@ const Invite: React.FC = () => {
         <Button onClick={handleAccept} disabled={accepting}>
           {accepting ? 'Joining...' : isAuthenticated ? 'Join Table' : 'Sign In To Join'}
         </Button>
+        {!isAuthenticated && (
+          <Button
+            variant="secondary"
+            onClick={() => navigate('/register', { state: { from: location, postAuthRedirect: joinPath } })}
+          >
+            Register To Join
+          </Button>
+        )}
         <Button variant="secondary" onClick={() => navigate('/tables')}>
           Back to Lobby
         </Button>

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { getPostAuthRedirectPath } from '../utils/authRedirect';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -16,8 +17,7 @@ const Login: React.FC = () => {
     e.preventDefault();
     try {
       await login(email, password);
-      const from = (location.state as any)?.from;
-      const nextPath = from?.pathname ? `${from.pathname}${from.search ?? ''}` : '/tables';
+      const nextPath = getPostAuthRedirectPath(location.state as any);
       navigate(nextPath, { replace: true });
     } catch {
       // Error state handled in store toast.
@@ -65,7 +65,7 @@ const Login: React.FC = () => {
 
           <p className="mt-6 text-sm text-white/65">
             Need an account?{' '}
-            <Link to="/register" className="text-amber-300 hover:text-amber-200">
+            <Link to="/register" state={location.state} className="text-amber-300 hover:text-amber-200">
               Register
             </Link>
           </p>

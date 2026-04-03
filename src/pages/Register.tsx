@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { getPostAuthRedirectPath } from '../utils/authRedirect';
 
 const Register: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -17,8 +18,7 @@ const Register: React.FC = () => {
     e.preventDefault();
     try {
       await register(username, email, password);
-      const from = (location.state as any)?.from;
-      const nextPath = from?.pathname ? `${from.pathname}${from.search ?? ''}` : '/tables';
+      const nextPath = getPostAuthRedirectPath(location.state as any);
       navigate(nextPath, { replace: true });
     } catch {
       // Errors are handled by auth store toast.
@@ -84,7 +84,7 @@ const Register: React.FC = () => {
 
           <p className="mt-6 text-sm text-white/65">
             Already registered?{' '}
-            <Link to="/login" className="text-amber-300 hover:text-amber-200">
+            <Link to="/login" state={location.state} className="text-amber-300 hover:text-amber-200">
               Sign in
             </Link>
           </p>
