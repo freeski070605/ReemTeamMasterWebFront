@@ -932,6 +932,19 @@ const Admin: React.FC = () => {
     );
   };
 
+  const handleDeleteEmptyPrivateTable = (table: AdminTable) => {
+    openConfirm(
+      'Delete Empty Private Table',
+      `Delete ${table.name}? This permanently removes the empty private table and its invite links.`,
+      async () => {
+        await adminApi.deleteTable(table.tableId);
+        toast.success('Empty private table deleted.');
+        await Promise.all([loadTables(tableStatusFilter), loadMetrics(), loadAudits(1, auditActionFilter, auditAdminFilter)]);
+      },
+      { danger: true, confirmLabel: 'Delete Table' }
+    );
+  };
+
   const lookupMatch = async () => {
     if (!matchLookupId.trim()) {
       toast.error('Enter a match id.');
@@ -1993,6 +2006,12 @@ const Admin: React.FC = () => {
                   <h4 className="text-lg rt-page-title">{table.name}</h4>
                   <div className="mt-1 flex items-center gap-2 text-xs">
                     <span className={`rounded-full px-2 py-0.5 ${statusChipClass(table.status)}`}>{table.status}</span>
+                    {table.isPrivate && !table.isPromo && (
+                      <span className="rounded-full bg-white/8 px-2 py-0.5 text-white/70">private</span>
+                    )}
+                    {table.isPromo && (
+                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-200">promo</span>
+                    )}
                     <span className="text-white/55">{table.mode} | Stake {formatCurrency(table.stake)}</span>
                   </div>
                 </div>
@@ -2004,12 +2023,18 @@ const Admin: React.FC = () => {
                 <div>Turn: {table.turnState?.turn ?? '--'} ({table.turnState?.status || 'no game state'})</div>
                 <div>Current player: {table.turnState?.currentPlayerUsername || '--'}</div>
                 <div>Time remaining: {table.turnState?.turnTimeRemainingMs ? `${Math.ceil(table.turnState.turnTimeRemainingMs / 1000)}s` : '--'}</div>
+                <div>Host note: {table.hostNote?.trim() || '--'}</div>
                 <div>Updated: {formatDate(table.updatedAt)}</div>
               </div>
               <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/65">
                 {table.playersSeated.map((player) => player.username).join(', ') || 'No players listed'}
               </div>
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex flex-wrap justify-end gap-2">
+                {table.isPrivate && !table.isPromo && table.currentPlayerCount === 0 && table.playersSeated.length === 0 && table.status === 'waiting' && !table.currentMatchId && (
+                  <Button size="sm" variant="danger" onClick={() => handleDeleteEmptyPrivateTable(table)}>
+                    Delete Empty Private
+                  </Button>
+                )}
                 <Button size="sm" variant="danger" onClick={() => handleResetTable(table)}>
                   Reset Table
                 </Button>

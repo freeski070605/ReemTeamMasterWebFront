@@ -12,7 +12,7 @@ import { SOCKET_URL } from '../api/socket';
 import { useAuthStore } from '../store/authStore';
 import { trackEvent } from '../api/analytics';
 import { getLobbySummary } from '../api/lobby';
-import { quickSeat, createPrivateTable } from '../api/tables';
+import { quickSeat, createPrivateTable, getMyPrivateTables, ManagedPrivateTable } from '../api/tables';
 import { createInvite } from '../api/invites';
 import { getRecentPlayers, RecentPlayer } from '../api/users';
 import PlayerAvatar from '../components/game/PlayerAvatar';
@@ -48,6 +48,10 @@ const TableSelect: React.FC = () => {
   const [privateMaxPlayers, setPrivateMaxPlayers] = useState<number>(4);
   const [privateHostNote, setPrivateHostNote] = useState('');
   const [privateCreating, setPrivateCreating] = useState(false);
+  const [myPrivateTables, setMyPrivateTables] = useState<ManagedPrivateTable[]>([]);
+  const [privateTablesLoading, setPrivateTablesLoading] = useState(false);
+  const [privateManagerOpen, setPrivateManagerOpen] = useState(false);
+  const [privateInviteBusyId, setPrivateInviteBusyId] = useState<string | null>(null);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteModalLink, setInviteModalLink] = useState('');
   const [vipModalOpen, setVipModalOpen] = useState(false);
@@ -63,6 +67,23 @@ const TableSelect: React.FC = () => {
   const { user, refreshVipStatus } = useAuthStore();
   const isVip = !!user?.isVip;
   const isAdmin = !!user?.role && roleAtLeast(user.role, 'admin');
+
+  const loadMyPrivateTables = useCallback(async () => {
+    if (!user?._id) {
+      setMyPrivateTables([]);
+      return;
+    }
+
+    setPrivateTablesLoading(true);
+    try {
+      const tables = await getMyPrivateTables();
+      setMyPrivateTables(tables);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Could not load your private tables.');
+    } finally {
+      setPrivateTablesLoading(false);
+    }
+  }, [user?._id]);
 
   const fetchTables = async () => {
     try {
@@ -157,6 +178,7 @@ const TableSelect: React.FC = () => {
       trackEvent('private_table_created', { tableId: result.table._id, mode: privateMode, stake: privateStake });
       toast.success(copied ? 'Private table created. Invite link copied.' : 'Private table created.');
       setPrivateModalOpen(false);
+      void loadMyPrivateTables();
       navigate(`/game/${result.table._id}?inviteCode=${encodeURIComponent(result.inviteCode)}`);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to create private table.');
@@ -208,6 +230,58 @@ const TableSelect: React.FC = () => {
     navigate(`/game/${lastTableId}${query}`);
   };
 
+  const handleOpenPrivateManager = async () => {
+    setPrivateManagerOpen(true);
+    if (myPrivateTables.length === 0) {
+      await loadMyPrivateTables();
+    }
+  };
+
+  const handleOpenManagedPrivateTable = (table: ManagedPrivateTable) => {
+    setPrivateManagerOpen(false);
+    navigate(`/game/${table._id}`);
+  };
+
+  const handleRefreshManagedInvite = async (table: ManagedPrivateTable) => {
+    setPrivateInviteBusyId(table._id);
+    try {
+      const invite = await createInvite({ tableId: table._id });
+      const copied = await copyToClipboard(invite.inviteUrl);
+      setMyPrivateTables((current) =>
+        current.map((item) =>
+          item._id === table._id
+            ? {
+                ...item,
+                inviteCode: invite.code,
+                inviteUrl: invite.inviteUrl,
+              }
+            : item
+        )
+      );
+      if (!copied) {
+        openInviteLinkModal(invite.inviteUrl);
+      }
+      toast.success(copied ? 'Fresh invite copied.' : 'Fresh invite ready.');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to create invite.');
+    } finally {
+      setPrivateInviteBusyId(null);
+    }
+  };
+
+  const handleCopyManagedInvite = async (table: ManagedPrivateTable) => {
+    if (table.inviteUrl) {
+      const copied = await copyToClipboard(table.inviteUrl);
+      if (!copied) {
+        openInviteLinkModal(table.inviteUrl);
+      }
+      toast.success(copied ? 'Invite link copied.' : 'Invite link ready.');
+      return;
+    }
+
+    await handleRefreshManagedInvite(table);
+  };
+
   const loadPromoTable = useCallback(async () => {
     if (!isAdmin) {
       setPromoTable(null);
@@ -252,6 +326,15 @@ const TableSelect: React.FC = () => {
     setActiveView('cribs');
     setPromoTable(null);
   }, [isAdmin, loadPromoTable]);
+
+  useEffect(() => {
+    if (!user?._id) {
+      setMyPrivateTables([]);
+      return;
+    }
+
+    void loadMyPrivateTables();
+  }, [loadMyPrivateTables, user?._id]);
 
   useEffect(() => {
     if (!user?._id) {
@@ -526,6 +609,11 @@ const TableSelect: React.FC = () => {
           <Button variant="secondary" onClick={handlePrivateEntry}>
             {isVip ? 'Create Private Table' : 'Create Private Table (VIP)'}
           </Button>
+          {myPrivateTables.length > 0 && (
+            <Button variant="secondary" onClick={() => void handleOpenPrivateManager()} isLoading={privateTablesLoading}>
+              Manage Private Tables
+            </Button>
+          )}
           {localStorage.getItem('last_table_id') && (
             <Button variant="secondary" onClick={handleRejoinLast}>
               Rejoin Last Table
@@ -811,6 +899,73 @@ const TableSelect: React.FC = () => {
             We&apos;ll copy the invite link and seat you instantly so you can host from inside the room.
           </p>
           {privateCreating && <p className="text-xs text-white/70">Creating private table...</p>}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={privateManagerOpen}
+        onClose={() => setPrivateManagerOpen(false)}
+        onConfirm={() => setPrivateManagerOpen(false)}
+        title="Manage Private Tables"
+        confirmLabel="Done"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-white/70">
+            Jump back into your rooms or send out a fresh invite link.
+          </p>
+          {privateTablesLoading && (
+            <p className="text-sm text-white/60">Loading your private tables...</p>
+          )}
+          {!privateTablesLoading && myPrivateTables.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-white/12 bg-black/15 p-4 text-sm text-white/60">
+              You haven&apos;t created any private tables yet.
+            </div>
+          )}
+          {!privateTablesLoading && myPrivateTables.length > 0 && (
+            <div className="space-y-3">
+              {myPrivateTables.map((table) => {
+                const stakeDisplay = getStakeDisplay(table.stake, table.mode);
+                return (
+                  <article key={table._id} className="rounded-2xl border border-white/12 bg-black/20 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="text-base font-semibold text-white">{table.name || 'Private Table'}</div>
+                        <div className="mt-1 text-xs text-white/55">
+                          {getModeBadge(table.mode)} | {stakeDisplay.amount} {stakeDisplay.unit}
+                        </div>
+                      </div>
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                        table.status === 'in-game'
+                          ? 'bg-amber-500/20 text-amber-100'
+                          : 'bg-emerald-500/20 text-emerald-200'
+                      }`}>
+                        {table.status === 'in-game' ? 'Hand Live' : 'Waiting'}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-xs text-white/70 sm:grid-cols-2">
+                      <div>Seats filled: {table.currentPlayerCount}/{table.maxPlayers}</div>
+                      <div>Updated: {table.updatedAt ? new Date(table.updatedAt).toLocaleString() : '--'}</div>
+                      <div>Invite: {table.inviteUrl ? 'Ready' : 'Generate a fresh link'}</div>
+                      <div>Access: Invite-only</div>
+                    </div>
+                    {table.hostNote && (
+                      <div className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-xs text-amber-100/85">
+                        Host note: {table.hostNote}
+                      </div>
+                    )}
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => handleOpenManagedPrivateTable(table)}>
+                        Open Table
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => void handleCopyManagedInvite(table)} isLoading={privateInviteBusyId === table._id}>
+                        {table.inviteUrl ? 'Copy Invite' : 'Create Invite'}
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
       </Modal>
 

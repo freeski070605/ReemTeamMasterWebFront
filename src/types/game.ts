@@ -84,8 +84,8 @@ export interface Table {
   activeContestId?: string;
   isPrivate?: boolean;
   isPromo?: boolean;
-  createdBy?: string;
-  hostNote?: string;
+  createdBy?: string | null;
+  hostNote?: string | null;
   minPlayers: number;
   maxPlayers: number;
   currentPlayerCount: number;

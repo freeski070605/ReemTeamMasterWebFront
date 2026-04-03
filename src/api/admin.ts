@@ -51,7 +51,10 @@ export interface AdminTable {
   mode: string;
   stake: number;
   status: 'waiting' | 'in-game';
+  isPrivate?: boolean;
   isPromo?: boolean;
+  createdBy?: string | null;
+  hostNote?: string | null;
   minPlayers: number;
   maxPlayers: number;
   currentPlayerCount: number;
@@ -249,6 +252,10 @@ export const adminApi = {
   },
   resetTable: async (tableId: string) => {
     const { data } = await client.post(`/admin/tables/${tableId}/reset`, { keepContestBinding: false });
+    return data;
+  },
+  deleteTable: async (tableId: string) => {
+    const { data } = await client.delete<{ success: boolean; tableId: string; invitesDeleted: number }>(`/admin/tables/${tableId}`);
     return data;
   },
   getMatch: async (id: string) => {
