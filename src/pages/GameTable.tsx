@@ -1419,11 +1419,11 @@ const GameTable: React.FC = () => {
     top: {
       positionClass: isHeadsUpTable
         ? isPhoneLandscapeLayout
-          ? "left-[18%] top-[10.5%] w-[34%] max-w-[236px]"
-          : "left-[17%] top-[9.25%] w-[30%] max-w-[304px]"
+          ? "left-[28%] top-[8.5%] w-[34%] max-w-[236px]"
+          : "left-[27%] top-[7%] w-[30%] max-w-[304px]"
         : isPhoneLandscapeLayout
-          ? "left-[18.5%] top-[10%] w-[32%] max-w-[224px]"
-          : "left-[17.5%] top-[8.75%] w-[27%] max-w-[282px]",
+          ? "left-[28.5%] top-[8%] w-[32%] max-w-[224px]"
+          : "left-[27.5%] top-[6.5%] w-[27%] max-w-[282px]",
       align: "left" as const,
       tiltClass: isThreeHandedTable ? "rotate-[0.5deg]" : "rotate-0",
       panelClass: "w-full",
@@ -1481,8 +1481,8 @@ const GameTable: React.FC = () => {
   const seatContextLayouts: Record<SeatZone, SeatContextLayout> = {
     top: {
       positionClass: isPhoneLandscapeLayout
-        ? "left-[18.5%] top-[20.5%]"
-        : "left-[18%] top-[19.75%]",
+        ? "left-[29%] top-[18.5%]"
+        : "left-[28%] top-[17.75%]",
       winnerWidthClass: isPhoneLandscapeLayout ? "w-[216px]" : "w-[288px]",
       chipWidthClass: isPhoneLandscapeLayout ? "w-[128px]" : "w-[150px]",
       alignClass: "items-start text-left",
