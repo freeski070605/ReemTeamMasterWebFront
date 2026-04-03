@@ -85,11 +85,17 @@ export interface Table {
   isPrivate?: boolean;
   isPromo?: boolean;
   createdBy?: string;
+  hostNote?: string;
   minPlayers: number;
   maxPlayers: number;
   currentPlayerCount: number;
   status: 'waiting' | 'in-game';
   name?: string;
+  players?: Array<{
+    userId: string;
+    isAI: boolean;
+    seat: number;
+  }>;
 }
 
 export interface Contest {

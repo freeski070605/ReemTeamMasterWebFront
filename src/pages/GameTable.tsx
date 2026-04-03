@@ -8,6 +8,7 @@ import { Card as CardType } from "../types/game";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { toast } from "react-toastify";
 import { trackEvent } from "../api/analytics";
+import { createInvite } from "../api/invites";
 
 import { PlayingCard as CardComponent } from "../components/ui/Card";
 import PlayerAvatar from "../components/game/PlayerAvatar";
@@ -15,12 +16,14 @@ import TurnTimer from "../components/game/TurnTimer";
 import GameActions from "../components/game/GameActions";
 import RtcParticleOverlay from "../components/game/RtcParticleOverlay";
 import { Button } from "../components/ui/Button";
+import { Modal } from "../components/ui/Modal";
 import {
   formatRoundDeltaAmount,
   getPlacementWinTypeLabel,
   getRoundNetForPlayer,
   getRoundOutcomePresentation,
 } from "../utils/roundResults";
+import { getModeLabel, getStakeDisplay } from "../branding/modeCopy";
 import bgImage from '../assets/bg.png';
 import backCardImage from "../assets/cards/back.png";
 
@@ -120,6 +123,7 @@ const GameTable: React.FC = () => {
     connect,
     disconnect,
     gameState,
+    tableInfo,
     isConnected,
     leaveTable,
     drawCard,
@@ -155,6 +159,9 @@ const GameTable: React.FC = () => {
   const [endRoundPhase, setEndRoundPhase] = useState<EndRoundPhase>("global");
   const [feedbackPulseArea, setFeedbackPulseArea] = useState<InlineFeedbackArea | null>(null);
   const [activityTick, setActivityTick] = useState(0);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteLink, setInviteLink] = useState("");
+  const [inviteBusy, setInviteBusy] = useState(false);
   const tableRef = useRef<HTMLDivElement | null>(null);
   const seatAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const lastAnimatedRoundKeyRef = useRef<string | null>(null);
@@ -183,6 +190,35 @@ const GameTable: React.FC = () => {
   const spectatorModeRequested = searchParams.get("spectator") === "1";
   const promoModeRequested = searchParams.get("promo") === "1";
   const previousStatusRef = useRef<string | null>(null);
+
+  const copyInviteLink = useCallback(async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Invite link copied.");
+      return true;
+    } catch {
+      toast.info("Invite link ready to share.");
+      return false;
+    }
+  }, []);
+
+  const handleCreateInviteLink = useCallback(async () => {
+    if (!tableId) {
+      return;
+    }
+
+    setInviteBusy(true);
+    try {
+      const invite = await createInvite({ tableId });
+      setInviteLink(invite.inviteUrl);
+      setInviteModalOpen(true);
+      await copyInviteLink(invite.inviteUrl);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to create invite.");
+    } finally {
+      setInviteBusy(false);
+    }
+  }, [copyInviteLink, tableId]);
 
   const clearGuidanceTimers = useCallback(() => {
     if (guidanceBannerTimeoutRef.current !== null) {
@@ -760,6 +796,128 @@ const GameTable: React.FC = () => {
   }, [clearGuidanceTimers, gameState?.status]);
 
   if (!isConnected || !gameState || !user) {
+    if (isConnected && !gameState && tableInfo && user) {
+      const seatCount = tableInfo.maxPlayers ?? 4;
+      const occupiedSeats = new Set((tableInfo.players ?? []).map((player) => player.seat));
+      const amHost = !!tableInfo.createdBy && tableInfo.createdBy === user._id;
+      const stakeDisplay = getStakeDisplay(tableInfo.stake, tableInfo.mode);
+
+      return (
+        <>
+          <div className="space-y-6">
+            <section className="rt-landscape-compact-card rt-panel-strong rounded-3xl p-6 sm:p-8">
+              <div className="text-xs uppercase tracking-[0.2em] text-white/50">Waiting Room</div>
+              <h1 className="mt-3 text-3xl rt-page-title sm:text-4xl">
+                {tableInfo.name || "Private Table"}
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm text-white/68 sm:text-base">
+                You're in the room. Invite players into the empty seats below. The table will begin once enough players have joined.
+              </p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/12 bg-black/20 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-white/45">Mode</div>
+                  <div className="mt-2 text-lg rt-page-title text-white">{getModeLabel(tableInfo.mode)}</div>
+                </div>
+                <div className="rounded-2xl border border-white/12 bg-black/20 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-white/45">Stake</div>
+                  <div className="mt-2 text-lg rt-page-title text-white">
+                    {stakeDisplay.amount} <span className="text-sm text-white/60">{stakeDisplay.unit}</span>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-white/12 bg-black/20 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-white/45">Seats Filled</div>
+                  <div className="mt-2 text-lg rt-page-title text-white">
+                    {tableInfo.currentPlayerCount}/{tableInfo.maxPlayers}
+                  </div>
+                </div>
+              </div>
+
+              {tableInfo.hostNote && (
+                <div className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-sm text-amber-100/90">
+                  Host note: {tableInfo.hostNote}
+                </div>
+              )}
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Button onClick={() => void handleCreateInviteLink()} disabled={inviteBusy}>
+                  {inviteBusy ? "Creating Invite..." : "Invite Players"}
+                </Button>
+                <Button variant="secondary" onClick={() => navigate("/tables")}>
+                  Back to Lobby
+                </Button>
+                {amHost && (
+                  <div className="rounded-full border border-white/12 bg-white/5 px-3 py-2 text-xs uppercase tracking-[0.16em] text-white/60">
+                    Host Controls Active
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: seatCount }, (_, seatIndex) => {
+                const occupied = occupiedSeats.has(seatIndex);
+                const isMySeat = (tableInfo.players ?? []).some((player) => player.seat === seatIndex && player.userId === user._id);
+
+                return (
+                  <article
+                    key={`seat-${seatIndex}`}
+                    className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-5"
+                  >
+                    <div className="text-xs uppercase tracking-[0.18em] text-white/45">Seat {seatIndex + 1}</div>
+                    <div className="mt-3 text-xl rt-page-title text-white">
+                      {occupied ? (isMySeat ? "You" : "Occupied") : "Open Seat"}
+                    </div>
+                    <div className="mt-2 text-sm text-white/65">
+                      {occupied
+                        ? isMySeat
+                          ? "You're locked into this seat."
+                          : "Waiting on this player."
+                        : "Send an invite link to fill this spot."}
+                    </div>
+                    {!occupied && (
+                      <Button
+                        className="mt-5 w-full"
+                        variant="secondary"
+                        onClick={() => void handleCreateInviteLink()}
+                        disabled={inviteBusy}
+                      >
+                        {inviteBusy ? "Creating..." : "Invite Player"}
+                      </Button>
+                    )}
+                  </article>
+                );
+              })}
+            </section>
+          </div>
+
+          <Modal
+            isOpen={inviteModalOpen}
+            onClose={() => setInviteModalOpen(false)}
+            onConfirm={() => {
+              if (inviteLink) {
+                void copyInviteLink(inviteLink);
+              }
+            }}
+            title="Invite Link Ready"
+            confirmLabel="Copy Link"
+          >
+            <div className="space-y-4">
+              <p>Share this link with the players you want at the table.</p>
+              <input
+                readOnly
+                value={inviteLink}
+                className="h-11 w-full rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
+              />
+              <p className="text-xs text-white/55">
+                The link opens the invite page for this room, then the player joins the table from there.
+              </p>
+            </div>
+          </Modal>
+        </>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-900">
         <Loader />

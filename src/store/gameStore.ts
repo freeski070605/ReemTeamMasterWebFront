@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
-import { IGameState, Card, RoundResult } from '../types/game';
+import { IGameState, Card, RoundResult, Table } from '../types/game';
 import { toast } from 'react-toastify';
 import { SOCKET_URL } from '../api/socket';
 import { buildRoundDeltaMessage, getRoundAnnouncement } from '../utils/roundResults';
@@ -10,6 +10,7 @@ let presenceInterval: ReturnType<typeof setInterval> | null = null;
 interface GameStore {
   socket: Socket | null;
   gameState: IGameState | null;
+  tableInfo: Table | null;
   lastRoundResult: RoundResult | null;
   isConnected: boolean;
   error: string | null;
@@ -40,6 +41,7 @@ interface GameStore {
 export const useGameStore = create<GameStore>((set, get) => ({
   socket: null,
   gameState: null,
+  tableInfo: null,
   lastRoundResult: null,
   isConnected: false,
   error: null,
@@ -49,6 +51,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (existingSocket) {
         existingSocket.disconnect();
     }
+
+    set({ gameState: null, tableInfo: null, lastRoundResult: null, error: null });
 
     if (presenceInterval) {
       clearInterval(presenceInterval);
@@ -120,9 +124,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({ lastRoundResult: roundResult });
     });
     
-    socket.on('tableUpdate', (data: { message: string, table: any, gameState?: IGameState }) => {
+    socket.on('tableUpdate', (data: { message: string, table: Table, gameState?: IGameState }) => {
         if (data.message) toast.info(data.message);
-        if (data.gameState) set({ gameState: data.gameState });
+        set((state) => ({
+          tableInfo: data.table ?? state.tableInfo,
+          gameState: data.gameState ?? state.gameState,
+        }));
     });
 
     socket.on('gameError', (data: { message: string }) => {
@@ -172,7 +179,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { socket } = get();
     if (socket) {
       socket.disconnect();
-      set({ socket: null, gameState: null, lastRoundResult: null, isConnected: false });
+      set({ socket: null, gameState: null, tableInfo: null, lastRoundResult: null, isConnected: false });
     }
     if (presenceInterval) {
       clearInterval(presenceInterval);
@@ -186,7 +193,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       socket.emit('leaveTable', { tableId, userId, username });
       // We don't disconnect here, we let the component handle navigation which will trigger cleanup
       // Or we can explicitly disconnect if we want to be sure
-      set({ gameState: null });
+      set({ gameState: null, tableInfo: null });
     }
   },
 

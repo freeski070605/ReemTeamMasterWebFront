@@ -48,6 +48,8 @@ const TableSelect: React.FC = () => {
   const [privateMaxPlayers, setPrivateMaxPlayers] = useState<number>(4);
   const [privateHostNote, setPrivateHostNote] = useState('');
   const [privateCreating, setPrivateCreating] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteModalLink, setInviteModalLink] = useState('');
   const [vipModalOpen, setVipModalOpen] = useState(false);
   const [vipCheckoutLoading, setVipCheckoutLoading] = useState(false);
   const [recentPlayers, setRecentPlayers] = useState<RecentPlayer[]>([]);
@@ -107,6 +109,11 @@ const TableSelect: React.FC = () => {
     }
   };
 
+  const openInviteLinkModal = (url: string) => {
+    setInviteModalLink(url);
+    setInviteModalOpen(true);
+  };
+
   const handleQuickSeat = async () => {
     setQuickSeatLoading(true);
     try {
@@ -124,8 +131,9 @@ const TableSelect: React.FC = () => {
     try {
       const invite = await createInvite({ tableId: table._id });
       const copied = await copyToClipboard(invite.inviteUrl);
+      openInviteLinkModal(invite.inviteUrl);
       trackEvent('invite_created', { tableId: table._id });
-      toast.success(copied ? 'Invite link copied.' : 'Invite created.');
+      toast.success(copied ? 'Invite link copied.' : 'Invite link ready.');
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to create invite.');
     }
@@ -145,6 +153,7 @@ const TableSelect: React.FC = () => {
         hostNote: privateHostNote.trim() || undefined,
       });
       const copied = await copyToClipboard(result.inviteUrl);
+      openInviteLinkModal(result.inviteUrl);
       trackEvent('private_table_created', { tableId: result.table._id, mode: privateMode, stake: privateStake });
       toast.success(copied ? 'Private table created. Invite link copied.' : 'Private table created.');
       setPrivateModalOpen(false);
@@ -821,6 +830,30 @@ const TableSelect: React.FC = () => {
           </ul>
           <p className="text-sm text-white/70">$4.99/mo. Cancel anytime.</p>
           {vipCheckoutLoading && <p className="text-xs text-white/70">Starting VIP checkout...</p>}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+        onConfirm={() => {
+          if (inviteModalLink) {
+            void copyToClipboard(inviteModalLink);
+          }
+        }}
+        title="Invite Link Ready"
+        confirmLabel="Copy Link"
+      >
+        <div className="space-y-4">
+          <p>Send this link to the players you want to bring into the room.</p>
+          <input
+            readOnly
+            value={inviteModalLink}
+            className="h-11 w-full rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
+          />
+          <p className="text-xs text-white/55">
+            The link opens the invite page first, then takes the player into the table from there.
+          </p>
         </div>
       </Modal>
         </>
