@@ -213,37 +213,37 @@ const Home: React.FC = () => {
 
   const featureCards = [
     {
-      eyebrow: 'Start Smooth',
-      title: 'Begin in live RTC cribs',
-      body: 'New players can learn table flow, reads, spreads, and timing without jumping straight into the highest-pressure format.',
+      eyebrow: 'Start Here',
+      title: 'Begin in RTC cribs',
+      body: 'If you are new, this is the easiest place to learn the pace of the table, how turns work, and when to push for a win.',
     },
     {
-      eyebrow: 'Stay Hooked',
-      title: 'Always something happening',
-      body: 'Live hands, open seats, leaderboard movement, and featured crowns give players a reason to check back throughout the day.',
+      eyebrow: 'See What Is Live',
+      title: 'Check the board and jump in',
+      body: 'You can see who is winning, which tables are active, and where the action is before you choose where to sit.',
     },
     {
-      eyebrow: 'Level Up',
-      title: 'Move into Cash Crown',
-      body: 'When players are ready for stiffer competition, they can step into fixed-bracket real-money tournaments with visible prize pools.',
+      eyebrow: 'Ready For More',
+      title: 'Step into Cash Crown',
+      body: 'When you want bigger pressure and real-money competition, Cash Crown gives you fixed seats, visible prize pools, and higher stakes.',
     },
   ];
 
   const newcomerSteps = [
     {
       step: '1',
-      title: 'Learn the language fast',
-      body: 'We explain RTC, cribs, Reems, and Cash Crown right on the page so first-time players are not lost before the first click.',
+      title: 'Learn the basics first',
+      body: 'You should know what RTC, cribs, Reems, and Cash Crown mean before you sit down, so the page explains them right away.',
     },
     {
       step: '2',
-      title: 'Choose the right lane',
-      body: 'Start in RTC cribs for repetition, move to tournaments for structure, then unlock VIP for private hosted rooms.',
+      title: 'Pick the right place to start',
+      body: 'Most players should begin in RTC cribs, then move into tournaments later once the game starts to feel natural.',
     },
     {
       step: '3',
-      title: 'Follow the heat',
-      body: 'Leaderboard movement and featured live action show who is running hot and where the energy is right now.',
+      title: 'Follow the live action',
+      body: 'The leaderboard and featured table show where the game is moving right now and who is playing well.',
     },
   ];
 
@@ -266,28 +266,32 @@ const Home: React.FC = () => {
         <div className="relative z-10 grid gap-8 xl:grid-cols-[1.2fr_0.8fr] xl:items-start">
           <div className="max-w-3xl">
             <div className="inline-flex items-center rounded-full border border-white/15 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-white/70">
-              Learn Fast. Compete Live. Come Back Daily.
+              Crib Smoke. Crown Stage.
             </div>
             <h1 className="mt-5 text-4xl leading-[0.98] rt-page-title sm:text-5xl xl:text-6xl">
-              ReemTeam makes the game legible for new players and competitive for the regulars.
+              Welcome to ReemTeam.
             </h1>
             <p className="mt-5 max-w-2xl text-base text-white/76 sm:text-lg">
-              Start in live RTC cribs, understand the table language from the first screen, and level into Cash Crown
-              tournaments when you are ready for real-money pressure.
+              Cribs are where players run everyday hands using Reem Team Cash. Pull up, learn the flow of the table,
+              and build your stack.
+            </p>
+            <p className="mt-3 max-w-2xl text-base text-white/70 sm:text-lg">
+              When you are ready for more pressure, step into Cash Crown Tournaments for fixed seats, real-money buy-ins,
+              and prize pools.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
               <Link to="/tables" onClick={() => void trackEvent('home_cta_click', { cta: 'play_cribs' })}>
-                <Button size="lg">Start in RTC Cribs</Button>
+                <Button size="lg">Pull Up to Cribs</Button>
               </Link>
               <Link to="/contests" onClick={() => void trackEvent('home_cta_click', { cta: 'cash_crown' })}>
                 <Button size="lg" variant="secondary">
-                  Explore Cash Crown
+                  View Cash Crown
                 </Button>
               </Link>
               <Link to="/how-to-play" onClick={() => void trackEvent('home_cta_click', { cta: 'how_to_play' })}>
                 <Button size="lg" variant="ghost">
-                  Understand the Game
+                  How to Play ReemTeam
                 </Button>
               </Link>
             </div>
@@ -305,9 +309,9 @@ const Home: React.FC = () => {
           <aside className="landing-spotlight rounded-[28px] p-5 md:p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">Live Pulse</div>
+                <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">Live Game Activity</div>
                 <div className="mt-2 text-2xl rt-page-title text-white">
-                  {loading ? 'Loading...' : 'What is active right now'}
+                  {loading ? 'Loading...' : 'What is running right now'}
                 </div>
               </div>
               <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-200">
@@ -367,11 +371,10 @@ const Home: React.FC = () => {
       <section className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-[28px] p-6 md:p-8">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Leaderboard Spotlight</div>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Leaderboard</div>
             <h2 className="mt-2 text-3xl rt-page-title">The 7-day board is front and center.</h2>
             <p className="mt-3 max-w-2xl text-sm text-white/68">
-              Winning should feel visible. New visitors immediately see that the game is active, and returning players
-              immediately see who they need to chase.
+              See who is winning, who is landing the most Reems, and who is on the best run this week.
             </p>
           </div>
           <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.16em] text-white/58">
@@ -426,7 +429,7 @@ const Home: React.FC = () => {
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <article className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-[28px] p-6 md:p-8">
           <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">How ReemTeam Works</div>
-          <h2 className="mt-2 text-3xl rt-page-title">Everything makes more sense before the first hand.</h2>
+          <h2 className="mt-2 text-3xl rt-page-title">Everything should make sense before your first hand.</h2>
           <div className="mt-6 grid gap-4">
             {newcomerSteps.map((item) => (
               <div key={item.step} className="flex gap-4 rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -451,8 +454,8 @@ const Home: React.FC = () => {
         </article>
 
         <article className="account-reveal rt-landscape-compact-card rt-glass rounded-[28px] p-6 md:p-8">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Main Feature Lanes</div>
-          <h2 className="mt-2 text-3xl rt-page-title">Choose the experience that matches your confidence.</h2>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Where To Start</div>
+          <h2 className="mt-2 text-3xl rt-page-title">Choose the game that fits where you are right now.</h2>
           <div className="mt-6 space-y-4">
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="text-[11px] uppercase tracking-[0.18em] text-amber-200/90">Best first stop</div>
@@ -462,17 +465,17 @@ const Home: React.FC = () => {
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-amber-200/90">Competitive step-up</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-amber-200/90">Next step</div>
               <div className="mt-2 text-xl rt-page-title text-white">Cash Crown Tournaments</div>
               <p className="mt-2 text-sm text-white/68">
-                Fixed entry, visible prize pools, locked seats, and a more focused competitive arc for players ready to press.
+                Fixed entry, visible prize pools, and locked seats for players who want a more serious match.
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-amber-200/90">Retention layer</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-amber-200/90">Private play</div>
               <div className="mt-2 text-xl rt-page-title text-white">VIP Private Rooms</div>
               <p className="mt-2 text-sm text-white/68">
-                Invite-only hosted tables give regulars a reason to stay connected, bring friends in, and keep the ecosystem sticky.
+                Invite-only hosted tables let you bring your own group in and play in a more controlled room.
               </p>
             </div>
           </div>
@@ -523,7 +526,7 @@ const Home: React.FC = () => {
             </span>
           </div>
           <p className="mt-3 text-sm text-white/68">
-            Real-money tournament play stays visible on the home page so players know there is always a bigger stage waiting.
+            If you want bigger pressure, this is where you can move from RTC tables into real-money tournament play.
           </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <div className="landing-stat-card rounded-2xl p-4">
@@ -550,10 +553,10 @@ const Home: React.FC = () => {
       <section className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-[28px] p-6 md:p-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Retention Hooks</div>
-            <h2 className="mt-2 text-3xl rt-page-title">A clearer home page should convert faster and bring people back.</h2>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Ready To Play</div>
+            <h2 className="mt-2 text-3xl rt-page-title">Pick your lane and get into the game.</h2>
             <p className="mt-3 max-w-2xl text-sm text-white/68">
-              This page now explains the product, shows live competition, surfaces status, and gives every player a clear first step.
+              Start in RTC cribs, check the leaderboard, or move into Cash Crown when you are ready for the bigger stage.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
