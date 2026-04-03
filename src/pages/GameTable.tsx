@@ -116,7 +116,6 @@ const GameTable: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const logoSrc = "/assets/logo.png";
   const displayFont = '"Oswald", "Gabarito", sans-serif';
   const {
     socket,
