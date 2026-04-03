@@ -259,6 +259,33 @@ const Home: React.FC = () => {
     totalPrizePool: overview?.contestSummary.totalPrizePool ?? 0,
   };
 
+  const openFeaturedTable = () => {
+    const featuredTableId = overview?.featuredTable?._id;
+    void trackEvent('home_cta_click', { cta: 'featured_table_primary' });
+
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: { pathname: '/tables' } } });
+      return;
+    }
+
+    if (featuredTableId) {
+      navigate(`/game/${featuredTableId}`);
+      return;
+    }
+
+    navigate('/tables');
+  };
+
+  const openContests = () => {
+    void trackEvent('home_cta_click', { cta: 'featured_contest_primary' });
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: { pathname: '/contests' } } });
+      return;
+    }
+
+    navigate('/contests');
+  };
+
   return (
     <div className="space-y-8 md:space-y-10">
       <section className="landing-hero account-reveal rt-landscape-compact-card relative overflow-hidden rounded-[32px] border border-white/12 p-6 md:p-10">
@@ -349,6 +376,12 @@ const Home: React.FC = () => {
                 <span>Buy-in: {featuredTableSummary.buyIn}</span>
                 <span>Seats: {featuredTableSummary.seats}</span>
               </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Button onClick={openFeaturedTable}>Go To Featured Table</Button>
+                <Link to={isAuthenticated ? '/tables' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'featured_table_browse' })}>
+                  <Button variant="secondary">Browse All Tables</Button>
+                </Link>
+              </div>
             </div>
           </aside>
         </div>
@@ -380,6 +413,15 @@ const Home: React.FC = () => {
           <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.16em] text-white/58">
             {loading ? 'Syncing board...' : `Updated ${new Date(overview?.generatedAt ?? Date.now()).toLocaleDateString()}`}
           </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link to={isAuthenticated ? '/tables' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'leaderboard_tables' })}>
+            <Button>Find a Table</Button>
+          </Link>
+          <Link to={isAuthenticated ? '/contests' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'leaderboard_crowns' })}>
+            <Button variant="secondary">See Cash Crown</Button>
+          </Link>
         </div>
 
         <div className="mt-6 grid gap-4 xl:grid-cols-4 md:grid-cols-2">
@@ -463,6 +505,11 @@ const Home: React.FC = () => {
               <p className="mt-2 text-sm text-white/68">
                 Continuous hands, easier repetition, and the cleanest place to learn table rhythm, spreads, hits, and drops.
               </p>
+              <div className="mt-4">
+                <Link to={isAuthenticated ? '/tables' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'where_start_cribs' })}>
+                  <Button>Open RTC Tables</Button>
+                </Link>
+              </div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="text-[11px] uppercase tracking-[0.18em] text-amber-200/90">Next step</div>
@@ -470,6 +517,11 @@ const Home: React.FC = () => {
               <p className="mt-2 text-sm text-white/68">
                 Fixed entry, visible prize pools, and locked seats for players who want a more serious match.
               </p>
+              <div className="mt-4">
+                <Link to={isAuthenticated ? '/contests' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'where_start_crowns' })}>
+                  <Button variant="secondary">Open Cash Crown</Button>
+                </Link>
+              </div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="text-[11px] uppercase tracking-[0.18em] text-amber-200/90">Private play</div>
@@ -477,9 +529,55 @@ const Home: React.FC = () => {
               <p className="mt-2 text-sm text-white/68">
                 Invite-only hosted tables let you bring your own group in and play in a more controlled room.
               </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Button variant="secondary" onClick={handleVipCheckout} disabled={vipCheckoutLoading}>
+                  {isVip ? 'Manage VIP' : vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP'}
+                </Button>
+                <Link to={isAuthenticated ? '/account' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'where_start_vip_account' })}>
+                  <Button variant="ghost">See Account</Button>
+                </Link>
+              </div>
             </div>
           </div>
         </article>
+      </section>
+
+      <section className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-[28px] p-6 md:p-8">
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr] xl:items-center">
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">VIP</div>
+            <h2 className="mt-2 text-3xl rt-page-title">Play in private rooms with your own people.</h2>
+            <p className="mt-3 max-w-2xl text-sm text-white/70">
+              VIP gives you access to private RTC and USD tables, invite links you can share, and a cleaner way to set up games
+              without waiting on public seats.
+            </p>
+            <p className="mt-3 max-w-2xl text-sm text-white/64">
+              It is the best option if you want to host friends, run invite-only games, or keep your play inside a smaller room.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button onClick={handleVipCheckout} disabled={vipCheckoutLoading}>
+                {isVip ? 'Manage VIP' : vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP'}
+              </Button>
+              <Link to={isAuthenticated ? '/account' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'vip_account' })}>
+                <Button variant="secondary">{isVip ? 'Open Account' : 'See Your Account'}</Button>
+              </Link>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            <div className="landing-stat-card rounded-2xl p-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Private RTC Tables</div>
+              <div className="mt-2 text-sm text-white/72">Create invite-only RTC rooms for your own group.</div>
+            </div>
+            <div className="landing-stat-card rounded-2xl p-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Private USD Tables</div>
+              <div className="mt-2 text-sm text-white/72">Host private cash games with clear stakes and human-only seats.</div>
+            </div>
+            <div className="landing-stat-card rounded-2xl p-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Shareable Invites</div>
+              <div className="mt-2 text-sm text-white/72">Send players straight into the right room without extra steps.</div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
@@ -509,9 +607,12 @@ const Home: React.FC = () => {
             </div>
           </div>
           <div className="mt-5">
-            <Link to="/tables" onClick={() => void trackEvent('home_cta_click', { cta: 'featured_table' })}>
-              <Button>Jump to Tables</Button>
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={openFeaturedTable}>Open This Table</Button>
+              <Link to={isAuthenticated ? '/tables' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'featured_table_list' })}>
+                <Button variant="secondary">View All Tables</Button>
+              </Link>
+            </div>
           </div>
         </article>
 
@@ -543,9 +644,12 @@ const Home: React.FC = () => {
             </div>
           </div>
           <div className="mt-5">
-            <Link to="/contests" onClick={() => void trackEvent('home_cta_click', { cta: 'featured_contest' })}>
-              <Button variant="secondary">View Cash Crown</Button>
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <Button variant="secondary" onClick={openContests}>Open Cash Crown</Button>
+              <Link to="/how-to-play" onClick={() => void trackEvent('home_cta_click', { cta: 'featured_contest_rules' })}>
+                <Button variant="ghost">Learn the Game First</Button>
+              </Link>
+            </div>
           </div>
         </article>
       </section>
@@ -564,7 +668,7 @@ const Home: React.FC = () => {
               <Button size="lg">Play Now</Button>
             </Link>
             <Button size="lg" variant="secondary" onClick={handleVipCheckout} disabled={vipCheckoutLoading || isVip}>
-              {isVip ? 'Manage VIP' : vipCheckoutLoading ? 'Starting VIP...' : 'Unlock VIP'}
+              {isVip ? 'Manage VIP' : vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP'}
             </Button>
           </div>
         </div>
