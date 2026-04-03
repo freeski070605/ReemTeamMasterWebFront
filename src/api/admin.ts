@@ -7,6 +7,10 @@ export interface AdminUser {
   email: string;
   avatarUrl?: string | null;
   role: UserRole;
+  isVip: boolean;
+  vipStatus?: string;
+  vipSince?: string | null;
+  vipExpiresAt?: string | null;
   isBanned: boolean;
   isFrozen: boolean;
   adminNotes: string[];
@@ -197,6 +201,10 @@ export const adminApi = {
   },
   setUserRole: async (id: string, role: UserRole, note?: string) => {
     const { data } = await client.patch<AdminUser>(`/admin/users/${id}/role`, { role, note });
+    return data;
+  },
+  setUserVipState: async (id: string, payload: { isVip: boolean; vipExpiresAt?: string | null; note?: string }) => {
+    const { data } = await client.patch<AdminUser>(`/admin/users/${id}/vip`, payload);
     return data;
   },
   getWallet: async (userId: string) => {

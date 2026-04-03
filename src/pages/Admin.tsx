@@ -156,6 +156,17 @@ const formatDate = (value?: string | number | null) => {
   return date.toLocaleString();
 };
 
+const formatVipStatusLabel = (status?: string | null) => {
+  const normalized = (status || 'NONE').toUpperCase();
+  if (normalized === 'ACTIVE') return 'Active';
+  if (normalized === 'PENDING') return 'Pending';
+  if (normalized === 'PAUSED') return 'Paused';
+  if (normalized === 'CANCELED') return 'Canceled';
+  if (normalized === 'DEACTIVATED') return 'Deactivated';
+  if (normalized === 'COMPLETED') return 'Completed';
+  return 'Not Active';
+};
+
 const roleBadgeClass = (role: UserRole) => {
   switch (role) {
     case 'superadmin':
@@ -839,6 +850,21 @@ const Admin: React.FC = () => {
     }
   };
 
+  const handleVipToggle = async (target: AdminUser, isVip: boolean) => {
+    try {
+      await adminApi.setUserVipState(target.id, { isVip });
+      toast.success(isVip ? 'VIP granted.' : 'VIP removed.');
+      await Promise.all([
+        loadUsers(userQuery),
+        selectedProfile?.user.id === target.id ? loadUserProfile(target.id) : Promise.resolve(),
+        walletProfile?.user.id === target.id ? loadWalletProfile(target.id) : Promise.resolve(),
+        loadMetrics(),
+      ]);
+    } catch (error: any) {
+      toast.error(getErrorMessage(error, 'Failed to update VIP status.'));
+    }
+  };
+
   const handleWalletAdjustment = async () => {
     const targetUserId = walletProfile?.user.id || walletLookupUserId;
     const amount = Number(walletAdjustDraft.amount);
@@ -991,6 +1017,62 @@ const Admin: React.FC = () => {
         await Promise.all([loadTournaments(), loadMetrics(), loadAudits(1, auditActionFilter, auditAdminFilter)]);
       },
       { danger: true, confirmLabel: 'Refund + Delete' }
+    );
+  };
+
+  const renderVipManagement = (target: AdminUser) => {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h4 className="text-lg rt-page-title">VIP Controls</h4>
+            <p className="text-xs text-white/55">Manually grant or remove VIP access for this account.</p>
+          </div>
+          <span className={`rounded-full border px-2.5 py-1 text-xs ${
+            target.isVip
+              ? 'border-amber-300/35 bg-amber-300/10 text-amber-200'
+              : 'border-white/12 bg-white/5 text-white/65'
+          }`}>
+            {formatVipStatusLabel(target.vipStatus)}
+          </span>
+        </div>
+        <div className="mt-4 grid gap-2 text-sm text-white/70">
+          <div>Current access: <span className="text-white/90">{target.isVip ? 'VIP active' : 'No VIP access'}</span></div>
+          <div>Member since: {target.vipSince ? formatDate(target.vipSince) : '--'}</div>
+          <div>Expires: {target.vipExpiresAt ? formatDate(target.vipExpiresAt) : 'No expiry set'}</div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            onClick={() =>
+              openConfirm(
+                'Grant VIP',
+                `Grant VIP access to ${target.username}?`,
+                () => handleVipToggle(target, true),
+                { confirmLabel: 'Grant VIP' }
+              )
+            }
+            disabled={target.isVip}
+          >
+            Grant VIP
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() =>
+              openConfirm(
+                'Remove VIP',
+                `Remove VIP access from ${target.username}?`,
+                () => handleVipToggle(target, false),
+                { danger: true, confirmLabel: 'Remove VIP' }
+              )
+            }
+            disabled={!target.isVip && (target.vipStatus || 'NONE').toUpperCase() === 'DEACTIVATED'}
+          >
+            Remove VIP
+          </Button>
+        </div>
+      </div>
     );
   };
 
@@ -1344,6 +1426,8 @@ const Admin: React.FC = () => {
                     </Button>
                   </div>
                 </div>
+
+                {canAdmin && renderVipManagement(activeProfile.user)}
               </div>
             )}
           </div>
@@ -1618,6 +1702,7 @@ const Admin: React.FC = () => {
                   </select>
                   {!isSuperAdmin && <div className="mt-2 text-xs text-white/45">Only superadmin can change roles.</div>}
                 </div>
+                {renderVipManagement(selectedProfile.user)}
               </div>
             )}
           </div>
