@@ -62,6 +62,9 @@ const TermsOfService: React.FC = () => {
             <ul className="mt-3 list-disc list-inside space-y-2">
               <li>Deposits and withdrawals are processed through third-party payment providers.</li>
               <li>We may apply verification or review to prevent fraud and protect players.</li>
+              <li>Withdrawal requests may take up to 24 hours to process.</li>
+              <li>Approved withdrawals under $200 are subject to a 10% processing fee.</li>
+              <li>Approved withdrawals of $200 or more are subject to a 5% processing fee.</li>
               <li>Withdrawals can be delayed or declined if required by law, compliance, or security review.</li>
               <li>You are responsible for any fees, chargebacks, taxes, or penalties related to your transactions.</li>
             </ul>

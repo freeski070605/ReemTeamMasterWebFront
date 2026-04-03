@@ -220,7 +220,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               How to Play
             </Link>
           </div>
-          <div>&copy; {new Date().getFullYear()} ReemTeam. All rights reserved.</div>
+          <div>&copy; 2020 DFB Solutions. All rights reserved.</div>
         </div>
       </footer>
     </div>
