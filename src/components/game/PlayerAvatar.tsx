@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { resolveAvatarUrl } from "../../utils/avatar";
 
 interface PlayerAvatarProps {
@@ -12,6 +12,11 @@ interface PlayerAvatarProps {
 
 const PlayerAvatar: React.FC<PlayerAvatarProps> = ({ player, size = 'md', showName = false }) => {
   const avatarSrc = resolveAvatarUrl(player.avatarUrl);
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [avatarSrc]);
 
   const sizeClasses = {
     sm: 'w-12 h-12 text-sm',
@@ -25,11 +30,12 @@ const PlayerAvatar: React.FC<PlayerAvatarProps> = ({ player, size = 'md', showNa
         className={`rounded-full border-2 border-yellow-400/40 bg-gradient-to-br from-neutral-800 to-neutral-900 p-[2px] shadow-[0_8px_20px_rgba(0,0,0,0.4)] ${sizeClasses[size]}`}
       >
         <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-black/28 ring-1 ring-white/8 shadow-[inset_0_1px_3px_rgba(255,255,255,0.14),inset_0_-10px_18px_rgba(0,0,0,0.24)]">
-          {avatarSrc ? (
+          {avatarSrc && !imageFailed ? (
             <img
               src={avatarSrc}
               alt={player.name}
               className="h-full w-full object-cover object-center"
+              onError={() => setImageFailed(true)}
             />
           ) : (
             <span className="text-white font-bold">{player.name.substring(0, 2).toUpperCase()}</span>
