@@ -323,13 +323,13 @@ const TournamentEditorModal: React.FC<{
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[76] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[76] overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="w-full max-w-4xl rounded-2xl border border-white/15 bg-[#0d1118] p-6 shadow-[0_30px_70px_rgba(0,0,0,0.55)]"
+            className="my-6 max-h-[calc(100dvh-3rem)] w-full max-w-4xl overflow-y-auto rounded-2xl border border-white/15 bg-[#0d1118] p-6 shadow-[0_30px_70px_rgba(0,0,0,0.55)] md:my-10"
             initial={{ opacity: 0, y: 14, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.97 }}
@@ -471,7 +471,7 @@ const TournamentEditorModal: React.FC<{
               </div>
             )}
 
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="sticky bottom-0 mt-6 flex justify-end gap-2 border-t border-white/10 bg-[#0d1118] pt-3">
               <Button variant="secondary" onClick={onClose} disabled={pending}>
                 Cancel
               </Button>
