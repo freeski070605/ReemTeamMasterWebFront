@@ -93,6 +93,11 @@ const Invite: React.FC = () => {
             ? `Hosted by ${inviteTable.hostName}. Review the room details below and join when you're ready.`
             : "You're one tap away from a live Reem Team table."}
         </p>
+        {inviteTable?.isPrivate && (
+          <p className="max-w-2xl text-sm text-amber-200/85">
+            Private tables are VIP-only. You need an active VIP membership on your account before you can enter this room.
+          </p>
+        )}
       </div>
 
       {inviteTable && stakeDisplay && (
@@ -129,6 +134,9 @@ const Invite: React.FC = () => {
             <div className="text-xs uppercase tracking-[0.18em] text-white/50">What To Expect</div>
             <div className="mt-3 space-y-3 text-sm text-white/72">
               <div>{inviteTable.isPrivate ? 'Invite-only VIP table' : 'Table invite link is ready'}</div>
+              {inviteTable.isPrivate && (
+                <div>Access requirement: active VIP membership</div>
+              )}
               <div>{inviteTable.mode === 'PRIVATE_USD_TABLE' ? 'Players need enough USD balance to sit.' : 'Players need enough RTC balance to sit.'}</div>
               <div>{inviteTable.isPrivate ? 'Private tables are human-only and do not auto-fill with AI.' : 'This link takes you straight to the room.'}</div>
               {inviteTable.hostNote && (
