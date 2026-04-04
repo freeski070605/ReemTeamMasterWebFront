@@ -33,6 +33,7 @@ type InlineFeedbackTone = "error" | "info";
 type EndRoundPhase = "global" | "winner" | "settlement";
 type SeatZone = "top" | "left" | "right" | "bottom";
 type OpponentSeatZone = Exclude<SeatZone, "bottom">;
+type SeatResultTone = "winner" | "loss";
 type SeatHudLayout = {
   positionClass: string;
   align: "left" | "right";
@@ -44,12 +45,28 @@ type SpreadZoneLayout = {
   positionClass: string;
   laneClass: string;
 };
-type SeatContextLayout = {
-  positionClass: string;
-  winnerWidthClass: string;
-  chipWidthClass: string;
+type TableRect = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+};
+type WinnerPanelLayout = {
+  width: number;
+  minHeight: number;
   alignClass: string;
   cardsJustifyClass: string;
+};
+type WinnerPanelPosition = {
+  left: number;
+  top: number;
+};
+type WinnerPanelMeasurement = {
+  enabled: boolean;
+  winnerZones: SeatZone[];
+  layoutByZone: Record<SeatZone, WinnerPanelLayout>;
 };
 
 const CARD_RANK_ORDER: Array<CardType["rank"]> = [
@@ -99,6 +116,42 @@ const getViewportSize = () => ({
 
 const DEFAULT_ROUND_READY_DURATION_MS = 30000;
 const PROMO_ROUND_READY_DURATION_MS = 20000;
+const CARD_LAYER_Z_INDEX = 2;
+const PANEL_LAYER_Z_INDEX = 3;
+const PANEL_MARGIN_FROM_CARDS = 20;
+const WINNER_PANEL_COLLISION_SHIFT_PX = 34;
+const WINNER_PANEL_EDGE_PADDING_PX = 16;
+
+const isOverlapping = (a: TableRect, b: TableRect) =>
+  a.left < b.right &&
+  a.right > b.left &&
+  a.top < b.bottom &&
+  a.bottom > b.top;
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const createRect = (left: number, top: number, width: number, height: number): TableRect => ({
+  left,
+  top,
+  right: left + width,
+  bottom: top + height,
+  width,
+  height,
+});
+
+const areWinnerPanelPositionsEqual = (
+  a: Partial<Record<SeatZone, WinnerPanelPosition>>,
+  b: Partial<Record<SeatZone, WinnerPanelPosition>>
+) => {
+  const allZones: SeatZone[] = ["top", "left", "right", "bottom"];
+  return allZones.every((zone) => {
+    const current = a[zone];
+    const next = b[zone];
+    if (!current && !next) return true;
+    if (!current || !next) return false;
+    return current.left === next.left && current.top === next.top;
+  });
+};
 
 const readSafeAreaInset = (token: "--safe-area-top" | "--safe-area-right" | "--safe-area-bottom" | "--safe-area-left") => {
   const rawValue = getComputedStyle(document.documentElement).getPropertyValue(token);
@@ -162,8 +215,11 @@ const GameTable: React.FC = () => {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
+  const [winnerPanelPositions, setWinnerPanelPositions] = useState<Partial<Record<SeatZone, WinnerPanelPosition>>>({});
   const tableRef = useRef<HTMLDivElement | null>(null);
   const seatAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const seatPanelRefs = useRef<Partial<Record<SeatZone, HTMLDivElement | null>>>({});
+  const winnerPanelMeasurementRef = useRef<WinnerPanelMeasurement | null>(null);
   const lastAnimatedRoundKeyRef = useRef<string | null>(null);
   const hasInitializedLastActionRef = useRef(false);
   const lastObservedActionTimestampRef = useRef<number | null>(null);
@@ -298,6 +354,132 @@ const GameTable: React.FC = () => {
   const setSeatAnchorRef = useCallback((userId: string, node: HTMLDivElement | null) => {
     seatAnchorRefs.current[userId] = node;
   }, []);
+
+  const setSeatPanelRef = useCallback((zone: SeatZone, node: HTMLDivElement | null) => {
+    seatPanelRefs.current[zone] = node;
+  }, []);
+
+  // This effect intentionally measures against the latest DOM layout after each render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const measurement = winnerPanelMeasurementRef.current;
+    if (!measurement?.enabled) {
+      setWinnerPanelPositions((current) => (Object.keys(current).length > 0 ? {} : current));
+      return;
+    }
+
+    const tableNode = tableRef.current;
+    if (!tableNode) return;
+
+    const measure = () => {
+      const nextPositions: Partial<Record<SeatZone, WinnerPanelPosition>> = {};
+      const tableBounds = tableNode.getBoundingClientRect();
+      const toRelativeRect = (node: HTMLDivElement | null): TableRect | null => {
+        if (!node) return null;
+        const rect = node.getBoundingClientRect();
+        return createRect(
+          rect.left - tableBounds.left,
+          rect.top - tableBounds.top,
+          rect.width,
+          rect.height
+        );
+      };
+
+      measurement.winnerZones.forEach((zone) => {
+        const panelRect = toRelativeRect(seatPanelRefs.current[zone] ?? null);
+        const layout = measurement.layoutByZone[zone];
+        const maxLeft = Math.max(
+          WINNER_PANEL_EDGE_PADDING_PX,
+          tableBounds.width - layout.width - WINNER_PANEL_EDGE_PADDING_PX
+        );
+        const maxTop = Math.max(
+          WINNER_PANEL_EDGE_PADDING_PX,
+          tableBounds.height - layout.minHeight - WINNER_PANEL_EDGE_PADDING_PX
+        );
+        let left = WINNER_PANEL_EDGE_PADDING_PX;
+        let top = WINNER_PANEL_EDGE_PADDING_PX;
+
+        if (zone === "bottom") {
+          const anchorX = tableBounds.width / 2;
+          const anchorY = tableBounds.height;
+          left = anchorX + 220;
+          top = anchorY - layout.minHeight - 120;
+        } else if (panelRect) {
+          if (zone === "top") {
+            left = panelRect.left + panelRect.width / 2 - layout.width / 2;
+            top = panelRect.top - layout.minHeight - PANEL_MARGIN_FROM_CARDS;
+          }
+
+          if (zone === "right") {
+            left = panelRect.right + PANEL_MARGIN_FROM_CARDS;
+            top = panelRect.top + 6;
+          }
+
+          if (zone === "left") {
+            left = panelRect.left - layout.width - PANEL_MARGIN_FROM_CARDS;
+            top = panelRect.top + 4;
+          }
+
+          let candidateRect = createRect(left, top, layout.width, layout.minHeight);
+          if (isOverlapping(candidateRect, panelRect)) {
+            if (zone === "top") {
+              left += 18;
+              top -= WINNER_PANEL_COLLISION_SHIFT_PX;
+            }
+
+            if (zone === "right") {
+              left += WINNER_PANEL_COLLISION_SHIFT_PX;
+              top += 16;
+            }
+
+            if (zone === "left") {
+              left -= WINNER_PANEL_COLLISION_SHIFT_PX;
+            }
+
+            candidateRect = createRect(left, top, layout.width, layout.minHeight);
+            if (isOverlapping(candidateRect, panelRect)) {
+              if (zone === "top") {
+                top = panelRect.top - layout.minHeight - PANEL_MARGIN_FROM_CARDS - WINNER_PANEL_COLLISION_SHIFT_PX;
+              }
+
+              if (zone === "right") {
+                left = panelRect.right + PANEL_MARGIN_FROM_CARDS + WINNER_PANEL_COLLISION_SHIFT_PX;
+              }
+
+              if (zone === "left") {
+                left = panelRect.left - layout.width - PANEL_MARGIN_FROM_CARDS - WINNER_PANEL_COLLISION_SHIFT_PX;
+              }
+            }
+          }
+        }
+
+        nextPositions[zone] = {
+          left: clamp(left, WINNER_PANEL_EDGE_PADDING_PX, maxLeft),
+          top: clamp(top, WINNER_PANEL_EDGE_PADDING_PX, maxTop),
+        };
+      });
+
+      setWinnerPanelPositions((current) =>
+        areWinnerPanelPositionsEqual(current, nextPositions) ? current : nextPositions
+      );
+    };
+
+    const frameId = window.requestAnimationFrame(measure);
+    const handleResize = () => {
+      window.requestAnimationFrame(measure);
+    };
+
+    window.addEventListener("resize", handleResize);
+    window.visualViewport?.addEventListener("resize", handleResize);
+    window.visualViewport?.addEventListener("scroll", handleResize);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", handleResize);
+      window.visualViewport?.removeEventListener("resize", handleResize);
+      window.visualViewport?.removeEventListener("scroll", handleResize);
+    };
+  });
 
   useEffect(() => {
     if (tableId && user) {
@@ -1229,6 +1411,8 @@ const GameTable: React.FC = () => {
       userId: player.userId,
       username: player.username,
       rank: placement?.rank ?? null,
+      resultTone: (isWinner ? "winner" : "loss") as SeatResultTone,
+      resultStateLabel: isWinner ? "WINNER" : "LOSS",
       resultLabel,
       statusLabel,
       scoreLabel:
@@ -1237,6 +1421,10 @@ const GameTable: React.FC = () => {
           : isWinner && resolvedHandScore === 0
             ? "EMPTY"
           : `${resolvedHandScore} in hand`,
+      infoScoreLabel:
+        resolvedHandScore === null
+          ? "Score unavailable"
+          : `${resolvedHandScore}`,
       detailLabel: isWinner
         ? roundOutcome.explanation
         : placement?.rank
@@ -1282,7 +1470,6 @@ const GameTable: React.FC = () => {
   const isRoundEndWinnerPhase = isRoundEnd && endRoundPhase === "winner";
   const isRoundEndSettlementPhase = isRoundEnd && endRoundPhase === "settlement";
   const showWinnerSpotlight = isRoundEndWinnerPhase || isRoundEndSettlementPhase;
-  const showLoserSettlementChips = isRoundEndSettlementPhase;
   const showCompactCountdownStrip = isRoundEndSettlementPhase && isContinuousMode;
   const roundOutcomeSummary = roundOutcome.explanation || roundOutcome.secondary;
   const roundCountdownStatusLine = [countdownLabel, roundRailStatusLabel].filter(Boolean).join(" | ");
@@ -1479,40 +1666,28 @@ const GameTable: React.FC = () => {
       laneClass: isPhoneLandscapeLayout ? "min-h-[72px] gap-2.5" : "min-h-[90px] gap-3.5",
     },
   };
-  const seatContextLayouts: Record<SeatZone, SeatContextLayout> = {
+  const winnerPanelLayouts: Record<SeatZone, WinnerPanelLayout> = {
     top: {
-      positionClass: isPhoneLandscapeLayout
-        ? "left-[29%] top-[18.5%]"
-        : "left-[28%] top-[17.75%]",
-      winnerWidthClass: isPhoneLandscapeLayout ? "w-[216px]" : "w-[288px]",
-      chipWidthClass: isPhoneLandscapeLayout ? "w-[128px]" : "w-[150px]",
+      width: isPhoneLandscapeLayout ? 184 : 244,
+      minHeight: isPhoneLandscapeLayout ? 108 : 136,
       alignClass: "items-start text-left",
       cardsJustifyClass: "justify-start",
     },
     left: {
-      positionClass: isPhoneLandscapeLayout
-        ? "left-[0.4%] top-[27.5%]"
-        : "left-[0.5%] top-[26.25%]",
-      winnerWidthClass: isPhoneLandscapeLayout ? "w-[188px]" : "w-[222px]",
-      chipWidthClass: isPhoneLandscapeLayout ? "w-[118px]" : "w-[136px]",
+      width: isPhoneLandscapeLayout ? 172 : 208,
+      minHeight: isPhoneLandscapeLayout ? 104 : 128,
       alignClass: "items-start text-left",
       cardsJustifyClass: "justify-start",
     },
     right: {
-      positionClass: isPhoneLandscapeLayout
-        ? "right-[0.5%] top-[45%]"
-        : "right-[0.85%] top-[43.5%]",
-      winnerWidthClass: isPhoneLandscapeLayout ? "w-[188px]" : "w-[222px]",
-      chipWidthClass: isPhoneLandscapeLayout ? "w-[118px]" : "w-[136px]",
+      width: isPhoneLandscapeLayout ? 172 : 208,
+      minHeight: isPhoneLandscapeLayout ? 104 : 128,
       alignClass: "items-end text-right",
       cardsJustifyClass: "justify-end",
     },
     bottom: {
-      positionClass: isPhoneLandscapeLayout
-        ? "left-[1.75%] bottom-[30.25%]"
-        : "left-[2.2%] bottom-[29.75%]",
-      winnerWidthClass: isPhoneLandscapeLayout ? "w-[198px]" : "w-[230px]",
-      chipWidthClass: isPhoneLandscapeLayout ? "w-[126px]" : "w-[142px]",
+      width: isPhoneLandscapeLayout ? 180 : 220,
+      minHeight: isPhoneLandscapeLayout ? 108 : 132,
       alignClass: "items-start text-left",
       cardsJustifyClass: "justify-start",
     },
@@ -1639,8 +1814,47 @@ const GameTable: React.FC = () => {
     );
   };
 
+  const renderSeatResultState = (
+    seatResult: (typeof roundResultRows)[number],
+    align: "left" | "right"
+  ) => {
+    const isWinner = seatResult.resultTone === "winner";
+    const glowClass = isWinner
+      ? "border-emerald-200/42 bg-[linear-gradient(135deg,rgba(16,84,60,0.48),rgba(10,19,16,0.66))] shadow-[0_0_22px_rgba(74,222,128,0.22)]"
+      : "border-rose-200/36 bg-[linear-gradient(135deg,rgba(96,27,43,0.46),rgba(18,10,14,0.68))] shadow-[0_0_20px_rgba(251,113,133,0.18)]";
+    const badgeClass = isWinner
+      ? "border-emerald-200/40 bg-emerald-300/12 text-emerald-100"
+      : "border-rose-200/36 bg-rose-300/12 text-rose-100";
+    const deltaClass = isWinner ? "text-emerald-200" : "text-rose-200";
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        className={`mt-2 rounded-[14px] border px-2.5 py-2 backdrop-blur-[6px] ${glowClass}`}
+      >
+        <div className={`flex flex-wrap items-center gap-1.5 ${align === "right" ? "justify-end" : "justify-start"}`}>
+          <div className={`inline-flex rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.22em] ${badgeClass}`}>
+            {seatResult.resultStateLabel}
+          </div>
+          <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} font-semibold ${deltaClass}`}>
+            {seatResult.deltaLabel}
+          </div>
+        </div>
+        <div className={`mt-1.5 ${align === "right" ? "text-right" : "text-left"}`}>
+          <div className="text-[8px] uppercase tracking-[0.2em] text-white/54">Hand Score</div>
+          <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} mt-0.5 font-semibold text-white`}>
+            {seatResult.infoScoreLabel}
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
   const renderSeatInfo = (
     player: typeof gameState.players[number] | null,
+    zone: SeatZone,
     layout: SeatHudLayout
   ) => {
     if (!player) return null;
@@ -1656,7 +1870,7 @@ const GameTable: React.FC = () => {
       ? shouldHeroWinnerSeat
         ? "border-emerald-200/55 bg-[linear-gradient(145deg,rgba(14,54,41,0.88),rgba(8,15,16,0.78))] shadow-[0_22px_40px_rgba(16,185,129,0.24)]"
         : shouldDimSeatLoser || shouldDimForWinnerFocus
-          ? "border-white/8 bg-black/14 opacity-60"
+          ? "border-white/10 bg-black/18 opacity-78"
           : "border-white/10 bg-black/18"
       : isActive
         ? "border-amber-300/42 bg-black/24 shadow-[0_18px_34px_rgba(251,191,36,0.16)]"
@@ -1664,7 +1878,8 @@ const GameTable: React.FC = () => {
 
     return (
       <motion.div
-        className={`absolute z-30 pointer-events-none ${layout.positionClass}`}
+        className={`absolute pointer-events-none ${layout.positionClass}`}
+        style={{ zIndex: PANEL_LAYER_Z_INDEX }}
         initial={false}
         animate={
           shouldHeroWinnerSeat
@@ -1695,6 +1910,7 @@ const GameTable: React.FC = () => {
             <div className="absolute -inset-2 rounded-[26px] bg-emerald-300/12 blur-2xl" aria-hidden />
           ) : null}
           <div
+            ref={(node) => setSeatPanelRef(zone, node)}
             className={`relative rounded-[18px] border transition-all duration-300 ${
               isPhoneLandscapeLayout ? "px-2.5 py-2" : "px-3 py-2.5"
             } ${layout.panelClass} ${seatShellClass}`}
@@ -1764,7 +1980,7 @@ const GameTable: React.FC = () => {
                       ? `Drop Locked ${player.hitLockCounter}`
                       : `${getVisibleCardCount(player.userId, player.hand.length)} cards`}
                   </div>
-                ) : null}
+                ) : roundSeatResult ? renderSeatResultState(roundSeatResult, layout.align) : null}
               </div>
               <div className={`${layout.align === "right" ? "order-first" : ""}`}>
                 {renderOpponentHand(player, layout.handSize)}
@@ -1805,7 +2021,7 @@ const GameTable: React.FC = () => {
     ? shouldHeroBottomWinner
       ? "border-emerald-200/55 bg-[linear-gradient(145deg,rgba(14,54,41,0.88),rgba(8,15,16,0.78))] shadow-[0_22px_42px_rgba(16,185,129,0.24)]"
       : shouldDimBottomLoser || shouldDimBottomForWinnerFocus
-        ? "border-white/8 bg-black/10 opacity-60"
+        ? "border-white/10 bg-black/10 opacity-78"
         : "border-white/10 bg-black/10 opacity-78"
     : isBottomSeatActive
       ? "border-amber-300/42 bg-black/10 shadow-[0_0_20px_rgba(251,191,36,0.14)]"
@@ -1868,6 +2084,19 @@ const GameTable: React.FC = () => {
     return null;
   };
   const winningSeat = getSeatForPlayer(winnerPlayer?.userId);
+  const seatPlayerByZone: Record<SeatZone, typeof gameState.players[number] | null> = {
+    top: topPlayer,
+    left: leftPlayer,
+    right: rightPlayer,
+    bottom: displayedBottomPlayer ?? null,
+  };
+  winnerPanelMeasurementRef.current = {
+    enabled: isRoundEnd && showWinnerSpotlight,
+    winnerZones: (Object.entries(seatPlayerByZone) as Array<[SeatZone, typeof gameState.players[number] | null]>)
+      .filter(([, player]) => !!player && !!roundResultByUserId.get(player.userId)?.isWinner)
+      .map(([zone]) => zone),
+    layoutByZone: winnerPanelLayouts,
+  };
 
   const renderSpreadZone = (
     player: typeof gameState.players[number] | null,
@@ -1890,7 +2119,10 @@ const GameTable: React.FC = () => {
             ? "grid grid-cols-2"
             : "grid grid-cols-2";
     return (
-      <div className={`absolute z-20 pointer-events-none ${layout.positionClass}`}>
+      <div
+        className={`absolute pointer-events-none ${layout.positionClass}`}
+        style={{ zIndex: CARD_LAYER_Z_INDEX }}
+      >
           <div
             className={`${spreadLayoutClass} items-start justify-center ${layout.laneClass}`}
           >
@@ -1974,125 +2206,90 @@ const GameTable: React.FC = () => {
 
   const renderSeatContext = (
     player: typeof gameState.players[number] | null,
-    zone: SeatZone,
-    layout: SeatContextLayout
+    zone: SeatZone
   ) => {
     if (!isRoundEnd || !player || isRoundEndGlobalPhase) return null;
     const roundSeatResult = roundResultByUserId.get(player.userId);
-    const isSeatWinner = player.userId === winnerPlayer?.userId;
-    const showWinnerSummary = isSeatWinner && showWinnerSpotlight && !!roundSeatResult;
-    const showLoserChip = !isSeatWinner && showLoserSettlementChips && !!roundSeatResult;
-    const showReveal = isSeatWinner && showWinnerSummary && revealedWinnerGroups.length > 0 && winningSeat === zone;
-    if (!showWinnerSummary && !showLoserChip) return null;
+    const showWinnerSummary = showWinnerSpotlight && !!roundSeatResult?.isWinner;
+    const showReveal =
+      player.userId === winnerPlayer?.userId &&
+      showWinnerSummary &&
+      revealedWinnerGroups.length > 0 &&
+      winningSeat === zone;
+    const panelPosition = winnerPanelPositions[zone];
+    if (!showWinnerSummary || !panelPosition || !roundSeatResult) return null;
 
-    const contextShellClass = isSeatWinner
-      ? "border-emerald-200/40 bg-[linear-gradient(145deg,rgba(14,54,41,0.9),rgba(8,15,16,0.8))] shadow-[0_22px_42px_rgba(16,185,129,0.22)]"
-      : roundSeatResult && !roundSeatResult.isWinner
-        ? "border-rose-200/26 bg-[linear-gradient(145deg,rgba(63,19,31,0.82),rgba(14,10,14,0.74))] shadow-[0_18px_38px_rgba(244,63,94,0.12)]"
-        : "border-white/12 bg-[linear-gradient(145deg,rgba(16,22,30,0.8),rgba(9,12,17,0.72))] shadow-[0_18px_38px_rgba(0,0,0,0.22)]";
-    const compactChipClass =
-      "border-white/12 bg-[linear-gradient(145deg,rgba(22,26,34,0.84),rgba(9,12,17,0.76))] shadow-[0_14px_28px_rgba(0,0,0,0.18)]";
-    const compactDeltaClass = roundSeatResult?.isWinner ? "text-emerald-200" : "text-rose-200";
-    const justifyClass = layout.alignClass.includes("center")
-      ? "justify-center"
-      : layout.alignClass.includes("right")
-        ? "justify-end"
-        : "justify-start";
+    const layout = winnerPanelLayouts[zone];
+    const justifyClass = layout.alignClass.includes("right") ? "justify-end" : "justify-start";
 
     return (
-      <div className={`pointer-events-none absolute z-20 ${layout.positionClass}`}>
-        <div className={`flex flex-col gap-2 ${layout.alignClass}`}>
-          {showWinnerSummary && roundSeatResult ? (
-            <motion.div
-              initial={{ opacity: 0, y: zone === "bottom" ? 18 : -14, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 250, damping: 24 }}
-              className={`rounded-[20px] border px-3 py-2.5 text-white backdrop-blur-[10px] ${layout.winnerWidthClass} ${contextShellClass}`}
-            >
-              <div className={`flex flex-wrap items-center gap-2 ${justifyClass}`}>
-                <div className="inline-flex rounded-full border border-white/14 bg-white/8 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.24em] text-white/80">
-                  Winner
-                </div>
-                <div className="inline-flex rounded-full border border-emerald-200/38 bg-emerald-300/14 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.24em] text-emerald-100">
-                  {roundSeatResult.statusLabel}
-                </div>
-              </div>
-              <div className={`mt-1.5 flex flex-col gap-1 ${layout.alignClass}`}>
-                <div className="text-[8px] uppercase tracking-[0.22em] text-white/52">Winning Hand</div>
-                <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[12px]"} font-semibold text-white`}>
-                  {roundSeatResult.scoreLabel}
-                </div>
-                <div className={`${isPhoneLandscapeLayout ? "text-[11px]" : "text-[13px]"} font-semibold text-emerald-200`}>
-                  {roundSeatResult.deltaLabel}
-                </div>
-              </div>
-              {showReveal ? (
-                <div className="mt-2 flex flex-col gap-1.5">
-                  {revealedWinnerGroups.map((spread, spreadIndex) => (
+      <motion.div
+        className="pointer-events-none absolute"
+        style={{
+          left: `${panelPosition.left}px`,
+          top: `${panelPosition.top}px`,
+          width: `${layout.width}px`,
+          zIndex: PANEL_LAYER_Z_INDEX,
+        }}
+        initial={{ opacity: 0, y: zone === "bottom" ? 10 : -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+      >
+        <div
+          className="rounded-[18px] border border-emerald-200/36 bg-[linear-gradient(145deg,rgba(15,61,44,0.88),rgba(8,15,16,0.78))] px-2.5 py-2 text-white shadow-[0_18px_34px_rgba(16,185,129,0.18)] backdrop-blur-[10px]"
+          style={{ minHeight: `${layout.minHeight}px` }}
+        >
+          <div className={`flex flex-wrap items-center gap-1.5 ${justifyClass}`}>
+            <div className="inline-flex rounded-full border border-white/14 bg-white/8 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.24em] text-white/80">
+              Winning Hand
+            </div>
+            <div className="inline-flex rounded-full border border-emerald-200/34 bg-emerald-300/12 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.2em] text-emerald-100">
+              {roundSeatResult.statusLabel}
+            </div>
+          </div>
+          <div className={`mt-1.5 flex flex-col gap-1 ${layout.alignClass}`}>
+            <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} text-white/76`}>
+              Score: <span className="font-semibold text-white">{roundSeatResult.infoScoreLabel}</span>
+            </div>
+            <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} font-semibold text-emerald-200`}>
+              {roundSeatResult.deltaLabel}
+            </div>
+          </div>
+          {showReveal ? (
+            <div className="mt-2 flex flex-col gap-1.5">
+              {revealedWinnerGroups.map((spread, spreadIndex) => (
+                <motion.div
+                  key={`reveal-lane-${spreadIndex}`}
+                  className={`flex items-end ${layout.cardsJustifyClass}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, ease: "easeOut", delay: spreadIndex * 0.05 }}
+                >
+                  {spread.map((card, cardIndex) => (
                     <motion.div
-                      key={`reveal-lane-${spreadIndex}`}
-                      className={`flex items-end ${layout.cardsJustifyClass}`}
-                      initial={{ opacity: 0, y: 18, scale: 0.95 }}
+                      key={`${card.rank}-${card.suit}-${cardIndex}`}
+                      className="origin-bottom"
+                      style={{
+                        marginLeft: cardIndex === 0 ? 0 : `-${isPhoneLandscapeLayout ? 12 : 16}px`,
+                        zIndex: cardIndex + 1,
+                      }}
+                      initial={{ opacity: 0, y: 10, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ type: "spring", stiffness: 260, damping: 24, delay: spreadIndex * 0.08 }}
+                      transition={{ duration: 0.28, ease: "easeOut", delay: 0.02 * cardIndex }}
                     >
-                      {spread.map((card, cardIndex) => (
-                        <motion.div
-                          key={`${card.rank}-${card.suit}-${cardIndex}`}
-                          className="origin-bottom"
-                          style={{
-                            marginLeft: cardIndex === 0 ? 0 : `-${isPhoneLandscapeLayout ? 14 : 18}px`,
-                            zIndex: cardIndex + 1,
-                          }}
-                          initial={{
-                            opacity: 0,
-                            y: 14,
-                            x: (cardIndex - (spread.length - 1) / 2) * 6,
-                            rotate: (cardIndex - (spread.length - 1) / 2) * 3.5,
-                            scale: 0.92,
-                          }}
-                          animate={{
-                            opacity: 1,
-                            y: 0,
-                            x: (cardIndex - (spread.length - 1) / 2) * 1.5,
-                            rotate: (cardIndex - (spread.length - 1) / 2) * 2.8,
-                            scale: 1,
-                          }}
-                          transition={{ type: "spring", stiffness: 300, damping: 24, delay: 0.03 * cardIndex }}
-                        >
-                          <CardComponent
-                            suit={card.suit}
-                            rank={card.rank}
-                            className={isPhoneLandscapeLayout ? "h-[2.75rem] w-[1.95rem]" : "h-[3.95rem] w-[2.75rem]"}
-                          />
-                        </motion.div>
-                      ))}
+                      <CardComponent
+                        suit={card.suit}
+                        rank={card.rank}
+                        className={isPhoneLandscapeLayout ? "h-[2.4rem] w-[1.7rem]" : "h-[3.4rem] w-[2.38rem]"}
+                      />
                     </motion.div>
                   ))}
-                </div>
-              ) : null}
-            </motion.div>
-          ) : null}
-          {showLoserChip && roundSeatResult ? (
-            <motion.div
-              initial={{ opacity: 0, y: zone === "bottom" ? 14 : -10, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 270, damping: 24 }}
-              className={`rounded-[16px] border px-2.5 py-2 text-white backdrop-blur-[6px] ${layout.chipWidthClass} ${compactChipClass}`}
-            >
-              <div className="text-[8px] font-semibold uppercase tracking-[0.24em] text-white/62">
-                {roundSeatResult.statusLabel}
-              </div>
-              <div className={`mt-1 ${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} text-white/78`}>
-                {roundSeatResult.scoreLabel}
-              </div>
-              <div className={`mt-1 ${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} font-semibold ${compactDeltaClass}`}>
-                {roundSeatResult.deltaLabel}
-              </div>
-            </motion.div>
+                </motion.div>
+              ))}
+            </div>
           ) : null}
         </div>
-      </div>
+      </motion.div>
     );
   };
 
@@ -2316,13 +2513,14 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pointer-events-none absolute inset-0 z-40">
-                {renderSeatInfo(topPlayer, playerHudLayouts.top)}
-                {renderSeatInfo(leftPlayer, playerHudLayouts.left)}
-                {renderSeatInfo(rightPlayer, playerHudLayouts.right)}
+              <div className="pointer-events-none absolute inset-0" style={{ zIndex: PANEL_LAYER_Z_INDEX }}>
+                {renderSeatInfo(topPlayer, "top", playerHudLayouts.top)}
+                {renderSeatInfo(leftPlayer, "left", playerHudLayouts.left)}
+                {renderSeatInfo(rightPlayer, "right", playerHudLayouts.right)}
                 <div className={`absolute flex items-end ${bottomSeatHudAnchorClass} ${shouldDimBottomForWinnerFocus ? "opacity-50 saturate-75" : ""}`}>
                   <div className={`${bottomSeatSideColumnClass} flex-shrink-0`}>
                     <div
+                      ref={(node) => setSeatPanelRef("bottom", node)}
                       className={`${
                         isBottomSeatActive ? "active-seat" : "inactive-seat"
                       } relative w-full rounded-[22px] border transition-all duration-300 ${
@@ -2398,7 +2596,7 @@ const GameTable: React.FC = () => {
                             >
                               {visibleHand.length} cards
                             </div>
-                          ) : null}
+                          ) : bottomSeatRoundResult ? renderSeatResultState(bottomSeatRoundResult, "left") : null}
                         </div>
                       </div>
                     </div>
@@ -2453,11 +2651,11 @@ const GameTable: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pointer-events-none absolute inset-0 z-30">
-                {renderSeatContext(topPlayer, "top", seatContextLayouts.top)}
-                {renderSeatContext(leftPlayer, "left", seatContextLayouts.left)}
-                {renderSeatContext(rightPlayer, "right", seatContextLayouts.right)}
-                {renderSeatContext(displayedBottomPlayer ?? null, "bottom", seatContextLayouts.bottom)}
+              <div className="pointer-events-none absolute inset-0" style={{ zIndex: PANEL_LAYER_Z_INDEX }}>
+                {renderSeatContext(topPlayer, "top")}
+                {renderSeatContext(leftPlayer, "left")}
+                {renderSeatContext(rightPlayer, "right")}
+                {renderSeatContext(displayedBottomPlayer ?? null, "bottom")}
                 <RtcParticleOverlay
                   gameState={gameState}
                   winnerPlayerId={winnerPlayer?.userId}
@@ -2469,7 +2667,7 @@ const GameTable: React.FC = () => {
                 />
               </div>
 
-              <div className="absolute inset-0 z-20">
+              <div className="absolute inset-0" style={{ zIndex: CARD_LAYER_Z_INDEX }}>
                 {renderSpreadZone(topPlayer, "top", spreadZoneLayouts.top)}
                 {renderSpreadZone(leftPlayer, "left", spreadZoneLayouts.left)}
                 {renderSpreadZone(rightPlayer, "right", spreadZoneLayouts.right)}
@@ -2620,7 +2818,7 @@ const GameTable: React.FC = () => {
               </div>
 
               {showBottomHand ? (
-                <div className="absolute z-20 -translate-x-1/2" style={bottomHandAnchor}>
+                <div className="absolute -translate-x-1/2" style={{ ...bottomHandAnchor, zIndex: CARD_LAYER_Z_INDEX }}>
                   <div className="flex w-full flex-col items-center">
                     <div
                       className={`hand relative w-full pointer-events-auto ${feedbackPulseArea === "hand" ? "rt-table-shake" : ""} ${
