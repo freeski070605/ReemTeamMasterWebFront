@@ -2473,7 +2473,7 @@ const GameTable: React.FC = () => {
                 {renderSpreadZone(topPlayer, "top", spreadZoneLayouts.top)}
                 {renderSpreadZone(leftPlayer, "left", spreadZoneLayouts.left)}
                 {renderSpreadZone(rightPlayer, "right", spreadZoneLayouts.right)}
-                {renderSpreadZone(currentPlayer ?? null, "bottom", spreadZoneLayouts.bottom)}
+                {renderSpreadZone(displayedBottomPlayer ?? null, "bottom", spreadZoneLayouts.bottom)}
 
               {showDealAnimation && (
                 <div className="absolute inset-0 z-40 pointer-events-none">
