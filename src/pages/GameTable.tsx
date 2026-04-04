@@ -399,11 +399,12 @@ const GameTable: React.FC = () => {
         let left = WINNER_PANEL_EDGE_PADDING_PX;
         let top = WINNER_PANEL_EDGE_PADDING_PX;
 
-        if (zone === "bottom") {
-          const anchorX = tableBounds.width / 2;
-          const anchorY = tableBounds.height;
-          left = anchorX + 220;
-          top = anchorY - layout.minHeight - 120;
+        if (zone === "bottom" && panelRect) {
+          left = panelRect.right + PANEL_MARGIN_FROM_CARDS;
+          top = panelRect.top + Math.max(0, (panelRect.height - layout.minHeight) / 2);
+        } else if (zone === "bottom") {
+          left = WINNER_PANEL_EDGE_PADDING_PX + 220;
+          top = tableBounds.height - layout.minHeight - 120;
         } else if (panelRect) {
           if (zone === "top") {
             left = panelRect.left + panelRect.width / 2 - layout.width / 2;
