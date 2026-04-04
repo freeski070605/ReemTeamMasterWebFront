@@ -33,7 +33,7 @@ const App: React.FC = () => {
   const { checkAuth } = useAuthStore();
 
   useEffect(() => {
-    checkAuth();
+    void checkAuth();
   }, [checkAuth]);
 
   return (

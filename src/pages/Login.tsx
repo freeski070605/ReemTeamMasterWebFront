@@ -1,22 +1,29 @@
-import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { getPostAuthRedirectPath } from '../utils/authRedirect';
+import { consumeSessionExpiredNotice } from '../utils/authSession';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberDevice, setRememberDevice] = useState(true);
   const { login, isLoading } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const logoSrc = '/assets/logo.png';
+  const sessionExpired = useMemo(
+    () => consumeSessionExpiredNotice() || searchParams.get('reauth') === '1',
+    [searchParams]
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login(email, password);
+      await login(email, password, rememberDevice);
       const nextPath = getPostAuthRedirectPath(location.state as any);
       navigate(nextPath, { replace: true });
     } catch {
@@ -37,6 +44,11 @@ const Login: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {sessionExpired && (
+              <div className="rounded-2xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                Your session timed out. Sign in again and we&apos;ll get you back to your game.
+              </div>
+            )}
             <Input
               label="Email Address"
               type="email"
@@ -58,6 +70,18 @@ const Login: React.FC = () => {
                 Forgot password?
               </Link>
             </div>
+            <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/75">
+              <input
+                type="checkbox"
+                checked={rememberDevice}
+                onChange={(e) => setRememberDevice(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-white/20 bg-black/30 text-amber-300 focus:ring-amber-300"
+              />
+              <span>
+                Keep me signed in on this device
+                <span className="block text-xs text-white/50">Recommended for personal or trusted devices.</span>
+              </span>
+            </label>
             <Button type="submit" className="w-full" isLoading={isLoading}>
               Sign In
             </Button>

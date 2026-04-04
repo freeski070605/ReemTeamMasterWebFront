@@ -1,3 +1,5 @@
+import { consumePostAuthRedirect } from './authSession';
+
 type LocationLike = {
   pathname?: string;
   search?: string;
@@ -23,6 +25,11 @@ export const buildInviteJoinPath = (tableId?: string | null, inviteCode?: string
 export const getPostAuthRedirectPath = (state?: AuthRedirectState | null) => {
   if (typeof state?.postAuthRedirect === 'string' && state.postAuthRedirect.length > 0) {
     return state.postAuthRedirect;
+  }
+
+  const storedRedirect = consumePostAuthRedirect();
+  if (storedRedirect) {
+    return storedRedirect;
   }
 
   if (state?.from?.pathname) {

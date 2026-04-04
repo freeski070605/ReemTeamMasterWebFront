@@ -9,6 +9,7 @@ const Register: React.FC = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberDevice, setRememberDevice] = useState(true);
   const { register, isLoading } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,7 +18,7 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await register(username, email, password);
+      await register(username, email, password, rememberDevice);
       const nextPath = getPostAuthRedirectPath(location.state as any);
       navigate(nextPath, { replace: true });
     } catch {
@@ -77,6 +78,18 @@ const Register: React.FC = () => {
               required
               placeholder="Create a secure password"
             />
+            <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/75">
+              <input
+                type="checkbox"
+                checked={rememberDevice}
+                onChange={(e) => setRememberDevice(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-white/20 bg-black/30 text-amber-300 focus:ring-amber-300"
+              />
+              <span>
+                Keep me signed in on this device
+                <span className="block text-xs text-white/50">Recommended for personal or trusted devices.</span>
+              </span>
+            </label>
             <Button type="submit" className="w-full" isLoading={isLoading}>
               Create Account
             </Button>

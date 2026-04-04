@@ -1,145 +1,99 @@
 import { create } from 'zustand';
 import client from '../api/client';
 import { toast } from 'react-toastify';
-import { UserRole, resolveUserRole } from '../types/roles';
-
-interface User {
-  _id: string;
-  username: string;
-  email: string;
-  avatarUrl?: string;
-  role: UserRole;
-  isAdmin?: boolean;
-  isVip?: boolean;
-  vipStatus?: string;
-  vipExpiresAt?: string | null;
-  vipSince?: string | null;
-}
-
-const normalizeStoredUser = (value: any): User | null => {
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-
-  const role = resolveUserRole(value.role, !!value.isAdmin);
-  return {
-    _id: value._id,
-    username: value.username,
-    email: value.email,
-    avatarUrl: value.avatarUrl,
-    role,
-    isAdmin: role === 'admin' || role === 'superadmin',
-    isVip: !!value.isVip,
-    vipStatus: value.vipStatus,
-    vipExpiresAt: value.vipExpiresAt ?? null,
-    vipSince: value.vipSince ?? null,
-  };
-};
+import {
+  AuthUser,
+  buildUserFromAuthResponse,
+  clearAuthSession,
+  readStoredToken,
+  readStoredUser,
+  storeAuthSession,
+} from '../utils/authSession';
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  authReady: boolean;
+  login: (email: string, password: string, rememberDevice?: boolean) => Promise<void>;
+  register: (username: string, email: string, password: string, rememberDevice?: boolean) => Promise<void>;
   logout: () => void;
-  checkAuth: () => void;
+  checkAuth: () => Promise<void>;
   uploadAvatar: (file: File) => Promise<void>;
   selectDefaultAvatar: (avatarUrl: string) => Promise<void>;
   refreshVipStatus: (sync?: boolean) => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: (() => {
-    const stored = JSON.parse(localStorage.getItem('user') || 'null');
-    return normalizeStoredUser(stored);
-  })(),
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
-  isLoading: false,
+const storedUser = readStoredUser();
+const storedToken = readStoredToken();
 
-  login: async (email, password) => {
+export const useAuthStore = create<AuthState>((set) => ({
+  user: storedUser,
+  token: storedToken,
+  isAuthenticated: !!storedToken && !!storedUser,
+  isLoading: false,
+  authReady: false,
+
+  login: async (email, password, rememberDevice = true) => {
     set({ isLoading: true });
     try {
-      const response = await client.post('/auth/login', { email, password });
-      const { token, userId, username, email: userEmail, avatarUrl, role, isAdmin } = response.data;
-      const { isVip, vipStatus, vipExpiresAt } = response.data;
-      const resolvedRole = resolveUserRole(role, !!isAdmin);
-      
-      const user = {
-        _id: userId,
-        username: username || 'User',
-        email: userEmail || email,
-        avatarUrl,
-        role: resolvedRole,
-        isAdmin: resolvedRole === 'admin' || resolvedRole === 'superadmin',
-        isVip: !!isVip,
-        vipStatus,
-        vipExpiresAt: vipExpiresAt ?? null,
-        vipSince: response.data?.vipSince ?? null,
-      };
-      
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      set({ user, token, isAuthenticated: true, isLoading: false });
+      const response = await client.post('/auth/login', { email, password, rememberDevice });
+      const token = response.data?.token;
+      const user = buildUserFromAuthResponse(response.data, { email });
+
+      storeAuthSession(token, user);
+      set({ user, token, isAuthenticated: true, isLoading: false, authReady: true });
       toast.success('Login successful!');
     } catch (error: any) {
-      set({ isLoading: false });
+      set({ isLoading: false, authReady: true });
       toast.error(error.response?.data?.message || 'Login failed');
       throw error;
     }
   },
 
-  register: async (username, email, password) => {
+  register: async (username, email, password, rememberDevice = true) => {
     set({ isLoading: true });
     try {
-      const response = await client.post('/auth/register', { username, email, password });
-      const { token, userId, avatarUrl, role, isAdmin } = response.data;
-      const { isVip, vipStatus, vipExpiresAt } = response.data;
-      const resolvedRole = resolveUserRole(role, !!isAdmin);
-      
-      const user = {
-        _id: userId,
-        username,
-        email,
-        avatarUrl,
-        role: resolvedRole,
-        isAdmin: resolvedRole === 'admin' || resolvedRole === 'superadmin',
-        isVip: !!isVip,
-        vipStatus,
-        vipExpiresAt: vipExpiresAt ?? null,
-        vipSince: response.data?.vipSince ?? null,
-      };
-      
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      set({ user, token, isAuthenticated: true, isLoading: false });
+      const response = await client.post('/auth/register', { username, email, password, rememberDevice });
+      const token = response.data?.token;
+      const user = buildUserFromAuthResponse(response.data, { username, email });
+
+      storeAuthSession(token, user);
+      set({ user, token, isAuthenticated: true, isLoading: false, authReady: true });
       toast.success('Registration successful!');
     } catch (error: any) {
-      set({ isLoading: false });
+      set({ isLoading: false, authReady: true });
       toast.error(error.response?.data?.message || 'Registration failed');
       throw error;
     }
   },
 
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    set({ user: null, token: null, isAuthenticated: false });
+    clearAuthSession();
+    set({ user: null, token: null, isAuthenticated: false, authReady: true });
+    void client.post('/auth/logout', {}, { skipAuthRefresh: true } as any).catch(() => undefined);
     toast.info('Logged out');
   },
 
-  checkAuth: () => {
-    const token = localStorage.getItem('token');
-    const stored = JSON.parse(localStorage.getItem('user') || 'null');
-    const normalizedUser = normalizeStoredUser(stored);
-    if (token && normalizedUser) {
-        set({ token, user: normalizedUser, isAuthenticated: true });
-    } else {
-        set({ token: null, user: null, isAuthenticated: false });
+  checkAuth: async () => {
+    const token = readStoredToken();
+    const user = readStoredUser();
+
+    if (token && user) {
+      set({ token, user, isAuthenticated: true, authReady: true });
+      return;
+    }
+
+    try {
+      const response = await client.post('/auth/refresh', {}, { skipAuthRefresh: true } as any);
+      const refreshedToken = response.data?.token;
+      const refreshedUser = buildUserFromAuthResponse(response.data);
+      storeAuthSession(refreshedToken, refreshedUser);
+      set({ token: refreshedToken, user: refreshedUser, isAuthenticated: true, authReady: true });
+    } catch {
+      clearAuthSession();
+      set({ token: null, user: null, isAuthenticated: false, authReady: true });
     }
   },
 
@@ -158,7 +112,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
 
         const user = { ...state.user, avatarUrl: response.data.avatarUrl };
-        localStorage.setItem('user', JSON.stringify(user));
+        if (state.token) {
+          storeAuthSession(state.token, user);
+        }
         return { ...state, user };
       });
       toast.success('Avatar updated successfully!');
@@ -176,7 +132,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
 
         const user = { ...state.user, avatarUrl: response.data.avatarUrl };
-        localStorage.setItem('user', JSON.stringify(user));
+        if (state.token) {
+          storeAuthSession(state.token, user);
+        }
         return { ...state, user };
       });
       toast.success('Avatar updated successfully!');
@@ -195,6 +153,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         if (!state.user) {
           return state;
         }
+
         const user = {
           ...state.user,
           vipStatus,
@@ -202,7 +161,11 @@ export const useAuthStore = create<AuthState>((set) => ({
           isVip: !!isVip,
           vipSince: response.data?.vipSince ?? null,
         };
-        localStorage.setItem('user', JSON.stringify(user));
+
+        if (state.token) {
+          storeAuthSession(state.token, user);
+        }
+
         return { ...state, user };
       });
     } catch {
