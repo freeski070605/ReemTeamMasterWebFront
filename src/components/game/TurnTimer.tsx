@@ -61,6 +61,13 @@ const TurnTimer: React.FC<TurnTimerProps> = ({
   const circumference = useMemo(() => 2 * Math.PI * radius, [radius]);
   const progress = clamp(localRemaining / safeDuration, 0, 1);
   const dashOffset = circumference * (1 - progress);
+  const strokeColor = !isActive
+    ? "rgba(255,255,255,0.22)"
+    : progress <= 0.2
+      ? "rgba(251, 113, 133, 0.96)"
+      : progress <= 0.45
+        ? "rgba(250, 204, 21, 0.96)"
+        : "rgba(52, 211, 153, 0.94)";
 
   return (
     <div
@@ -83,7 +90,7 @@ const TurnTimer: React.FC<TurnTimerProps> = ({
           cy={size / 2}
           r={radius}
           fill="transparent"
-          stroke={isActive ? "rgba(250, 204, 21, 0.96)" : "rgba(255,255,255,0.22)"}
+          stroke={strokeColor}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}

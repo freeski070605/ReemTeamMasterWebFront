@@ -17,6 +17,8 @@ import GameActions from "../components/game/GameActions";
 import RtcParticleOverlay from "../components/game/RtcParticleOverlay";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
+import { experienceFlags } from "../config/experienceFlags";
+import { buildTableMomentFromLastAction, TableMoment } from "../utils/gameMoments";
 import {
   formatRoundDeltaAmount,
   getPlacementWinTypeLabel,
@@ -34,6 +36,11 @@ type EndRoundPhase = "global" | "winner" | "settlement";
 type SeatZone = "top" | "left" | "right" | "bottom";
 type OpponentSeatZone = Exclude<SeatZone, "bottom">;
 type SeatResultTone = "winner" | "loss";
+type SeatPresenceTone = "neutral" | "action" | "warning" | "ready";
+type SeatPresenceBadge = {
+  label: string;
+  tone: SeatPresenceTone;
+};
 type SeatHudLayout = {
   positionClass: string;
   align: "left" | "right";
@@ -212,6 +219,7 @@ const GameTable: React.FC = () => {
   const [endRoundPhase, setEndRoundPhase] = useState<EndRoundPhase>("global");
   const [feedbackPulseArea, setFeedbackPulseArea] = useState<InlineFeedbackArea | null>(null);
   const [activityTick, setActivityTick] = useState(0);
+  const [tableMoment, setTableMoment] = useState<TableMoment | null>(null);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -228,6 +236,7 @@ const GameTable: React.FC = () => {
   const idleGuidanceTimeoutRef = useRef<number | null>(null);
   const inlineFeedbackTimeoutRef = useRef<number | null>(null);
   const feedbackPulseTimeoutRef = useRef<number | null>(null);
+  const tableMomentTimeoutRef = useRef<number | null>(null);
   const endRoundPhaseTimeoutsRef = useRef<number[]>([]);
   const lastRoundPresentationKeyRef = useRef<string | null>(null);
   const myTurnStartCountRef = useRef(0);
@@ -839,6 +848,35 @@ const GameTable: React.FC = () => {
   }, [gameState?.lastAction?.timestamp]);
 
   useEffect(() => {
+    const lastActionForMoment = gameState?.lastAction ?? null;
+    const playersForMoment = gameState?.players ?? [];
+    const caughtDroppingPlayerIdForMoment = gameState?.caughtDroppingPlayerId;
+
+    if (!experienceFlags.enhancedTableMoments || !hasInitializedLastActionRef.current || !lastActionForMoment) {
+      return;
+    }
+
+    const latestTableMoment = buildTableMomentFromLastAction({
+      players: playersForMoment,
+      lastAction: lastActionForMoment,
+      caughtDroppingPlayerId: caughtDroppingPlayerIdForMoment,
+    });
+    if (!latestTableMoment) {
+      return;
+    }
+
+    setTableMoment(latestTableMoment);
+
+    if (tableMomentTimeoutRef.current !== null) {
+      window.clearTimeout(tableMomentTimeoutRef.current);
+    }
+
+    tableMomentTimeoutRef.current = window.setTimeout(() => {
+      setTableMoment((current) => (current?.title === latestTableMoment.title ? null : current));
+    }, 2400);
+  }, [gameState?.caughtDroppingPlayerId, gameState?.lastAction, gameState?.players]);
+
+  useEffect(() => {
     if (!isMyTurn || !hasCurrentPlayer) {
       setSelectedCards([]);
       setIsHitMode(false);
@@ -966,6 +1004,7 @@ const GameTable: React.FC = () => {
     setGuidanceOverrideHelper(null);
     setInlineFeedback(null);
     setFeedbackPulseArea(null);
+    setTableMoment(null);
 
     if (inlineFeedbackTimeoutRef.current !== null) {
       window.clearTimeout(inlineFeedbackTimeoutRef.current);
@@ -976,7 +1015,20 @@ const GameTable: React.FC = () => {
       window.clearTimeout(feedbackPulseTimeoutRef.current);
       feedbackPulseTimeoutRef.current = null;
     }
+
+    if (tableMomentTimeoutRef.current !== null) {
+      window.clearTimeout(tableMomentTimeoutRef.current);
+      tableMomentTimeoutRef.current = null;
+    }
   }, [clearGuidanceTimers, gameState?.status]);
+
+  useEffect(() => {
+    return () => {
+      if (tableMomentTimeoutRef.current !== null) {
+        window.clearTimeout(tableMomentTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (!isConnected || !gameState || !user) {
     if (isConnected && !gameState && tableInfo && user) {
@@ -1443,6 +1495,7 @@ const GameTable: React.FC = () => {
   });
   const roundResultByUserId = new Map(roundResultRows.map((row) => [row.userId, row]));
   const waitingPlayerCount = Math.max(0, totalRoundPlayers - readyCount);
+  const roundReadyProgress = totalRoundPlayers > 0 ? readyCount / totalRoundPlayers : 0;
   const roundRailStatusLabel = isContinuousMode
     ? waitingPlayerCount === 0
       ? "All players ready"
@@ -1475,6 +1528,19 @@ const GameTable: React.FC = () => {
   const roundOutcomeSummary = roundOutcome.explanation || roundOutcome.secondary;
   const roundCountdownStatusLine = [countdownLabel, roundRailStatusLabel].filter(Boolean).join(" | ");
   const roundCountdownMetaLine = [roundStatusDetail].filter(Boolean).join(" | ");
+  const runItBackPrompt = !isContinuousMode
+    ? "Match complete"
+    : waitingPlayerCount === 0
+      ? "Table locked in"
+      : waitingPlayerCount === 1
+        ? "Waiting on one player"
+        : `${waitingPlayerCount} players still deciding`;
+  const readyStatusChips = gameState.players.map((player) => ({
+    userId: player.userId,
+    username: player.username,
+    ready: readyPlayerIds.has(player.userId),
+    isAI: player.isAI,
+  }));
   const activeTurnPlayer = gameState.players[gameState.currentPlayerIndex] ?? null;
   const activeTurnPlayerName = activeTurnPlayer?.username ?? "Player";
   const isDrawStep = isMyTurn && !hasDrawnThisTurn;
@@ -1546,6 +1612,10 @@ const GameTable: React.FC = () => {
     }
 
     if (isRoundEnd) return null;
+
+    if (tableMoment && !(isMyTurn && (guidanceBannerText || shouldShowGuidanceHelper))) {
+      return tableMoment;
+    }
 
     if (guidanceBannerText || shouldShowGuidanceHelper || ambientCenterStatusText) {
       return {
@@ -1853,6 +1923,71 @@ const GameTable: React.FC = () => {
     );
   };
 
+  const getSeatPresenceBadges = (
+    player: typeof gameState.players[number] | null,
+    isSeatActive: boolean
+  ): SeatPresenceBadge[] => {
+    if (!player || !experienceFlags.enhancedSeatPresence) {
+      return [];
+    }
+
+    if (isRoundEnd && isContinuousMode) {
+      if (readyPlayerIds.has(player.userId)) {
+        return [{ label: player.isAI ? "Auto ready" : "Locked in", tone: "ready" }];
+      }
+
+      return player.isAI ? [] : [{ label: "Deciding", tone: "neutral" }];
+    }
+
+    if (isSeatActive) {
+      return [{ label: "On move", tone: "action" }];
+    }
+
+    if (player.hitLockCounter > 0) {
+      return [{ label: `Hit lock ${player.hitLockCounter}`, tone: "warning" }];
+    }
+
+    if (player.spreads.length >= 2) {
+      return [{ label: "Double spread", tone: "ready" }];
+    }
+
+    if (player.spreads.length === 1) {
+      return [{ label: "Spread live", tone: "action" }];
+    }
+
+    return [];
+  };
+
+  const renderSeatPresenceBadges = (
+    badges: SeatPresenceBadge[],
+    align: "left" | "right"
+  ) => {
+    if (badges.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className={`mt-1.5 flex flex-wrap gap-1 ${align === "right" ? "justify-end" : "justify-start"}`}>
+        {badges.map((badge) => (
+          <div
+            key={`${badge.tone}-${badge.label}`}
+            className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.18em] ${
+              badge.tone === "ready"
+                ? "border-emerald-200/34 bg-emerald-300/12 text-emerald-100"
+                : badge.tone === "warning"
+                  ? "border-rose-200/30 bg-rose-300/10 text-rose-100"
+                  : badge.tone === "action"
+                    ? "border-amber-200/34 bg-amber-300/12 text-amber-100"
+                    : "border-white/14 bg-white/[0.05] text-white/68"
+            }`}
+          >
+            {badge.label}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const renderSeatInfo = (
     player: typeof gameState.players[number] | null,
     zone: SeatZone,
@@ -1863,6 +1998,7 @@ const GameTable: React.FC = () => {
     const turnStatus = getTurnStatus(player.userId);
     const seatBalance = playerBalances[player.userId];
     const roundSeatResult = isRoundEnd ? roundResultByUserId.get(player.userId) : null;
+    const seatPresenceBadges = getSeatPresenceBadges(player, isActive);
     const shouldHighlightSeatWinner = !!roundSeatResult?.isWinner;
     const shouldDimSeatLoser = !!roundSeatResult && !roundSeatResult.isWinner;
     const shouldDimForWinnerFocus = isRoundEndWinnerPhase && !shouldHighlightSeatWinner;
@@ -1971,6 +2107,7 @@ const GameTable: React.FC = () => {
                 >
                   {formatSeatBalance(seatBalance)}
                 </div>
+                {!isRoundEnd ? renderSeatPresenceBadges(seatPresenceBadges, layout.align) : null}
                 {!isRoundEnd ? (
                   <div
                     className={`${
@@ -2014,6 +2151,7 @@ const GameTable: React.FC = () => {
       ? "..."
       : formatSeatBalance(balance);
   const bottomSeatRoundResult = displayedBottomPlayer ? roundResultByUserId.get(displayedBottomPlayer.userId) : null;
+  const bottomSeatPresenceBadges = getSeatPresenceBadges(displayedBottomPlayer ?? null, isBottomSeatActive);
   const shouldHighlightBottomWinner = !!bottomSeatRoundResult?.isWinner;
   const shouldDimBottomLoser = !!bottomSeatRoundResult && !bottomSeatRoundResult.isWinner;
   const shouldDimBottomForWinnerFocus = isRoundEndWinnerPhase && !shouldHighlightBottomWinner;
@@ -2493,16 +2631,52 @@ const GameTable: React.FC = () => {
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -6, scale: 0.98 }}
                             transition={{ duration: 0.24, ease: "easeOut" }}
-                            className={`pointer-events-none flex w-full items-center justify-center gap-3 rounded-full border px-4 py-2 text-white backdrop-blur-[8px] ${countdownStripClass}`}
+                            className={`pointer-events-none w-full rounded-[22px] border px-4 py-3 text-white backdrop-blur-[8px] ${countdownStripClass}`}
                           >
-                            <div className={`text-[8px] font-semibold uppercase tracking-[0.26em] ${countdownHeadlineClass}`}>
-                              NEXT HAND
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className={`text-[8px] font-semibold uppercase tracking-[0.26em] ${countdownHeadlineClass}`}>
+                                  Run It Back
+                                </div>
+                                <div className={`${isPhoneLandscapeLayout ? "mt-1 text-[11px]" : "mt-1 text-[13px]"} font-semibold text-white`}>
+                                  {runItBackPrompt}
+                                </div>
+                                <div className={`${isPhoneLandscapeLayout ? "text-[9px]" : "text-[10px]"} mt-1 text-white/70`}>
+                                  {roundCountdownStatusLine || roundRailStatusLabel}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-[8px] uppercase tracking-[0.22em] text-white/52">Lock In</div>
+                                <div className={`${isPhoneLandscapeLayout ? "text-[13px]" : "text-[15px]"} mt-1 font-semibold text-white`}>
+                                  {readyCount}/{totalRoundPlayers}
+                                </div>
+                              </div>
                             </div>
-                            <div className={`${isPhoneLandscapeLayout ? "text-[10px]" : "text-[11px]"} font-semibold text-white`}>
-                              {roundCountdownStatusLine || roundRailStatusLabel}
+
+                            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/8">
+                              <div
+                                className="h-full rounded-full bg-[linear-gradient(90deg,rgba(251,191,36,0.9),rgba(74,222,128,0.9))]"
+                                style={{ width: `${Math.max(8, roundReadyProgress * 100)}%` }}
+                              />
                             </div>
+
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              {readyStatusChips.map((entry) => (
+                                <div
+                                  key={`ready-${entry.userId}`}
+                                  className={`rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] ${
+                                    entry.ready
+                                      ? "border-emerald-200/32 bg-emerald-300/10 text-emerald-100"
+                                      : "border-white/12 bg-white/[0.04] text-white/62"
+                                  }`}
+                                >
+                                  {entry.username} {entry.ready ? "locked" : entry.isAI ? "auto" : "thinking"}
+                                </div>
+                              ))}
+                            </div>
+
                             {roundCountdownMetaLine ? (
-                              <div className={`${isPhoneLandscapeLayout ? "hidden" : "block"} text-[9px] text-white/70`}>
+                              <div className={`${isPhoneLandscapeLayout ? "mt-2 text-[8px]" : "mt-2 text-[9px]"} text-white/62`}>
                                 {roundCountdownMetaLine}
                               </div>
                             ) : null}
@@ -2589,6 +2763,7 @@ const GameTable: React.FC = () => {
                           >
                             {bottomSeatBalance}
                           </div>
+                          {!isRoundEnd ? renderSeatPresenceBadges(bottomSeatPresenceBadges, "left") : null}
                           {!isRoundEnd ? (
                             <div
                               className={`${
@@ -2644,7 +2819,7 @@ const GameTable: React.FC = () => {
                           disabled={isReadyForNextRound}
                           className={`w-full ${isPhoneLandscapeLayout ? "h-9 px-2 text-[10px]" : "h-10 px-2.5 text-[10px]"}`}
                         >
-                          {isReadyForNextRound ? "Ready For Next Hand" : "Run It Back"}
+                          {isReadyForNextRound ? "Locked In" : waitingPlayerCount <= 1 ? "Run It Back" : "Stay In"}
                         </Button>
                       ) : null}
                     </div>

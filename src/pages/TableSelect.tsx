@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Coins, Shield, Users } from 'lucide-react';
+import { Activity, ArrowRight, Coins, Crown, Flame, Shield, Sparkles, Trophy, Users } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
 import client from '../api/client';
+import { getHomeOverview, HomeOverview } from '../api/home';
 import { Table } from '../types/game';
 import { Button } from '../components/ui/Button';
 import { Loader } from '../components/ui/Loader';
@@ -15,10 +17,20 @@ import { getLobbySummary } from '../api/lobby';
 import { quickSeat, createPrivateTable, getMyPrivateTables, ManagedPrivateTable } from '../api/tables';
 import { createInvite } from '../api/invites';
 import { getRecentPlayers, RecentPlayer } from '../api/users';
+import { AccountStats, getAccountStats } from '../api/wallet';
 import PlayerAvatar from '../components/game/PlayerAvatar';
 import { createVipCheckout } from '../api/vip';
 import { adminApi, AdminTable } from '../api/admin';
+import { experienceFlags } from '../config/experienceFlags';
 import { roleAtLeast } from '../types/roles';
+import {
+  buildLobbyActivityItems,
+  getRecommendedTable,
+  getTableMomentumMeta,
+  LobbyActivityItem,
+  LobbyActivityTone,
+  LobbyRealtimeEvent,
+} from '../utils/lobbyExperience';
 import {
   getModeBadge,
   getModeDescription,
@@ -32,6 +44,14 @@ type PrivateTableMode = 'FREE_RTC_TABLE' | 'PRIVATE_USD_TABLE';
 const DEFAULT_PRIVATE_RTC_STAKES = [1, 5, 10, 25, 50];
 const PRIVATE_USD_STAKES = [5, 10, 20, 50, 100];
 
+const toneClasses: Record<LobbyActivityTone, string> = {
+  amber: 'border-amber-300/35 bg-amber-300/10 text-amber-100',
+  emerald: 'border-emerald-300/35 bg-emerald-300/10 text-emerald-100',
+  sky: 'border-sky-300/35 bg-sky-300/10 text-sky-100',
+  rose: 'border-rose-300/35 bg-rose-300/10 text-rose-100',
+  slate: 'border-white/15 bg-white/[0.05] text-white/78',
+};
+
 const TableSelect: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,8 +59,9 @@ const TableSelect: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [lobbyPresence, setLobbyPresence] = useState({ onlinePlayers: 0, lobbyConnections: 0 });
-  const [lobbyFeed, setLobbyFeed] = useState<Array<{ message: string; timestamp: number }>>([]);
+  const [lobbyFeed, setLobbyFeed] = useState<LobbyRealtimeEvent[]>([]);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [experienceLoading, setExperienceLoading] = useState(false);
   const [quickSeatLoading, setQuickSeatLoading] = useState(false);
   const [privateModalOpen, setPrivateModalOpen] = useState(false);
   const [privateMode, setPrivateMode] = useState<PrivateTableMode>('FREE_RTC_TABLE');
@@ -63,6 +84,8 @@ const TableSelect: React.FC = () => {
   const [promoTable, setPromoTable] = useState<AdminTable | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoLaunching, setPromoLaunching] = useState(false);
+  const [homeOverview, setHomeOverview] = useState<HomeOverview | null>(null);
+  const [accountStats, setAccountStats] = useState<AccountStats | null>(null);
   const navigate = useNavigate();
   const { user, refreshVipStatus } = useAuthStore();
   const isVip = !!user?.isVip;
@@ -120,6 +143,28 @@ const TableSelect: React.FC = () => {
       setSummaryLoading(false);
     }
   };
+
+  const fetchExperienceData = useCallback(async () => {
+    setExperienceLoading(true);
+    try {
+      const [overviewResult, accountStatsResult] = await Promise.allSettled([
+        getHomeOverview(),
+        getAccountStats(),
+      ]);
+
+      if (overviewResult.status === 'fulfilled') {
+        setHomeOverview(overviewResult.value);
+      }
+
+      if (accountStatsResult.status === 'fulfilled') {
+        setAccountStats(accountStatsResult.value);
+      }
+    } catch (error) {
+      console.error('Failed to load lobby experience data', error);
+    } finally {
+      setExperienceLoading(false);
+    }
+  }, []);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -316,7 +361,8 @@ const TableSelect: React.FC = () => {
     trackEvent('lobby_view', { source: 'tables' });
     void fetchTables();
     void fetchSummary();
-  }, []);
+    void fetchExperienceData();
+  }, [fetchExperienceData]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -363,7 +409,7 @@ const TableSelect: React.FC = () => {
       }));
     });
 
-    socket.on('lobbyEvent', (payload: { message: string; timestamp: number }) => {
+    socket.on('lobbyEvent', (payload: LobbyRealtimeEvent) => {
       setLobbyFeed((prev) => [payload, ...prev].slice(0, 8));
     });
 
@@ -433,6 +479,34 @@ const TableSelect: React.FC = () => {
     return tables.reduce((sum, table) => sum + Math.max(0, table.maxPlayers - table.currentPlayerCount), 0);
   }, [tables]);
 
+  const recommendedTable = useMemo(() => getRecommendedTable(rtcTables), [rtcTables]);
+
+  const activityItems = useMemo(
+    () =>
+      experienceFlags.lobbyActivityStrip
+        ? buildLobbyActivityItems({
+            tables: rtcTables,
+            lobbyFeed,
+            overview: homeOverview,
+            accountStats,
+          })
+        : [],
+    [accountStats, homeOverview, lobbyFeed, rtcTables]
+  );
+
+  const activityLoop = useMemo(
+    () => (activityItems.length > 1 ? [...activityItems, ...activityItems] : activityItems),
+    [activityItems]
+  );
+
+  const recommendedTableMomentum = recommendedTable ? getTableMomentumMeta(recommendedTable) : null;
+  const recommendedStakeDisplay = recommendedTable
+    ? getStakeDisplay(recommendedTable.stake, recommendedTable.mode)
+    : null;
+  const streakLeader = homeOverview?.leaderboards.longestStreak?.rankings?.[0] ?? null;
+  const reemLeader = homeOverview?.leaderboards.mostReems?.rankings?.[0] ?? null;
+  const topEarner = homeOverview?.leaderboards.topEarners?.rankings?.[0] ?? null;
+
   const handleJoinClick = (table: Table) => {
     if (table.mode === 'USD_CONTEST') {
       navigate(`/contests?stake=${encodeURIComponent(String(table.stake))}`);
@@ -447,6 +521,12 @@ const TableSelect: React.FC = () => {
     if (!selectedTable) return;
     trackEvent('table_join_clicked', { tableId: selectedTable._id });
     navigate(`/game/${selectedTable._id}`);
+  };
+
+  const handleActivityClick = (item: LobbyActivityItem) => {
+    if (item.tableId) {
+      navigate(`/game/${item.tableId}`);
+    }
   };
 
   if (loading) {
@@ -594,175 +674,455 @@ const TableSelect: React.FC = () => {
         </section>
       ) : (
         <>
-      <header className="rt-landscape-compact-card rt-panel-strong rounded-3xl p-7">
-        <div className="text-xs uppercase tracking-[0.2em] text-white/50">Crib Lobby (Recommended Start)</div>
-        <h1 className="mt-2 text-4xl rt-page-title font-semibold">Play Reem Team Cash Cribs</h1>
-        <p className="mt-2 text-white/65">
-          Cribs run on Reem Team Cash and are the main experience right now. Cash Crowns are real-cash tournaments
-          and open through the Cash Crown Tournament Lobby.
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Button onClick={() => void fetchTables()}>Reload Cribs</Button>
-          <Button onClick={handleQuickSeat} disabled={quickSeatLoading}>
-            {quickSeatLoading ? 'Finding Seat...' : 'Quick Seat'}
-          </Button>
-          <Button variant="secondary" onClick={handlePrivateEntry}>
-            {isVip ? 'Create Private Table' : 'Create Private Table (VIP)'}
-          </Button>
-          {myPrivateTables.length > 0 && (
-            <Button variant="secondary" onClick={() => void handleOpenPrivateManager()} isLoading={privateTablesLoading}>
-              Manage Private Tables
-            </Button>
-          )}
-          {localStorage.getItem('last_table_id') && (
-            <Button variant="secondary" onClick={handleRejoinLast}>
-              Rejoin Last Table
-            </Button>
-          )}
-          <Button variant="secondary" onClick={() => navigate('/contests')}>
-            View Cash Crown Tournaments
-          </Button>
-        </div>
-      </header>
+          <section className="rt-landscape-compact-card relative overflow-hidden rounded-[32px] border border-white/12 bg-[linear-gradient(135deg,rgba(10,14,18,0.98),rgba(18,22,28,0.95)_48%,rgba(35,24,13,0.92))] p-6 md:p-8">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(680px_320px_at_8%_10%,rgba(247,188,58,0.2),transparent_72%),radial-gradient(620px_340px_at_92%_14%,rgba(56,189,248,0.14),transparent_74%),linear-gradient(120deg,rgba(255,255,255,0.04),transparent_38%,rgba(255,255,255,0.02))]" />
+            <div className="relative z-10 grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-start">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-white/72">
+                  <Activity className="h-3.5 w-3.5 text-amber-200" />
+                  Crib Board
+                </div>
+                <h1 className="mt-5 max-w-3xl text-4xl leading-[0.96] rt-page-title sm:text-5xl">
+                  Live cribs with pressure already on them.
+                </h1>
+                <p className="mt-4 max-w-2xl text-base text-white/74 sm:text-lg">
+                  The board should tell you where the action is in seconds. Seats are live, streaks matter, and the next move stays obvious.
+                </p>
+                <p className="mt-3 text-sm text-white/60">
+                  {summaryLoading
+                    ? 'Syncing the room...'
+                    : `${lobbyPresence.onlinePlayers} players online, ${lobbyPresence.lobbyConnections} people watching the board, ${openSeats} open seats across the crib floor.`}
+                </p>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Players Online</div>
-          <div className="mt-2 text-3xl rt-page-title">
-            {summaryLoading ? '--' : lobbyPresence.onlinePlayers}
-          </div>
-        </div>
-        <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Open Seats</div>
-          <div className="mt-2 text-3xl rt-page-title">{openSeats}</div>
-        </div>
-        <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Live Cribs</div>
-          <div className="mt-2 text-3xl rt-page-title">{metrics.rtc}</div>
-        </div>
-        <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Hands Live</div>
-          <div className="mt-2 text-3xl rt-page-title">{metrics.active}</div>
-        </div>
-        <div className="rt-glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Cash Crown Tournaments Live</div>
-          <div className="mt-2 text-3xl rt-page-title">{metrics.usd}</div>
-        </div>
-      </section>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <Button onClick={handleQuickSeat} disabled={quickSeatLoading}>
+                    {quickSeatLoading ? 'Finding Seat...' : 'Quick Seat'}
+                  </Button>
+                  {recommendedTable ? (
+                    <Button variant="secondary" onClick={() => handleJoinClick(recommendedTable)}>
+                      Enter Recommended Crib
+                    </Button>
+                  ) : null}
+                  <Button variant="secondary" onClick={() => void fetchTables()}>
+                    Reload Cribs
+                  </Button>
+                  <Button variant="secondary" onClick={handlePrivateEntry}>
+                    {isVip ? 'Create Private Table' : 'Create Private Table (VIP)'}
+                  </Button>
+                  {myPrivateTables.length > 0 && (
+                    <Button variant="secondary" onClick={() => void handleOpenPrivateManager()} isLoading={privateTablesLoading}>
+                      Manage Private Tables
+                    </Button>
+                  )}
+                  {localStorage.getItem('last_table_id') && (
+                    <Button variant="ghost" onClick={handleRejoinLast}>
+                      Rejoin Last Table
+                    </Button>
+                  )}
+                  <Button variant="ghost" onClick={() => navigate('/contests')}>
+                    View Cash Crown
+                  </Button>
+                </div>
 
-      <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-5">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Recent Players</div>
-          {recentLoading && <div className="mt-3 text-sm text-white/60">Loading recent players...</div>}
-          {!recentLoading && recentError && (
-            <div className="mt-3 text-sm text-red-300">{recentError}</div>
-          )}
-          {!recentLoading && !recentError && recentPlayers.length === 0 && (
-            <div className="mt-3 text-sm text-white/60">Play a few hands to see recent players.</div>
-          )}
-          {!recentLoading && recentPlayers.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-4">
-              {recentPlayers.map((player) => (
-                <div key={player._id} className="flex flex-col items-center gap-2">
-                  <PlayerAvatar
-                    player={{ name: player.recentUsername, avatarUrl: player.recentAvatarUrl ?? undefined }}
-                    size="sm"
-                    showName
-                  />
-                  <div className="text-[11px] text-white/60">
-                    Last played {new Date(player.lastPlayedAt).toLocaleDateString()}
+                <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    { label: 'Players Online', value: summaryLoading ? '--' : String(lobbyPresence.onlinePlayers) },
+                    { label: 'Hands Live', value: String(metrics.active) },
+                    { label: 'Open Seats', value: String(openSeats) },
+                    { label: 'Cash Crowns', value: String(metrics.usd) },
+                  ].map((metric) => (
+                    <div key={metric.label} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 backdrop-blur">
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">{metric.label}</div>
+                      <div className="mt-2 text-3xl rt-page-title text-white">{metric.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <aside className="grid gap-4">
+                <div className="rounded-[28px] border border-amber-300/18 bg-[linear-gradient(145deg,rgba(18,22,29,0.95),rgba(12,14,18,0.9))] p-5 shadow-[0_24px_48px_rgba(0,0,0,0.3)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-amber-200/84">Best Next Move</div>
+                      <h2 className="mt-2 text-2xl rt-page-title text-white">
+                        {recommendedTable ? getTableDisplayName(recommendedTable) : 'Open crib floor'}
+                      </h2>
+                    </div>
+                    <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
+                      recommendedTableMomentum ? toneClasses[recommendedTableMomentum.tone] : toneClasses.slate
+                    }`}>
+                      {recommendedTableMomentum?.badge ?? 'Browse tables'}
+                    </span>
+                  </div>
+
+                  <p className="mt-3 text-sm leading-6 text-white/70">
+                    {recommendedTableMomentum?.detail ?? 'Refresh the crib list, grab an open seat, or start a private room with your own lineup.'}
+                  </p>
+
+                  {recommendedTable && recommendedStakeDisplay ? (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                        <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Stake</div>
+                        <div className="mt-2 text-lg rt-page-title text-white">
+                          {recommendedStakeDisplay.amount} {recommendedStakeDisplay.unit}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                        <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Seats</div>
+                        <div className="mt-2 text-lg rt-page-title text-white">
+                          {recommendedTable.currentPlayerCount}/{recommendedTable.maxPlayers}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                        <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Lane</div>
+                        <div className="mt-2 text-lg rt-page-title text-white">{getModeBadge(recommendedTable.mode)}</div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {recommendedTable ? (
+                      <Button onClick={() => handleJoinClick(recommendedTable)}>
+                        Take This Seat
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button onClick={handleQuickSeat} disabled={quickSeatLoading}>
+                        {quickSeatLoading ? 'Finding Seat...' : 'Find Me A Seat'}
+                      </Button>
+                    )}
+                    <Button variant="ghost" onClick={() => navigate('/contests')}>
+                      Cash Crown Lobby
+                    </Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        <div className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-5">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Lobby Pulse</div>
-          {lobbyFeed.length === 0 && (
-            <div className="mt-3 text-sm text-white/60">Lobby updates will appear here.</div>
-          )}
-          <div className="mt-4 space-y-2">
-            {lobbyFeed.map((entry, index) => (
-              <div key={`${entry.timestamp}-${index}`} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/75">
-                <div>{entry.message}</div>
-                <div className="text-[11px] text-white/45">
-                  {new Date(entry.timestamp).toLocaleTimeString()}
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+                  <div className="rounded-[24px] border border-white/10 bg-black/24 p-5">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/48">
+                      <Flame className="h-3.5 w-3.5 text-amber-200" />
+                      Your Line
+                    </div>
+                    {experienceFlags.lobbyIdentityPanel && accountStats ? (
+                      <>
+                        <div className="mt-3 text-3xl rt-page-title text-white">{accountStats.winRate.toFixed(1)}%</div>
+                        <div className="text-sm text-white/62">Win rate across {accountStats.matchesPlayed.toLocaleString('en-US')} recorded hands.</div>
+                        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                            <div className="text-[10px] uppercase tracking-[0.16em] text-white/46">Reems</div>
+                            <div className="mt-2 text-lg rt-page-title text-white">{accountStats.totalReems.toLocaleString('en-US')}</div>
+                          </div>
+                          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                            <div className="text-[10px] uppercase tracking-[0.16em] text-white/46">Wins</div>
+                            <div className="mt-2 text-lg rt-page-title text-white">{accountStats.totalWins.toLocaleString('en-US')}</div>
+                          </div>
+                          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                            <div className="text-[10px] uppercase tracking-[0.16em] text-white/46">Best RTC</div>
+                            <div className="mt-2 text-lg rt-page-title text-white">{Math.round(accountStats.biggestRtcPayout).toLocaleString('en-US')}</div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="mt-3 text-sm text-white/62">
+                        {experienceLoading ? 'Syncing your account line...' : 'Play a few hands and your board starts to matter here.'}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-[24px] border border-white/10 bg-black/24 p-5">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/48">
+                      <Sparkles className="h-3.5 w-3.5 text-sky-200" />
+                      Board Pressure
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-white/46">Streak Leader</div>
+                        <div className="mt-1 text-base font-semibold text-white">{streakLeader?.username ?? 'Waiting on data'}</div>
+                        <div className="text-sm text-white/62">
+                          {streakLeader ? `${Math.round(streakLeader.value)} wins in the current run.` : 'The hottest player will show here.'}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-white/46">Most Reems</div>
+                        <div className="mt-1 text-base font-semibold text-white">{reemLeader?.username ?? 'Waiting on data'}</div>
+                        <div className="text-sm text-white/62">
+                          {reemLeader ? `${Math.round(reemLeader.value)} reems in the current leaderboard window.` : 'Reem leaders will show here.'}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-white/46">Top Earner</div>
+                        <div className="mt-1 text-base font-semibold text-white">{topEarner?.username ?? 'Waiting on data'}</div>
+                        <div className="text-sm text-white/62">
+                          {topEarner ? `${Math.round(topEarner.value).toLocaleString('en-US')} on the board right now.` : 'The strongest payout line will show here.'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </section>
+
+          {activityItems.length > 0 ? (
+            <section className="rt-glass overflow-hidden rounded-[24px] border border-white/10 px-4 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Live Activity</div>
+                  <div className="mt-1 text-sm text-white/64">Real lobby motion, hot seats, and current pressure from the board.</div>
+                </div>
+                <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/58">
+                  Updated live
+                </div>
+              </div>
+
+              <div className="mt-4 overflow-hidden">
+                <div className={`flex gap-3 ${activityItems.length > 1 ? 'rt-live-marquee' : 'flex-wrap'}`}>
+                  {activityLoop.map((item, index) => (
+                    <button
+                      key={`${item.id}-${index}`}
+                      type="button"
+                      onClick={() => handleActivityClick(item)}
+                      disabled={!item.tableId}
+                      className={`rt-live-pill group flex min-w-[260px] max-w-[320px] items-start gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                        toneClasses[item.tone]
+                      } ${item.tableId ? 'cursor-pointer hover:border-white/30 hover:text-white' : 'cursor-default'}`}
+                    >
+                      <div className="mt-0.5 rounded-full border border-white/12 bg-black/20 p-2 text-white/80">
+                        <Activity className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-white/55">{item.eyebrow}</div>
+                        <div className="mt-1 text-sm font-semibold leading-tight text-white">{item.message}</div>
+                        {item.detail ? <div className="mt-1 text-xs text-white/64">{item.detail}</div> : null}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          <section className="grid gap-4 xl:grid-cols-[1.02fr_0.98fr]">
+            <div className="rt-landscape-compact-card rt-panel-strong rounded-[28px] p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Recent Lineup</div>
+                  <div className="mt-1 text-2xl rt-page-title">Players you already know</div>
+                </div>
+                <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/55">
+                  Faster re-entry
+                </div>
+              </div>
+
+              {recentLoading && <div className="mt-4 text-sm text-white/60">Loading recent players...</div>}
+              {!recentLoading && recentError && <div className="mt-4 text-sm text-red-300">{recentError}</div>}
+              {!recentLoading && !recentError && recentPlayers.length === 0 && (
+                <div className="mt-4 rounded-2xl border border-dashed border-white/12 bg-black/15 p-4 text-sm text-white/60">
+                  Play a few hands and familiar opponents will show up here.
+                </div>
+              )}
+              {!recentLoading && recentPlayers.length > 0 && (
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {recentPlayers.map((player) => (
+                    <div key={player._id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <div className="flex items-center gap-3">
+                        <PlayerAvatar
+                          player={{ name: player.recentUsername, avatarUrl: player.recentAvatarUrl ?? undefined }}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-white">{player.recentUsername}</div>
+                          <div className="text-xs text-white/56">
+                            Last played {new Date(player.lastPlayedAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rt-landscape-compact-card rt-panel-strong rounded-[28px] p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Competitive Pulse</div>
+                  <div className="mt-1 text-2xl rt-page-title">What the room feels like</div>
+                </div>
+                <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/55">
+                  Live board
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
+                {[
+                  {
+                    icon: Flame,
+                    label: 'Longest streak',
+                    title: streakLeader?.username ?? 'No leader yet',
+                    body: streakLeader ? `${Math.round(streakLeader.value)} wins on the best run.` : 'Current streak heat appears here.',
+                  },
+                  {
+                    icon: Trophy,
+                    label: 'Most reems',
+                    title: reemLeader?.username ?? 'No leader yet',
+                    body: reemLeader ? `${Math.round(reemLeader.value)} reems in the active window.` : 'Reem pressure appears here.',
+                  },
+                  {
+                    icon: Crown,
+                    label: 'Top earner',
+                    title: topEarner?.username ?? 'No leader yet',
+                    body: topEarner ? `${Math.round(topEarner.value).toLocaleString('en-US')} on the current board.` : 'Top payout pressure appears here.',
+                  },
+                ].map((card) => (
+                  <div key={card.label} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/48">
+                      <card.icon className="h-3.5 w-3.5 text-amber-200" />
+                      {card.label}
+                    </div>
+                    <div className="mt-3 text-base font-semibold text-white">{card.title}</div>
+                    <div className="mt-1 text-sm text-white/62">{card.body}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 space-y-2">
+                {lobbyFeed.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/12 bg-black/15 p-4 text-sm text-white/60">
+                    Lobby updates will appear here as players move through the room.
+                  </div>
+                ) : (
+                  lobbyFeed.map((entry, index) => (
+                    <div key={`${entry.timestamp}-${index}`} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                      <div className="text-sm font-medium text-white/82">{entry.message}</div>
+                      <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-white/46">
+                        {new Date(entry.timestamp).toLocaleTimeString()}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-8">
+            {groupedByStake.map(([stake, stakeTables]) => (
+              <div key={stake}>
+                <div className="mb-4 flex items-center gap-3">
+                  <Coins className="h-5 w-5 text-amber-300" />
+                  <h2 className="text-2xl rt-page-title">{getStakeTierHeading(stake, 'FREE_RTC_TABLE')}</h2>
+                </div>
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {stakeTables.map((table, index) => {
+                    const isDisabled = table.currentPlayerCount >= table.maxPlayers;
+                    const tableName = getTableDisplayName(table);
+                    const stakeDisplay = getStakeDisplay(table.stake, table.mode);
+                    const momentum = getTableMomentumMeta(table);
+                    const isRecommended = table._id === recommendedTable?._id;
+                    const aiSeats = (table.players ?? []).filter((player) => player.isAI).length;
+                    const humanSeats = Math.max(0, table.currentPlayerCount - aiSeats);
+
+                    return (
+                      <motion.article
+                        key={table._id}
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.28, delay: index * 0.04 }}
+                        whileHover={{ y: -4, scale: 1.01 }}
+                        className={`rt-landscape-compact-card group relative overflow-hidden rounded-[26px] border p-5 ${
+                          isRecommended
+                            ? 'border-amber-300/34 bg-[linear-gradient(145deg,rgba(22,22,26,0.96),rgba(33,24,12,0.92))] shadow-[0_24px_48px_rgba(120,71,7,0.18)]'
+                            : 'border-white/10 bg-[linear-gradient(145deg,rgba(15,18,23,0.94),rgba(10,12,16,0.94))] shadow-[0_22px_44px_rgba(0,0,0,0.24)]'
+                        }`}
+                      >
+                        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.03),transparent_34%,rgba(255,255,255,0.015))]" />
+                        <div className="relative z-10">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-white/60">
+                                  {getModeBadge(table.mode)}
+                                </span>
+                                <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${toneClasses[momentum.tone]}`}>
+                                  {momentum.badge}
+                                </span>
+                                {isRecommended ? (
+                                  <span className="rounded-full border border-amber-300/35 bg-amber-300/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100">
+                                    Recommended
+                                  </span>
+                                ) : null}
+                              </div>
+                              <h3 className="mt-3 text-2xl rt-page-title">{tableName}</h3>
+                            </div>
+                            <div className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              table.status === 'in-game'
+                                ? 'bg-amber-500/20 text-amber-100'
+                                : 'bg-emerald-500/20 text-emerald-200'
+                            }`}>
+                              {table.status === 'in-game' ? 'Hand Live' : 'Waiting'}
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex items-baseline text-amber-300">
+                            <Coins className="mr-1 h-5 w-5" />
+                            <span className="text-3xl rt-page-title">{stakeDisplay.amount}</span>
+                            <span className="ml-2 text-sm text-white/60">{stakeDisplay.unit}</span>
+                          </div>
+
+                          <p className="mt-2 text-sm leading-6 text-white/66">{getModeDescription(table.mode)}</p>
+
+                          <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+                            <div className="flex items-center justify-between gap-3 text-sm text-white/70">
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4 text-white/55" />
+                                {table.currentPlayerCount}/{table.maxPlayers} seats
+                              </div>
+                              <div>{momentum.seatLabel}</div>
+                            </div>
+                            <div className="mt-3 flex items-center gap-2">
+                              {Array.from({ length: table.maxPlayers }).map((_, seatIndex) => (
+                                <span
+                                  key={`${table._id}-seat-${seatIndex}`}
+                                  className={`h-2.5 flex-1 rounded-full ${
+                                    seatIndex < table.currentPlayerCount
+                                      ? 'rt-live-pulse bg-gradient-to-r from-amber-300 to-orange-300 shadow-[0_0_12px_rgba(251,191,36,0.45)]'
+                                      : 'bg-white/10'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <div className="mt-3 text-xs text-white/56">
+                              {table.currentPlayerCount === 1 && !table.isPrivate
+                                ? 'Heads-up public tables can auto-fill with one AI opponent to keep motion on the board.'
+                                : `${humanSeats} human seat${humanSeats === 1 ? '' : 's'}${aiSeats > 0 ? `, ${aiSeats} AI` : ''}. ${momentum.detail}`}
+                            </div>
+                          </div>
+
+                          <div className="mt-5 flex flex-wrap gap-3">
+                            <Button
+                              className="flex-1 min-w-[150px]"
+                              disabled={isDisabled}
+                              variant={isDisabled ? 'secondary' : 'primary'}
+                              onClick={() => handleJoinClick(table)}
+                            >
+                              {isDisabled ? 'Crib Full' : isRecommended ? 'Take This Seat' : table.status === 'in-game' ? 'Jump In' : 'Enter Crib'}
+                            </Button>
+                            <Button
+                              className="flex-1 min-w-[150px]"
+                              variant="secondary"
+                              onClick={() => handleCreateInvite(table)}
+                            >
+                              Invite Friends
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.article>
+                    );
+                  })}
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-8">
-        {groupedByStake.map(([stake, stakeTables]) => (
-          <div key={stake}>
-            <div className="flex items-center gap-3 mb-4">
-              <Coins className="w-5 h-5 text-amber-300" />
-              <h2 className="text-2xl rt-page-title">{getStakeTierHeading(stake, 'FREE_RTC_TABLE')}</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {stakeTables.map((table) => {
-                const isDisabled = table.currentPlayerCount >= table.maxPlayers;
-                const tableName = getTableDisplayName(table);
-                const stakeDisplay = getStakeDisplay(table.stake, table.mode);
-
-                return (
-                  <article key={table._id} className="rt-landscape-compact-card rt-panel-strong rounded-2xl p-5">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xl rt-page-title">{tableName}</h3>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          table.status === 'in-game'
-                            ? 'bg-amber-500/20 text-amber-100'
-                            : 'bg-emerald-500/20 text-emerald-200'
-                        }`}
-                      >
-                        {table.status === 'in-game' ? 'Hand Live' : 'Waiting'}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 inline-flex rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/70">
-                      {getModeBadge(table.mode)}
-                    </div>
-
-                    <div className="mt-4 flex items-baseline text-amber-300">
-                      <Coins className="w-5 h-5 mr-1" />
-                      <span className="text-3xl rt-page-title">{stakeDisplay.amount}</span>
-                      <span className="ml-2 text-sm text-white/60">{stakeDisplay.unit}</span>
-                    </div>
-
-                    <div className="mt-2 text-sm text-white/60">{getModeDescription(table.mode)}</div>
-
-                    <div className="mt-4 flex items-center text-white/65 text-sm">
-                      <Users className="w-4 h-4 mr-2" />
-                      {table.currentPlayerCount}/{table.maxPlayers} seats
-                    </div>
-
-                    <Button
-                      className="mt-5 w-full"
-                      disabled={isDisabled}
-                      variant={isDisabled ? 'secondary' : 'primary'}
-                      onClick={() => handleJoinClick(table)}
-                    >
-                      {table.currentPlayerCount >= table.maxPlayers ? 'Crib Full' : 'Enter Crib'}
-                    </Button>
-                    <Button
-                      className="mt-2 w-full"
-                      variant="secondary"
-                      onClick={() => handleCreateInvite(table)}
-                    >
-                      Invite Friends
-                    </Button>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </section>
+          </section>
 
       {rtcTables.length === 0 && !loading && (
         <div className="rt-panel-strong rounded-2xl p-8 text-center text-white/55">

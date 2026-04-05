@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import client from '../api/client';
 import { trackEvent } from '../api/analytics';
+import { getHomeOverview, HomeLeaderboard, HomeOverview } from '../api/home';
 import { createVipCheckout } from '../api/vip';
 import { Button } from '../components/ui/Button';
 import { useAuthStore } from '../store/authStore';
-import { Contest, Table } from '../types/game';
 import {
   getContestDisplayName,
   getContestStatusLabel,
@@ -15,49 +14,6 @@ import {
   getStakeDisplay,
   getTableDisplayName,
 } from '../branding/modeCopy';
-
-type LeaderboardRanking = {
-  rank: number;
-  playerId: string;
-  username: string;
-  value: number;
-  secondaryValue?: number;
-};
-
-type HomeLeaderboard = {
-  metric: string;
-  window: string;
-  title: string;
-  description: string;
-  rankings: LeaderboardRanking[];
-};
-
-type HomeOverview = {
-  generatedAt: string;
-  tableSummary: {
-    totalTables: number;
-    activeTables: number;
-    rtcTables: number;
-    cashTables: number;
-    privateTables: number;
-  };
-  contestSummary: {
-    totalContests: number;
-    openContests: number;
-    liveContests: number;
-    seatsFilled: number;
-    totalSeats: number;
-    totalPrizePool: number;
-  };
-  featuredTable: Table | null;
-  featuredContest: Contest | null;
-  leaderboards: {
-    topEarners: HomeLeaderboard | null;
-    mostReems: HomeLeaderboard | null;
-    bestWinRate: HomeLeaderboard | null;
-    longestStreak: HomeLeaderboard | null;
-  };
-};
 
 const formatUsd = (value?: number | null) =>
   new Intl.NumberFormat('en-US', {
@@ -92,8 +48,8 @@ const Home: React.FC = () => {
 
     const fetchOverview = async () => {
       try {
-        const response = await client.get<HomeOverview>('/home/overview');
-        setOverview(response.data ?? null);
+        const response = await getHomeOverview();
+        setOverview(response ?? null);
       } catch (error) {
         console.error('Failed to load home overview', error);
         setOverview(null);
