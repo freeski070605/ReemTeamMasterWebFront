@@ -826,6 +826,7 @@ const GameTable: React.FC = () => {
   );
   const turnDurationMs = gameState?.turnDurationMs ?? 60_000;
   const turnTimeRemainingMs = Math.max(0, (gameState?.turnExpiresAt ?? Date.now()) - Date.now());
+  const turnTimerCycleKey = `${gameState?.turn ?? 0}:${gameState?.currentPlayerIndex ?? -1}:${gameState?.turnExpiresAt ?? 0}`;
   const hasCurrentPlayer = !!currentPlayer;
   const hasDrawnThisTurn = !!(currentPlayer?.hasDrawnThisTurn ?? currentPlayer?.hasTakenActionThisTurn);
   const hasDiscardedThisTurn = !!currentPlayer?.hasDiscardedThisTurn;
@@ -2075,6 +2076,7 @@ const GameTable: React.FC = () => {
                   <PlayerAvatar player={{ name: player.username, avatarUrl: player.avatarUrl }} size="sm" />
                 </div>
                 <TurnTimer
+                  key={`${player.userId}:${turnTimerCycleKey}`}
                   duration={turnDurationMs}
                   timeRemaining={isActive ? turnTimeRemainingMs : turnDurationMs}
                   isActive={isActive}
@@ -2731,6 +2733,7 @@ const GameTable: React.FC = () => {
                             <PlayerAvatar player={{ name: bottomSeatName, avatarUrl: bottomSeatAvatarUrl }} size="sm" />
                           </div>
                           <TurnTimer
+                            key={`${displayedBottomPlayer?.userId ?? user._id}:${turnTimerCycleKey}:bottom`}
                             duration={turnDurationMs}
                             timeRemaining={isBottomSeatActive ? turnTimeRemainingMs : turnDurationMs}
                             isActive={isBottomSeatActive}
