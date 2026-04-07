@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Transaction } from "../../types/transaction";
 import { getTransactionHistory } from "../../api/wallet";
 import { Loader } from "../ui/Loader";
+import { formatRTCCompactAmount } from "../../utils/rtcCurrency";
 
 type TransactionHistoryProps = {
   embedded?: boolean;
@@ -60,7 +61,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     if (currency === "USD") {
       return `${sign}$${absoluteAmount.toFixed(2)}`;
     }
-    return `${sign}${absoluteAmount} RTC`;
+    return `${sign}${formatRTCCompactAmount(absoluteAmount)} RTC`;
   };
 
   const totalPages = pageSize ? Math.max(1, Math.ceil(transactions.length / pageSize)) : 1;

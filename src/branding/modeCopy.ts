@@ -1,4 +1,5 @@
 import { Contest, GameMode, Table } from '../types/game';
+import { formatRTCCompactAmount } from '../utils/rtcCurrency';
 
 const DEFAULT_MODE: GameMode = 'FREE_RTC_TABLE';
 
@@ -58,7 +59,7 @@ export const getModeDescription = (mode?: GameMode): string => getModeCopy(mode)
 const rtcFromTier = (stakeTier: number): number => stakeTier * 1000;
 
 export const formatRtcStake = (stakeTier: number): string =>
-  `${rtcFromTier(stakeTier).toLocaleString()} Reem Team Cash`;
+  `${formatRTCCompactAmount(rtcFromTier(stakeTier))} Reem Team Cash`;
 
 export const getStakeDisplay = (
   stakeTier: number,
@@ -72,7 +73,7 @@ export const getStakeDisplay = (
   }
 
   return {
-    amount: rtcFromTier(stakeTier).toLocaleString(),
+    amount: formatRTCCompactAmount(rtcFromTier(stakeTier)),
     unit: 'Reem Team Cash',
   };
 };
@@ -113,7 +114,7 @@ export const getTableDisplayName = (table: Pick<Table, '_id' | 'name' | 'mode' |
   }
 
   if (typeof table.stake === 'number' && Number.isFinite(table.stake)) {
-    return `Crib ${rtcFromTier(table.stake).toLocaleString()} Reem Team Cash`;
+    return `Crib ${formatRTCCompactAmount(rtcFromTier(table.stake))} Reem Team Cash`;
   }
 
   return `Crib ${suffix}`;

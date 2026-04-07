@@ -34,5 +34,31 @@ export const breakIntoRTC = (amount: number, maxParticles = 40): RTCDenomination
   return result;
 };
 
+const COMPACT_RTC_UNITS = [
+  { value: 1_000_000_000_000, suffix: "T" },
+  { value: 1_000_000_000, suffix: "B" },
+  { value: 1_000_000, suffix: "M" },
+  { value: 1_000, suffix: "K" },
+] as const;
+
+const trimTrailingZero = (value: string): string => value.replace(/\.0$/, "");
+
+export const formatRTCCompactAmount = (amount: number | null | undefined): string => {
+  if (typeof amount !== "number" || !Number.isFinite(amount)) {
+    return "0";
+  }
+
+  const normalizedAmount = Math.max(0, Math.trunc(amount));
+  const unit = COMPACT_RTC_UNITS.find((candidate) => normalizedAmount >= candidate.value);
+
+  if (!unit) {
+    return normalizedAmount.toLocaleString("en-US");
+  }
+
+  const scaledValue = normalizedAmount / unit.value;
+  const fractionDigits = scaledValue >= 100 || Number.isInteger(scaledValue) ? 0 : 1;
+  return `${trimTrailingZero(scaledValue.toFixed(fractionDigits))}${unit.suffix}`;
+};
+
 export const formatRTCAmount = (amount: number): string =>
-  `${Math.max(0, Math.trunc(amount)).toLocaleString("en-US")} RTC`;
+  `${formatRTCCompactAmount(amount)} RTC`;

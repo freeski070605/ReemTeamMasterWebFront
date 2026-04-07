@@ -34,6 +34,7 @@ interface GameStore {
   hit: (tableId: string, userId: string, card: Card, targetPlayerId: string, targetSpreadIndex: number) => void;
   drop: (tableId: string, userId: string) => void;
   declare41: (tableId: string, userId: string) => void;
+  reorderHand: (tableId: string, userId: string, handOrder: string[]) => void;
   requestLeaveTable: (tableId: string, userId: string) => void;
   putIn: (tableId: string, userId: string) => void;
 }
@@ -225,6 +226,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   declare41: (tableId, userId) => {
     const { socket } = get();
     if (socket) socket.emit('declare41', { tableId, userId });
+  },
+
+  reorderHand: (tableId, userId, handOrder) => {
+    const { socket } = get();
+    if (socket) socket.emit('reorderHand', { tableId, userId, handOrder });
   },
 
   requestLeaveTable: (tableId, userId) => {

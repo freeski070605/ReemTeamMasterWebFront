@@ -14,6 +14,7 @@ import {
   getStakeDisplay,
   getTableDisplayName,
 } from '../branding/modeCopy';
+import { formatRTCAmount } from '../utils/rtcCurrency';
 
 const formatUsd = (value?: number | null) =>
   new Intl.NumberFormat('en-US', {
@@ -24,9 +25,9 @@ const formatUsd = (value?: number | null) =>
 
 const formatRtcFromStake = (stake?: number) => {
   if (typeof stake !== 'number' || !Number.isFinite(stake)) {
-    return '25,000 RTC';
+    return formatRTCAmount(25000);
   }
-  return (stake * 1000).toLocaleString('en-US');
+  return formatRTCAmount(stake * 1000);
 };
 
 const formatLeaderboardValue = (metric: string, value: number) => {
@@ -90,9 +91,9 @@ const Home: React.FC = () => {
     const featuredTable = overview?.featuredTable;
     if (!featuredTable) {
       return {
-        title: 'Crib 25,000 Reem Team Cash',
+        title: 'Crib 25K Reem Team Cash',
         label: 'Reem Team Cash Crib',
-        buyIn: '25,000 RTC',
+        buyIn: formatRTCAmount(25000),
         seats: '0 / 4',
         description: 'The easiest place to learn the rhythm of a live ReemTeam table.',
       };
@@ -104,7 +105,7 @@ const Home: React.FC = () => {
     return {
       title: getTableDisplayName(featuredTable),
       label: getModeLabel(featuredTable.mode),
-      buyIn: isUsdTable ? `${stakeDisplay.amount} ${stakeDisplay.unit}` : `${formatRtcFromStake(featuredTable.stake)} RTC`,
+      buyIn: isUsdTable ? `${stakeDisplay.amount} ${stakeDisplay.unit}` : formatRtcFromStake(featuredTable.stake),
       seats: `${featuredTable.currentPlayerCount} / ${featuredTable.maxPlayers}`,
       description: getModeDescription(featuredTable.mode),
     };

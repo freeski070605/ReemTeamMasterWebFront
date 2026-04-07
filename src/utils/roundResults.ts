@@ -1,4 +1,5 @@
 import { IGameState, PlacementWinType } from "../types/game";
+import { formatRTCCompactAmount } from "./rtcCurrency";
 
 export type RoundDisplayCurrency = "USD" | "RTC";
 export type RoundOutcomeKey =
@@ -27,6 +28,15 @@ const is41Win = (state: Pick<IGameState, "roundEndedBy" | "lastAction">): boolea
 const isSuccessfulDrop = (state: Pick<IGameState, "roundEndedBy" | "lastAction">): boolean =>
   state.roundEndedBy === "REGULAR" && state.lastAction?.type === "drop" && !state.lastAction?.payload?.caught;
 
+const getRegularOpeningAutoWinValue = (state: Pick<IGameState, "roundEndedBy" | "lastAction">): 47 | 50 | null => {
+  const handValue = state.lastAction?.payload?.handValue;
+  if (state.roundEndedBy === "REGULAR" && state.lastAction?.type === "autoWin" && (handValue === 47 || handValue === 50)) {
+    return handValue;
+  }
+
+  return null;
+};
+
 const formatStakeAmount = (amount: number, currency: RoundDisplayCurrency): string => {
   if (currency === "USD") {
     return new Intl.NumberFormat("en-US", {
@@ -37,7 +47,7 @@ const formatStakeAmount = (amount: number, currency: RoundDisplayCurrency): stri
     }).format(amount);
   }
 
-  return `${Math.max(0, Math.trunc(amount)).toLocaleString("en-US")} RTC`;
+  return `${formatRTCCompactAmount(amount)} RTC`;
 };
 
 const findPlayerName = (state: Pick<IGameState, "players">, userId?: string): string | null => {
@@ -64,7 +74,7 @@ export const formatRoundDeltaAmount = (amount: number, currency: RoundDisplayCur
     }).format(absoluteAmount)}`;
   }
 
-  return `${sign}${Math.trunc(absoluteAmount).toLocaleString("en-US")} RTC`;
+  return `${sign}${formatRTCCompactAmount(absoluteAmount)} RTC`;
 };
 
 export const getRoundReasonLabel = (state: Pick<IGameState, "roundEndedBy" | "lastAction">): string => {
@@ -73,6 +83,8 @@ export const getRoundReasonLabel = (state: Pick<IGameState, "roundEndedBy" | "la
   if (state.roundEndedBy === "CAUGHT_DROP") return "Caught Dropping";
   if (state.roundEndedBy === "DECK_EMPTY") return "Deck Runs Out";
   if (isSuccessfulDrop(state)) return "Successful Drop";
+  const regularAutoWinValue = getRegularOpeningAutoWinValue(state);
+  if (regularAutoWinValue) return String(regularAutoWinValue);
   if (state.roundEndedBy === "REGULAR") return "Lowest Hand";
   return "Round End";
 };
@@ -86,6 +98,8 @@ export const getPlacementWinTypeLabel = (
   if (winType === "CAUGHT_DROP") return "Caught Dropping";
   if (winType === "DECK_EMPTY") return "Deck Runs Out";
   if (winType === "REEM") return "Reem";
+  const regularAutoWinValue = getRegularOpeningAutoWinValue(state);
+  if (winType === "REGULAR" && regularAutoWinValue) return String(regularAutoWinValue);
   return isSuccessfulDrop(state) ? "Successful Drop" : "Point Win";
 };
 
@@ -165,6 +179,18 @@ export const getRoundOutcomePresentation = (
         explanation: "Deck ran dry. Lowest hand on the table took the win.",
       };
     case "point-win":
+      const regularAutoWinValue = getRegularOpeningAutoWinValue(state);
+      if (regularAutoWinValue) {
+        return {
+          key: "point-win",
+          tone: "sky",
+          eyebrow: "ROUND OVER",
+          headline: `${regularAutoWinValue} AUTO WIN`,
+          secondary: amountText,
+          explanation: `Starting hand hit exactly ${regularAutoWinValue}. Regular stake payout.`,
+        };
+      }
+
       return {
         key: "point-win",
         tone: "sky",
@@ -263,6 +289,11 @@ export const getRoundAnnouncement = (
 
   if (isSuccessfulDrop(state)) {
     return `${winnerName} won on a successful drop.`;
+  }
+
+  const regularAutoWinValue = getRegularOpeningAutoWinValue(state);
+  if (regularAutoWinValue) {
+    return `${winnerName} won automatically with ${regularAutoWinValue}.`;
   }
 
   if (state.roundEndedBy === "REGULAR") {

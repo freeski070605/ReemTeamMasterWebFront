@@ -15,6 +15,8 @@ export interface Player {
   username: string;
   avatarUrl?: string;
   hand: Card[];
+  handOrder?: string[];
+  handOrderCustomized?: boolean;
   isAI: boolean;
   isHitLocked: boolean;
   hitLockCounter: number;

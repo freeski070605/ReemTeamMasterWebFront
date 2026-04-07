@@ -33,6 +33,7 @@ import {
 } from '../api/admin';
 import { useAuthStore } from '../store/authStore';
 import { USER_ROLES, UserRole, roleAtLeast } from '../types/roles';
+import { formatRTCCompactAmount } from '../utils/rtcCurrency';
 
 type AdminSection =
   | 'dashboard'
@@ -154,6 +155,14 @@ const formatDate = (value?: string | number | null) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
   return date.toLocaleString();
+};
+
+const formatRtc = (value: number | null | undefined) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '--';
+  }
+
+  return `${formatRTCCompactAmount(value)} RTC`;
 };
 
 const formatVipStatusLabel = (status?: string | null) => {
@@ -1121,7 +1130,7 @@ const Admin: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <span>Total RTC Across Wallets</span>
-                <span>{metrics?.wallets.totalRtcBalance ?? '--'}</span>
+                <span>{formatRtc(metrics?.wallets.totalRtcBalance)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Pending Queue Value</span>
@@ -1308,7 +1317,7 @@ const Admin: React.FC = () => {
                         <div className="text-xs text-white/55">{item.user.email}</div>
                       </td>
                       <td className="px-4 py-3 text-white/75">{formatCurrency(item.wallet.usdBalance)}</td>
-                      <td className="px-4 py-3 text-white/75">{item.wallet.rtcBalance}</td>
+                      <td className="px-4 py-3 text-white/75">{formatRtc(item.wallet.rtcBalance)}</td>
                       <td className="px-4 py-3 text-right">
                         <Button size="sm" variant="secondary" onClick={() => void loadWalletProfile(item.user.id)}>
                           Open
@@ -1359,7 +1368,7 @@ const Admin: React.FC = () => {
                     </div>
                     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
                       <div className="text-[11px] uppercase tracking-[0.16em] text-white/50">RTC Wallet</div>
-                      <div className="mt-1 text-lg rt-page-title">{activeProfile.wallet.rtcBalance}</div>
+                      <div className="mt-1 text-lg rt-page-title">{formatRtc(activeProfile.wallet.rtcBalance)}</div>
                     </div>
                     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
                       <div className="text-[11px] uppercase tracking-[0.16em] text-white/50">User ID</div>
@@ -1777,7 +1786,7 @@ const Admin: React.FC = () => {
                       <div className="text-xs text-white/55">{item.user.email}</div>
                     </td>
                     <td className="px-4 py-3 text-white/75">{formatCurrency(item.wallet.usdBalance)}</td>
-                    <td className="px-4 py-3 text-white/75">{item.wallet.rtcBalance}</td>
+                    <td className="px-4 py-3 text-white/75">{formatRtc(item.wallet.rtcBalance)}</td>
                     <td className="px-4 py-3 text-right">
                       <Button size="sm" variant="secondary" onClick={() => void loadWalletProfile(item.user.id)}>
                         Load
@@ -1810,7 +1819,7 @@ const Admin: React.FC = () => {
               </article>
               <article className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
                 <div className="text-xs uppercase tracking-[0.18em] text-white/50">RTC Balance</div>
-                <div className="mt-2 text-2xl rt-page-title">{activeWallet?.rtcBalance ?? '--'}</div>
+                <div className="mt-2 text-2xl rt-page-title">{formatRtc(activeWallet?.rtcBalance)}</div>
               </article>
               <article className="rounded-2xl border border-white/10 bg-[#0f1622] p-4">
                 <div className="text-xs uppercase tracking-[0.18em] text-white/50">Pending Withdrawals</div>

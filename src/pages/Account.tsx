@@ -14,6 +14,7 @@ import { Modal } from '../components/ui/Modal';
 import { DEFAULT_AVATAR_PATHS } from '../constants/avatars';
 import { resolveAvatarUrl } from '../utils/avatar';
 import { useWalletBalance } from '../hooks/useWalletBalance';
+import { formatRTCCompactAmount } from '../utils/rtcCurrency';
 
 const QUICK_DEPOSIT_AMOUNTS = [25, 50, 100, 250];
 
@@ -25,10 +26,7 @@ const formatUsdBalance = (amount: number | null): string => {
 };
 
 const formatRtcBalance = (amount: number | null): string => {
-  if (amount === null) {
-    return '0';
-  }
-  return Math.max(0, Math.floor(amount)).toLocaleString('en-US');
+  return formatRTCCompactAmount(amount);
 };
 
 const formatVipDate = (value?: string | null): string => {
@@ -211,7 +209,7 @@ const Account: React.FC = () => {
       const result = await requestRtcRefill();
       setRtcRefillNextEligibleAt(result.nextEligibleAt);
       if (result.refilled) {
-        toast.success(`Daily RTC boost claimed: +${Math.floor(result.refillAmount)} RTC`);
+        toast.success(`Daily RTC boost claimed: +${formatRTCCompactAmount(result.refillAmount)} RTC`);
       } else {
         toast.info('Daily RTC boost already claimed. Check back later.');
       }
@@ -600,8 +598,8 @@ const Account: React.FC = () => {
                         </span>
                       )}
                       <div className="text-[11px] uppercase tracking-[0.17em] text-white/55">${bundle.usdPrice.toFixed(2)} USD</div>
-                      <div className="mt-1 text-2xl rt-page-title text-white">{bundle.rtcAmount.toLocaleString()} RTC</div>
-                      <div className="mt-1 text-xs text-white/62">{rtcPerDollar.toLocaleString()} RTC per $1</div>
+                      <div className="mt-1 text-2xl rt-page-title text-white">{formatRTCCompactAmount(bundle.rtcAmount)} RTC</div>
+                      <div className="mt-1 text-xs text-white/62">{formatRTCCompactAmount(rtcPerDollar)} RTC per $1</div>
                       <div className="mt-3 text-xs text-amber-100/90">
                         {isPurchasing ? 'Redirecting to checkout...' : 'Buy this bundle'}
                       </div>

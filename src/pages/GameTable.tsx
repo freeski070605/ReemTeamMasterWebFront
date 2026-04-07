@@ -25,6 +25,7 @@ import {
   getRoundNetForPlayer,
   getRoundOutcomePresentation,
 } from "../utils/roundResults";
+import { formatRTCAmount } from "../utils/rtcCurrency";
 import { getModeLabel, getStakeDisplay } from "../branding/modeCopy";
 import bgImage from '../assets/bg.png';
 import backCardImage from "../assets/cards/back.png";
@@ -192,6 +193,7 @@ const GameTable: React.FC = () => {
     hit,
     drop,
     putIn,
+    reorderHand,
   } = useGameStore();
 
   const [selectedCards, setSelectedCards] = useState<CardType[]>([]);
@@ -220,6 +222,7 @@ const GameTable: React.FC = () => {
   const [feedbackPulseArea, setFeedbackPulseArea] = useState<InlineFeedbackArea | null>(null);
   const [activityTick, setActivityTick] = useState(0);
   const [tableMoment, setTableMoment] = useState<TableMoment | null>(null);
+  const [showHandReorderHint, setShowHandReorderHint] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -227,6 +230,7 @@ const GameTable: React.FC = () => {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const seatAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const seatPanelRefs = useRef<Partial<Record<SeatZone, HTMLDivElement | null>>>({});
+  const handCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const winnerPanelMeasurementRef = useRef<WinnerPanelMeasurement | null>(null);
   const lastAnimatedRoundKeyRef = useRef<string | null>(null);
   const hasInitializedLastActionRef = useRef(false);
@@ -237,6 +241,9 @@ const GameTable: React.FC = () => {
   const inlineFeedbackTimeoutRef = useRef<number | null>(null);
   const feedbackPulseTimeoutRef = useRef<number | null>(null);
   const tableMomentTimeoutRef = useRef<number | null>(null);
+  const handReorderHintTimeoutRef = useRef<number | null>(null);
+  const hasShownHandReorderHintRef = useRef(false);
+  const lastHandDragAtRef = useRef(0);
   const endRoundPhaseTimeoutsRef = useRef<number[]>([]);
   const lastRoundPresentationKeyRef = useRef<string | null>(null);
   const myTurnStartCountRef = useRef(0);
@@ -366,6 +373,10 @@ const GameTable: React.FC = () => {
 
   const setSeatPanelRef = useCallback((zone: SeatZone, node: HTMLDivElement | null) => {
     seatPanelRefs.current[zone] = node;
+  }, []);
+
+  const setHandCardRef = useCallback((cardId: string, node: HTMLDivElement | null) => {
+    handCardRefs.current[cardId] = node;
   }, []);
 
   // This effect intentionally measures against the latest DOM layout after each render.
@@ -908,6 +919,17 @@ const GameTable: React.FC = () => {
       if (myTurnStartCountRef.current <= 2) {
         triggerGuidance();
       }
+      if (!hasShownHandReorderHintRef.current && hasCurrentPlayer && (currentPlayer?.hand.length ?? 0) > 1) {
+        hasShownHandReorderHintRef.current = true;
+        setShowHandReorderHint(true);
+        if (handReorderHintTimeoutRef.current !== null) {
+          window.clearTimeout(handReorderHintTimeoutRef.current);
+        }
+        handReorderHintTimeoutRef.current = window.setTimeout(() => {
+          setShowHandReorderHint(false);
+          handReorderHintTimeoutRef.current = null;
+        }, 5200);
+      }
     }
 
     if (
@@ -922,13 +944,18 @@ const GameTable: React.FC = () => {
       clearGuidanceTimers();
       setShowGuidanceBanner(false);
       setShowGuidanceHelper(false);
+      setShowHandReorderHint(false);
       setGuidanceOverrideText(null);
       setGuidanceOverrideHelper(null);
+      if (handReorderHintTimeoutRef.current !== null) {
+        window.clearTimeout(handReorderHintTimeoutRef.current);
+        handReorderHintTimeoutRef.current = null;
+      }
     }
 
     wasMyTurnRef.current = isMyTurn;
     previousTurnStepRef.current = currentTurnStep;
-  }, [clearGuidanceTimers, currentTurnStep, gameState, isMyTurn, triggerGuidance]);
+  }, [clearGuidanceTimers, currentPlayer?.hand.length, currentTurnStep, gameState, hasCurrentPlayer, isMyTurn, triggerGuidance]);
 
   useEffect(() => {
     if (idleGuidanceTimeoutRef.current !== null) {
@@ -1169,6 +1196,10 @@ const GameTable: React.FC = () => {
 
   const toggleCardSelection = (card: CardType) => {
     markActionActivity();
+    if (Date.now() - lastHandDragAtRef.current < 220) {
+      return;
+    }
+
     if (selectedCards.some((c) => c.rank === card.rank && c.suit === card.suit)) {
       setSelectedCards(
         selectedCards.filter((c) => c.rank !== card.rank || c.suit !== card.suit)
@@ -1259,17 +1290,17 @@ const GameTable: React.FC = () => {
     }
   };
 
-  const handleFlickDiscard = (card: CardType, info: PanInfo) => {
+  const handleFlickDiscard = (card: CardType, info: PanInfo): boolean => {
     markActionActivity();
     const isDiscardStep = isMyTurn && hasDrawnThisTurn;
-    if (!isTouchDevice || !isDiscardStep || selectedCards.length !== 1) return;
-    if (selectedCards[0].rank !== card.rank || selectedCards[0].suit !== card.suit) return;
+    if (!isTouchDevice || !isDiscardStep || selectedCards.length !== 1) return false;
+    if (selectedCards[0].rank !== card.rank || selectedCards[0].suit !== card.suit) return false;
 
     const movedTowardDiscard = info.offset.y < -85 && Math.abs(info.offset.x) < 170;
     const quickFlickTowardDiscard = info.velocity.y < -700 && Math.abs(info.velocity.x) < 900;
 
-    if (!movedTowardDiscard && !quickFlickTowardDiscard) return;
-    discardSelectedCard();
+    if (!movedTowardDiscard && !quickFlickTowardDiscard) return false;
+    return discardSelectedCard();
   };
 
   const handleSpread = () => {
@@ -1426,7 +1457,7 @@ const GameTable: React.FC = () => {
     }
 
     if (amount === null || amount === undefined) return "-- RTC";
-    return `${Math.max(0, Math.floor(amount)).toLocaleString("en-US")} RTC`;
+    return formatRTCAmount(amount);
   };
   const placementByUserId = new Map((gameState.placements ?? []).map((placement) => [placement.userId, placement]));
   const isContinuousMode = !gameState.mode || gameState.mode === "FREE_RTC_TABLE";
@@ -2133,11 +2164,17 @@ const GameTable: React.FC = () => {
   };
 
   const displayedBottomPlayer = isSpectator ? viewerSeatPlayer : currentPlayer;
-  const hand = sortHandCards(displayedBottomPlayer?.hand ?? []);
+  const hand = [...(displayedBottomPlayer?.hand ?? [])];
   const visibleHand =
     displayedBottomPlayer ? hand.slice(0, getVisibleCardCount(displayedBottomPlayer.userId, hand.length)) : [];
   const myTurnStatus = getTurnStatus(displayedBottomPlayer?.userId ?? user._id, true);
   const canUseFlickDiscard = !isSpectator && isTouchDevice && isDiscardReady;
+  const canReorderHand =
+    !isSpectator &&
+    !!tableId &&
+    !!user &&
+    displayedBottomPlayer?.userId === user._id &&
+    visibleHand.length > 1;
   const isBottomSeatActive = isSpectator
     ? gameState.players[gameState.currentPlayerIndex]?.userId === displayedBottomPlayer?.userId
     : isMyTurn;
@@ -2203,12 +2240,67 @@ const GameTable: React.FC = () => {
   const handTouchPaddingTop = isPhoneLandscapeLayout ? 8 : 12;
   const handTouchPaddingBottom = isPhoneLandscapeLayout ? 10 : 14;
   const showBottomHand = !isRoundEnd && visibleHand.length > 0;
+  const handReorderThresholdPx = Math.max(30, handOverlapPx * 1.15);
+  const handleHandCardDragEnd = (card: CardType, info: PanInfo, allowDiscardFlick: boolean) => {
+    if (allowDiscardFlick && handleFlickDiscard(card, info)) {
+      return;
+    }
+
+    if (!canReorderHand || !tableId || !user || !displayedBottomPlayer) {
+      return;
+    }
+
+    if (Math.abs(info.offset.x) < handReorderThresholdPx || Math.abs(info.offset.x) <= Math.abs(info.offset.y)) {
+      return;
+    }
+
+    lastHandDragAtRef.current = Date.now();
+    const draggedCardId = getCardId(card);
+    const draggedNode = handCardRefs.current[draggedCardId];
+    if (!draggedNode) {
+      return;
+    }
+
+    const draggedRect = draggedNode.getBoundingClientRect();
+    const projectedCenterX = draggedRect.left + draggedRect.width / 2 + info.offset.x;
+    const otherCardIds = visibleHand
+      .map(getCardId)
+      .filter((cardId) => cardId !== draggedCardId);
+
+    const insertAt = otherCardIds.findIndex((cardId) => {
+      const node = handCardRefs.current[cardId];
+      if (!node) {
+        return false;
+      }
+
+      const rect = node.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      return projectedCenterX < centerX;
+    });
+
+    const nextHandOrder =
+      insertAt === -1
+        ? [...otherCardIds, draggedCardId]
+        : [
+            ...otherCardIds.slice(0, insertAt),
+            draggedCardId,
+            ...otherCardIds.slice(insertAt),
+          ];
+    const currentHandOrder = visibleHand.map(getCardId);
+
+    if (nextHandOrder.every((cardId, index) => cardId === currentHandOrder[index])) {
+      return;
+    }
+
+    markActionActivity();
+    reorderHand(tableId, user._id, nextHandOrder);
+  };
   const getRevealGroupsForPlayer = (player: typeof gameState.players[number] | null | undefined) => {
     if (!player) return [];
 
     const revealGroups = player.spreads.map(sortSpreadCards);
     if (player.hand.length > 0) {
-      revealGroups.push(sortHandCards(player.hand));
+      revealGroups.push([...player.hand]);
     }
 
     return revealGroups;
@@ -3014,7 +3106,26 @@ const GameTable: React.FC = () => {
                         }`}
                       />
                       <AnimatePresence>
-                        <div className={`flex flex-nowrap items-end justify-center overflow-visible ${isPhoneLandscapeLayout ? "px-2 pt-5" : "px-3 pt-6"}`}>
+                        {showHandReorderHint ? (
+                          <motion.div
+                            key="hand-reorder-hint"
+                            className={`pointer-events-none absolute left-1/2 z-[90] -translate-x-1/2 rounded-full border border-amber-200/35 bg-black/45 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-50 shadow-[0_12px_28px_rgba(0,0,0,0.28)] backdrop-blur-[8px] ${
+                              isPhoneLandscapeLayout ? "top-0" : "top-1"
+                            }`}
+                            initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                            transition={{ duration: 0.22, ease: "easeOut" }}
+                          >
+                            <span className="mr-2 text-amber-200">{"<->"}</span>
+                            Slide cards to arrange
+                          </motion.div>
+                        ) : null}
+                        <motion.div
+                          className={`flex flex-nowrap items-end justify-center overflow-visible ${isPhoneLandscapeLayout ? "px-2 pt-5" : "px-3 pt-6"}`}
+                          animate={showHandReorderHint ? { x: [0, 12, -10, 0] } : { x: 0 }}
+                          transition={showHandReorderHint ? { duration: 1.25, repeat: 2, ease: "easeInOut" } : { duration: 0.2 }}
+                        >
                           {visibleHand.map((card, cardIndex) => {
                             const isSelectedCard = selectedCards.some(
                               (c) => c.rank === card.rank && c.suit === card.suit
@@ -3023,6 +3134,7 @@ const GameTable: React.FC = () => {
                               isSelectedCard && isDiscardStep && isRestrictedDiscardCard(card);
                             const enableFlickDrag =
                               canUseFlickDiscard && isSelectedCard && !isIllegalDiscardSelection;
+                            const enableReorderDrag = canReorderHand;
                             const centerOffset = cardIndex - (visibleHand.length - 1) / 2;
                             const fanLift = Math.abs(centerOffset) * handFanLiftStep;
                             const baseRotate = centerOffset * handRotateStep;
@@ -3030,6 +3142,7 @@ const GameTable: React.FC = () => {
                             return (
                               <motion.div
                                 key={`${card.rank}-${card.suit}`}
+                                ref={(node) => setHandCardRef(getCardId(card), node)}
                                 className="card origin-bottom relative flex items-end justify-center touch-manipulation"
                                 style={{
                                   marginLeft: cardIndex === 0 ? 0 : `-${handOverlapPx}px`,
@@ -3055,12 +3168,24 @@ const GameTable: React.FC = () => {
                                     : undefined
                                 }
                                 whileTap={isMyTurn ? { scale: 0.985 } : undefined}
-                                drag={enableFlickDrag}
-                                dragElastic={enableFlickDrag ? 0.24 : 0}
+                                drag={enableFlickDrag ? true : enableReorderDrag ? "x" : false}
+                                dragElastic={enableFlickDrag ? 0.24 : enableReorderDrag ? 0.12 : 0}
                                 dragMomentum={enableFlickDrag}
                                 dragSnapToOrigin
-                                onDragEnd={enableFlickDrag ? (_, info) => handleFlickDiscard(card, info) : undefined}
+                                onDragEnd={
+                                  enableFlickDrag || enableReorderDrag
+                                    ? (_, info) => handleHandCardDragEnd(card, info, enableFlickDrag)
+                                    : undefined
+                                }
                               >
+                                {showHandReorderHint && cardIndex === Math.min(1, visibleHand.length - 1) ? (
+                                  <motion.div
+                                    className="pointer-events-none absolute inset-x-2 bottom-3 z-[95] rounded-[14px] border border-amber-200/55 shadow-[0_0_18px_rgba(251,191,36,0.36)]"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: [0.35, 0.95, 0.35] }}
+                                    transition={{ duration: 1.1, repeat: 3, ease: "easeInOut" }}
+                                  />
+                                ) : null}
                                 <div
                                   className={`pointer-events-none absolute inset-x-3 bottom-4 rounded-full blur-2xl transition-opacity ${
                                     isSelectedCard
@@ -3085,7 +3210,7 @@ const GameTable: React.FC = () => {
                               </motion.div>
                             );
                           })}
-                        </div>
+                        </motion.div>
                       </AnimatePresence>
                     </div>
                   </div>

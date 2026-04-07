@@ -38,6 +38,7 @@ import {
   getStakeTierHeading,
   getTableDisplayName,
 } from '../branding/modeCopy';
+import { formatRTCAmount } from '../utils/rtcCurrency';
 
 type PrivateTableMode = 'FREE_RTC_TABLE' | 'PRIVATE_USD_TABLE';
 
@@ -612,7 +613,7 @@ const TableSelect: React.FC = () => {
             </div>
             <div className="rt-glass rounded-2xl p-4">
               <div className="text-xs uppercase tracking-[0.2em] text-white/50">Stake</div>
-              <div className="mt-2 text-3xl rt-page-title">{promoTable ? `${promoTable.stake} RTC` : '--'}</div>
+              <div className="mt-2 text-3xl rt-page-title">{promoTable ? formatRTCAmount(promoTable.stake * 1000) : '--'}</div>
             </div>
           </section>
 

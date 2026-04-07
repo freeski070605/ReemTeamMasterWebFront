@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { PlayingCard } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { CardRank, CardSuit } from "../../types/game";
+import { formatRTCAmount } from "../../utils/rtcCurrency";
 
 type RulePopupKey = "spreadHold" | "hitLock" | "caughtDrop" | "declare41";
 
@@ -27,10 +28,6 @@ const RULE_POPUPS: Record<RulePopupKey, RulePopupContent> = {
     title: "Automatic 41",
     body: "If your starting hand is exactly 41, it is auto-claimed at the start of your first turn before drawing. If someone wins before your turn, you cannot use 41.",
   },
-};
-
-const formatRtc = (amount: number): string => {
-  return `${Math.max(0, Math.trunc(amount)).toLocaleString("en-US")} RTC`;
 };
 
 const cardSizeClass = "w-11 h-16 sm:w-12 sm:h-[4.5rem]";
@@ -77,12 +74,13 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
       caughtDrop3Players: stake * 3,
       triple4Players: stake * 9,
       summary: [
-        { label: "Reem", payout: `Each opponent pays ${formatRtc(stake * 2)}` },
-        { label: "Successful Drop", payout: `Each opponent pays ${formatRtc(stake)}` },
-        { label: "Caught Dropping", payout: `Dropper pays ${formatRtc(stake * 2)}; others pay ${formatRtc(stake)}` },
-        { label: "Deck Runs Out", payout: `Each opponent pays ${formatRtc(stake)}` },
-        { label: "41", payout: `Each opponent pays ${formatRtc(stake * 3)}` },
-        { label: "11 and Under", payout: `Each opponent pays ${formatRtc(stake * 3)}` },
+        { label: "Reem", payout: `Each opponent pays ${formatRTCAmount(stake * 2)}` },
+        { label: "Successful Drop", payout: `Each opponent pays ${formatRTCAmount(stake)}` },
+        { label: "Caught Dropping", payout: `Dropper pays ${formatRTCAmount(stake * 2)}; others pay ${formatRTCAmount(stake)}` },
+        { label: "Deck Runs Out", payout: `Each opponent pays ${formatRTCAmount(stake)}` },
+        { label: "47 or 50", payout: `Each opponent pays ${formatRTCAmount(stake)}` },
+        { label: "41", payout: `Each opponent pays ${formatRTCAmount(stake * 3)}` },
+        { label: "11 and Under", payout: `Each opponent pays ${formatRTCAmount(stake * 3)}` },
       ],
     };
   }, [exampleStakeRtc]);
@@ -100,7 +98,7 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
       <details className="rounded-xl border border-white/10 bg-black/20 p-3" open>
         <summary className="cursor-pointer font-semibold text-white">Goal of the Game</summary>
         <div className="mt-2 text-sm text-white/75">
-          Win the hand by Reem (play all cards in spreads), dropping with the lowest hand, winning when the draw pile runs out, or by a special hand (41 or 11 and under).
+          Win the hand by Reem (play all cards in spreads), dropping with the lowest hand, winning when the draw pile runs out, or by a special hand (47, 50, 41, or 11 and under).
         </div>
       </details>
 
@@ -193,11 +191,11 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
         <div className="mt-3 space-y-3 text-sm text-white/75">
           <div className="rounded-lg border border-white/10 bg-black/25 p-3">
             <div className="font-semibold text-white">Reem</div>
-            <div>4 players at {formatRtc(examples.stake)} stake: winner receives {formatRtc(examples.reem4Players)}.</div>
+            <div>4 players at {formatRTCAmount(examples.stake)} stake: winner receives {formatRTCAmount(examples.reem4Players)}.</div>
           </div>
           <div className="rounded-lg border border-white/10 bg-black/25 p-3">
             <div className="font-semibold text-white">Successful Drop</div>
-            <div>3 players at {formatRtc(examples.stake)} stake: winner receives {formatRtc(examples.drop3Players)}.</div>
+            <div>3 players at {formatRTCAmount(examples.stake)} stake: winner receives {formatRTCAmount(examples.drop3Players)}.</div>
           </div>
           <div className="rounded-lg border border-white/10 bg-black/25 p-3">
             <div className="flex flex-wrap items-center gap-2 font-semibold text-white">
@@ -205,16 +203,21 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
               <InfoButton onClick={() => setActivePopup("caughtDrop")} label="Rule Popup" />
             </div>
             <div className="mt-1">
-              3 players at {formatRtc(examples.stake)} stake: winner receives {formatRtc(examples.caughtDrop3Players)} total.
+              3 players at {formatRTCAmount(examples.stake)} stake: winner receives {formatRTCAmount(examples.caughtDrop3Players)} total.
             </div>
           </div>
           <div className="rounded-lg border border-white/10 bg-black/25 p-3">
             <div className="font-semibold text-white">Deck Runs Out</div>
-            <div>4 players at {formatRtc(examples.stake)} stake: winner receives {formatRtc(examples.standard4Players)}.</div>
+            <div>4 players at {formatRTCAmount(examples.stake)} stake: winner receives {formatRTCAmount(examples.standard4Players)}.</div>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-black/25 p-3">
+            <div className="font-semibold text-white">47 and 50</div>
+            <div>Starting hand totals exactly 47 or 50, wins automatically on the deal, and pays regular stake.</div>
+            <div>4 players at {formatRTCAmount(examples.stake)} stake: winner receives {formatRTCAmount(examples.standard4Players)}.</div>
           </div>
           <div className="rounded-lg border border-white/10 bg-black/25 p-3">
             <div className="font-semibold text-white">41 and 11 and Under</div>
-            <div>4 players at {formatRtc(examples.stake)} stake: winner receives {formatRtc(examples.triple4Players)}.</div>
+            <div>4 players at {formatRTCAmount(examples.stake)} stake: winner receives {formatRTCAmount(examples.triple4Players)}.</div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span>41 is auto-claimed at the start of your first turn before drawing.</span>
               <InfoButton onClick={() => setActivePopup("declare41")} label="Rule Popup" />
@@ -241,7 +244,10 @@ const HowToPlayGuide: React.FC<HowToPlayGuideProps> = ({ exampleStakeRtc = 1000 
           <div>
             <span className="font-semibold text-white">11 and Under:</span> Starting hand of 11 points or less is an automatic win.
           </div>
-          <div>Both special wins pay triple stake from each opponent.</div>
+          <div>
+            <span className="font-semibold text-white">47 or 50:</span> Starting hand totals exactly 47 or 50 and wins automatically on the deal.
+          </div>
+          <div>41 and 11 and Under pay triple stake from each opponent. 47 and 50 pay regular stake.</div>
         </div>
       </details>
 

@@ -33,7 +33,8 @@ export const buildTableMomentFromLastAction = (
     state.lastAction.payload?.userId ??
     state.lastAction.payload?.playerId ??
     state.lastAction.payload?.actingPlayerId ??
-    state.lastAction.payload?.currentPlayerId;
+    state.lastAction.payload?.currentPlayerId ??
+    state.lastAction.payload?.winnerId;
   const actorName = findPlayerName(state, actorId);
 
   switch (state.lastAction.type) {
@@ -88,6 +89,19 @@ export const buildTableMomentFromLastAction = (
         detail: "Triple pressure hit the table.",
         tone: "action",
       };
+    case "autoWin": {
+      const handValue = state.lastAction.payload?.handValue;
+      return {
+        eyebrow: "Opening Hand",
+        title: handValue === 47 || handValue === 50
+          ? `${actorName} auto-won with ${handValue}`
+          : `${actorName} won on the deal`,
+        detail: handValue === 47 || handValue === 50
+          ? "Regular stake payout, no declaration needed."
+          : "The round ended immediately.",
+        tone: "action",
+      };
+    }
     case "turnExpiredSkip":
     case "turnExpiredSkipNoDiscard":
       return {
