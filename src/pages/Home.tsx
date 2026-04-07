@@ -91,7 +91,7 @@ const Home: React.FC = () => {
     const featuredTable = overview?.featuredTable;
     if (!featuredTable) {
       return {
-        title: 'Crib 25K Reem Team Cash',
+        title: '25K Table',
         label: 'Reem Team Cash Crib',
         buyIn: formatRTCAmount(25000),
         seats: '0 / 4',
@@ -103,7 +103,7 @@ const Home: React.FC = () => {
     const isUsdTable = featuredTable.mode === 'USD_CONTEST' || featuredTable.mode === 'PRIVATE_USD_TABLE';
 
     return {
-      title: getTableDisplayName(featuredTable),
+      title: isUsdTable ? getTableDisplayName(featuredTable) : `${stakeDisplay.amount} Table`,
       label: getModeLabel(featuredTable.mode),
       buyIn: isUsdTable ? `${stakeDisplay.amount} ${stakeDisplay.unit}` : formatRtcFromStake(featuredTable.stake),
       seats: `${featuredTable.currentPlayerCount} / ${featuredTable.maxPlayers}`,
