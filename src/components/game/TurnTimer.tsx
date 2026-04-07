@@ -10,6 +10,7 @@ interface TurnTimerProps {
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+const TIMER_VISUAL_REFRESH_MS = 100;
 
 const TurnTimer: React.FC<TurnTimerProps> = ({
   duration,
@@ -22,7 +23,7 @@ const TurnTimer: React.FC<TurnTimerProps> = ({
   const safeDuration = Math.max(1, duration);
   const [localRemaining, setLocalRemaining] = useState(Math.max(0, timeRemaining));
   const expiresAtRef = useRef(Date.now() + Math.max(0, timeRemaining));
-  const frameRef = useRef<number | null>(null);
+  const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     const remaining = Math.max(0, timeRemaining);
@@ -31,9 +32,9 @@ const TurnTimer: React.FC<TurnTimerProps> = ({
   }, [timeRemaining, duration, isActive]);
 
   useEffect(() => {
-    if (frameRef.current !== null) {
-      cancelAnimationFrame(frameRef.current);
-      frameRef.current = null;
+    if (intervalRef.current !== null) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
 
     if (!isActive) {
@@ -43,16 +44,18 @@ const TurnTimer: React.FC<TurnTimerProps> = ({
     const tick = () => {
       const next = Math.max(0, expiresAtRef.current - Date.now());
       setLocalRemaining(next);
-      if (next > 0) {
-        frameRef.current = requestAnimationFrame(tick);
+      if (next <= 0 && intervalRef.current !== null) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
 
-    frameRef.current = requestAnimationFrame(tick);
+    tick();
+    intervalRef.current = window.setInterval(tick, TIMER_VISUAL_REFRESH_MS);
     return () => {
-      if (frameRef.current !== null) {
-        cancelAnimationFrame(frameRef.current);
-        frameRef.current = null;
+      if (intervalRef.current !== null) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
   }, [isActive]);

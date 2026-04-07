@@ -6,6 +6,7 @@ import { SOCKET_URL } from '../api/socket';
 import { buildRoundDeltaMessage, getRoundAnnouncement } from '../utils/roundResults';
 
 let presenceInterval: ReturnType<typeof setInterval> | null = null;
+const DEBUG_GAME_SOCKET = process.env.REACT_APP_DEBUG_GAME_SOCKET === 'true';
 
 interface GameStore {
   socket: Socket | null;
@@ -65,20 +66,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let activeRoundEndToastId: string | number | null = null;
 
     socket.on('connect', () => {
-      console.log('Connected to game server');
+      if (DEBUG_GAME_SOCKET) console.log('Connected to game server');
       set({ isConnected: true, error: null });
-      console.log(`Emitting joinTable for ${username} (${userId}) in table ${tableId}`);
+      if (DEBUG_GAME_SOCKET) console.log(`Emitting joinTable for ${username} (${userId}) in table ${tableId}`);
       socket.emit('joinTable', { tableId, userId, username, avatarUrl, contestId, inviteCode, spectator });
       socket.emit('presenceHeartbeat', { userId });
     });
 
     socket.on('initialGameState', (gameState: IGameState) => {
-      console.log('Received initialGameState:', gameState);
+      if (DEBUG_GAME_SOCKET) console.log('Received initialGameState:', gameState);
       set({ gameState });
     });
 
     socket.on('gameStateUpdate', (gameState: IGameState) => {
-      console.log('Received gameStateUpdate:', gameState);
+      if (DEBUG_GAME_SOCKET) console.log('Received gameStateUpdate:', gameState);
       set({ gameState });
       
       // Check for round end and notify
@@ -121,7 +122,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
 
     socket.on('roundResult', (roundResult: RoundResult) => {
-      console.log('Received roundResult:', roundResult);
+      if (DEBUG_GAME_SOCKET) console.log('Received roundResult:', roundResult);
       set({ lastRoundResult: roundResult });
     });
     
@@ -155,13 +156,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // You might want to handle redirection here if the current user is the one who left.
         // This can be done by checking against the current user's ID from useAuthStore.
         // For now, just logging it.
-        console.log(`Player ${leftPlayerId} has left the table.`);
+        if (DEBUG_GAME_SOCKET) console.log(`Player ${leftPlayerId} has left the table.`);
       }
     });
 
 
     socket.on('disconnect', () => {
-      console.log('Disconnected from game server');
+      if (DEBUG_GAME_SOCKET) console.log('Disconnected from game server');
       if (activeRoundEndToastId !== null) {
         toast.dismiss(activeRoundEndToastId);
         activeRoundEndToastId = null;
