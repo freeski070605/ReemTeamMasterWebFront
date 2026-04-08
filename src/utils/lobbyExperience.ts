@@ -1,5 +1,6 @@
 import { HomeOverview } from "../api/home";
 import { AccountStats } from "../api/wallet";
+import { getStakeDisplay } from "../branding/modeCopy";
 import { Table } from "../types/game";
 
 export interface LobbyRealtimeEvent {
@@ -61,6 +62,32 @@ const getFeedEyebrow = (type?: string) => {
 
 const getTableSeatsRemaining = (table: Table) =>
   Math.max(0, Number(table.maxPlayers ?? 0) - Number(table.currentPlayerCount ?? 0));
+
+const formatActivityStakeAmount = (amount: string) =>
+  amount.replace(/([KMBT])$/, (suffix) => suffix.toLowerCase());
+
+const getActivityTableLabel = (table: Table) => {
+  const stakeDisplay = getStakeDisplay(table.stake, table.mode);
+  return `${formatActivityStakeAmount(stakeDisplay.amount)} Table`;
+};
+
+const formatLobbyFeedMessage = (entry: LobbyRealtimeEvent, table?: Table) => {
+  if (!table) {
+    return entry.message;
+  }
+
+  const tableLabel = getActivityTableLabel(table);
+  if (entry.type === "table_join" && entry.username) {
+    return `${entry.username} joined ${tableLabel}.`;
+  }
+
+  if (entry.type === "player_left" && entry.username) {
+    return `${entry.username} left ${tableLabel}.`;
+  }
+
+  const tableName = table.name?.trim();
+  return tableName ? entry.message.replace(tableName, tableLabel) : entry.message;
+};
 
 export const getTableMomentumMeta = (table: Table): TableMomentumMeta => {
   const currentPlayerCount = Number(table.currentPlayerCount ?? 0);
@@ -161,11 +188,13 @@ export const buildLobbyActivityItems = (input: {
 }) => {
   const items: LobbyActivityItem[] = [];
   const seen = new Set<string>();
+  const tableById = new Map(input.tables.map((table) => [table._id, table]));
 
   input.lobbyFeed.slice(0, 4).forEach((entry, index) => {
+    const table = entry.tableId ? tableById.get(entry.tableId) : undefined;
     pushActivity(items, seen, {
       eyebrow: getFeedEyebrow(entry.type),
-      message: entry.message,
+      message: formatLobbyFeedMessage(entry, table),
       detail: formatRelativeTime(entry.timestamp),
       tone: getFeedTone(entry.type),
       tableId: entry.tableId,
@@ -180,14 +209,15 @@ export const buildLobbyActivityItems = (input: {
     .slice(0, 3)
     .forEach((table, index) => {
       const momentum = getTableMomentumMeta(table);
+      const tableLabel = getActivityTableLabel(table);
       pushActivity(items, seen, {
         eyebrow: momentum.badge,
         message:
           momentum.badge === "1 seat left"
-            ? `${table.name ?? "This crib"} needs one more player`
+            ? `${tableLabel} needs one more player`
             : momentum.badge === "Hot table"
-              ? `${table.name ?? "This crib"} is moving right now`
-              : `${table.name ?? "This crib"} is ${table.status === "in-game" ? "live" : "filling"}`,
+              ? `${tableLabel} is moving right now`
+              : `${tableLabel} is ${table.status === "in-game" ? "live" : "filling"}`,
         detail: momentum.detail,
         tone: momentum.tone,
         tableId: table._id,
