@@ -2206,6 +2206,10 @@ const GameTable: React.FC = () => {
       : "border-white/10 bg-black/8 opacity-85";
   const showBottomActionDock = showActionDock && (canDrop || canSpread || canHit);
   const showBottomReadyButton = isRoundEnd && isContinuousMode && !isSpectator;
+  const shouldShiftBottomReadyDockForWinner = showBottomReadyButton && shouldHeroBottomWinner;
+  const bottomReadyDockWinnerOffsetPx = shouldShiftBottomReadyDockForWinner
+    ? winnerPanelLayouts.bottom.width + PANEL_MARGIN_FROM_CARDS + (isPhoneLandscapeLayout ? 8 : 12)
+    : 0;
   const bottomSeatSideColumnClass = isPhoneLandscapeLayout ? "w-[148px]" : "w-[182px]";
   const phoneHandCardClass =
     visibleHand.length >= 6
@@ -2878,6 +2882,11 @@ const GameTable: React.FC = () => {
                       className={`pointer-events-auto flex flex-col ${
                         isPhoneLandscapeLayout ? "w-[82px] gap-1.5 pb-1" : "w-[92px] gap-1.5 pb-1"
                       }`}
+                      style={
+                        bottomReadyDockWinnerOffsetPx > 0
+                          ? { marginLeft: `${bottomReadyDockWinnerOffsetPx}px` }
+                          : undefined
+                      }
                     >
                       {showBottomActionDock ? (
                         <div className="rounded-[22px] border border-white/12 bg-black/18 p-1.5 shadow-[0_14px_28px_rgba(0,0,0,0.22)] backdrop-blur-[4px]">
