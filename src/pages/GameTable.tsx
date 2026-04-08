@@ -828,11 +828,19 @@ const GameTable: React.FC = () => {
   }, [showDealAnimation]);
 
   const currentPlayer = gameState?.players.find((p) => p.userId === user?._id);
+  const isQueuedForNextRound = !!(
+    user &&
+    gameState &&
+    !currentPlayer &&
+    !spectatorModeRequested &&
+    tableInfo?.players?.some((player) => player.userId === user._id && !player.isAI)
+  );
   const isSpectator = spectatorModeRequested && !currentPlayer;
   const isMyTurn = !!(
     gameState &&
     user &&
     !isSpectator &&
+    !isQueuedForNextRound &&
     gameState.players[gameState.currentPlayerIndex]?.userId === user._id
   );
   const turnDurationMs = gameState?.turnDurationMs ?? 60_000;
@@ -1631,7 +1639,11 @@ const GameTable: React.FC = () => {
   const guidanceHelperText = guidanceOverrideHelper ?? discardHelperText;
   const shouldShowGuidanceHelper = showGuidanceHelper && !!guidanceHelperText;
   const ambientCenterStatusText =
-    !isRoundEnd && (promoModeRequested || isSpectator) ? `${activeTurnPlayerName} is playing...` : null;
+    !isRoundEnd && isQueuedForNextRound
+      ? `You're in for the next hand. Watching ${activeTurnPlayerName} play...`
+      : !isRoundEnd && (promoModeRequested || isSpectator)
+        ? `${activeTurnPlayerName} is playing...`
+        : null;
   const routineHudMessage = (() => {
     if (inlineFeedback) {
       const isError = inlineFeedback.tone === "error";
@@ -1700,7 +1712,7 @@ const GameTable: React.FC = () => {
   const discardIsAnimating =
     lastActionType === "discardCard" ||
     (lastActionType === "drawCard" && lastActionPayload?.source === "discard");
-  const showActionDock = !isSpectator && !hideCardsForPresentation && !isRoundEnd;
+  const showActionDock = !isSpectator && !isQueuedForNextRound && !hideCardsForPresentation && !isRoundEnd;
   const globalHudBandClass = isPhoneLandscapeLayout
     ? "top-2 left-2 right-2 gap-2"
     : "top-4 left-4 right-4 gap-4";
@@ -2205,7 +2217,7 @@ const GameTable: React.FC = () => {
       ? "border-amber-300/42 bg-black/10 shadow-[0_0_20px_rgba(251,191,36,0.14)]"
       : "border-white/10 bg-black/8 opacity-85";
   const showBottomActionDock = showActionDock && (canDrop || canSpread || canHit);
-  const showBottomReadyButton = isRoundEnd && isContinuousMode && !isSpectator;
+  const showBottomReadyButton = isRoundEnd && isContinuousMode && !isSpectator && !isQueuedForNextRound && hasCurrentPlayer;
   const shouldShiftBottomReadyDockForWinner = showBottomReadyButton && shouldHeroBottomWinner;
   const bottomReadyDockWinnerOffsetPx = shouldShiftBottomReadyDockForWinner
     ? winnerPanelLayouts.bottom.width + PANEL_MARGIN_FROM_CARDS + (isPhoneLandscapeLayout ? 8 : 12)
