@@ -7,6 +7,7 @@ import { useWalletBalance } from "../hooks/useWalletBalance";
 import { Card as CardType } from "../types/game";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { toast } from "react-toastify";
+import { ANALYTICS_EVENTS } from "../analytics/events";
 import { trackEvent } from "../api/analytics";
 import { createInvite } from "../api/invites";
 
@@ -25,6 +26,11 @@ import {
   getRoundNetForPlayer,
   getRoundOutcomePresentation,
 } from "../utils/roundResults";
+import {
+  markFirstGameCompleted,
+  markFirstGameStarted,
+  readActivationExperience,
+} from "../utils/activationExperience";
 import { formatRTCAmount } from "../utils/rtcCurrency";
 import { getModeLabel, getStakeDisplay } from "../branding/modeCopy";
 import bgImage from '../assets/bg.png';
@@ -185,6 +191,7 @@ const GameTable: React.FC = () => {
     disconnect,
     gameState,
     tableInfo,
+    error: gameError,
     isConnected,
     leaveTable,
     drawCard,
@@ -259,9 +266,15 @@ const GameTable: React.FC = () => {
   } = useWalletBalance({ refreshIntervalMs: 15000, currency: walletCurrency });
   const contestId = searchParams.get("contestId") ?? undefined;
   const inviteCode = searchParams.get("inviteCode") ?? undefined;
+  const entrySource = searchParams.get("entry") ?? "direct";
+  const quickPlayReason = searchParams.get("quickPlayReason") ?? undefined;
   const spectatorModeRequested = searchParams.get("spectator") === "1";
   const promoModeRequested = searchParams.get("promo") === "1";
   const previousStatusRef = useRef<string | null>(null);
+  const joinSuccessTrackedRef = useRef(false);
+  const joinFailureTrackedRef = useRef(false);
+  const firstGameStartedRef = useRef(false);
+  const firstGameCompletedRef = useRef(false);
 
   const copyInviteLink = useCallback(async (url: string) => {
     try {
@@ -522,9 +535,46 @@ const GameTable: React.FC = () => {
       disconnect();
       if (tableId) {
         trackEvent('table_left', { tableId });
+        if (firstGameStartedRef.current && !firstGameCompletedRef.current) {
+          trackEvent(ANALYTICS_EVENTS.firstGameAbandon, {
+            tableId,
+            source: entrySource,
+            quickPlayReason,
+          });
+        }
       }
     };
-  }, [tableId, user, connect, disconnect, navigate, contestId, inviteCode, spectatorModeRequested]);
+  }, [tableId, user, connect, disconnect, navigate, contestId, inviteCode, spectatorModeRequested, entrySource, quickPlayReason]);
+
+  useEffect(() => {
+    if (!tableId || joinSuccessTrackedRef.current || !user) {
+      return;
+    }
+
+    if (tableInfo || gameState) {
+      joinSuccessTrackedRef.current = true;
+      trackEvent(ANALYTICS_EVENTS.joinTableSuccess, {
+        tableId,
+        source: entrySource,
+        quickPlayReason,
+        state: gameState ? 'live' : 'waiting_room',
+      });
+    }
+  }, [tableId, user, tableInfo, gameState, entrySource, quickPlayReason]);
+
+  useEffect(() => {
+    if (!tableId || !gameError || joinFailureTrackedRef.current || joinSuccessTrackedRef.current) {
+      return;
+    }
+
+    joinFailureTrackedRef.current = true;
+    trackEvent(ANALYTICS_EVENTS.joinTableFail, {
+      tableId,
+      source: entrySource,
+      quickPlayReason,
+      reason: gameError,
+    });
+  }, [tableId, gameError, entrySource, quickPlayReason]);
 
   useEffect(() => {
     if (!tableId || spectatorModeRequested) return;
@@ -541,14 +591,32 @@ const GameTable: React.FC = () => {
 
     if (previousStatus !== currentStatus && currentStatus === "in-progress") {
       trackEvent('game_start', { tableId, mode: gameState.mode ?? 'FREE_RTC_TABLE' });
+      if (user?._id && !readActivationExperience(user._id).hasPlayedGame) {
+        firstGameStartedRef.current = true;
+        markFirstGameStarted(user._id);
+        trackEvent(ANALYTICS_EVENTS.firstGameStarted, {
+          tableId,
+          source: entrySource,
+          quickPlayReason,
+        });
+      }
     }
 
     if (previousStatus !== currentStatus && currentStatus === "round-end") {
       trackEvent('round_end', { tableId, mode: gameState.mode ?? 'FREE_RTC_TABLE', endedBy: gameState.roundEndedBy });
+      if (user?._id && !readActivationExperience(user._id).hasCompletedGame) {
+        firstGameCompletedRef.current = true;
+        markFirstGameCompleted(user._id);
+        trackEvent(ANALYTICS_EVENTS.firstGameCompleted, {
+          tableId,
+          source: entrySource,
+          quickPlayReason,
+        });
+      }
     }
 
     previousStatusRef.current = currentStatus;
-  }, [gameState, tableId]);
+  }, [gameState, tableId, user?._id, entrySource, quickPlayReason]);
 
   useEffect(() => {
     if (gameState?.status === "round-end") {
@@ -1186,6 +1254,21 @@ const GameTable: React.FC = () => {
             </div>
           </Modal>
         </>
+      );
+    }
+
+    if (gameError && !tableInfo) {
+      return (
+        <div className="mx-auto max-w-2xl">
+          <section className="rt-panel-strong rounded-[28px] p-8 text-center">
+            <h1 className="text-3xl rt-page-title">Couldn&apos;t seat this join.</h1>
+            <p className="mt-3 text-white/68">{gameError}</p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Button onClick={() => navigate("/tables?focus=recommended")}>Browse Cribs</Button>
+              <Button variant="secondary" onClick={() => navigate("/")}>Back Home</Button>
+            </div>
+          </section>
+        </div>
       );
     }
 

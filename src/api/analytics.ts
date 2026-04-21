@@ -1,6 +1,7 @@
 import client from './client';
 
 const SESSION_KEY = 'rt_session_id';
+const SESSION_EVENT_PREFIX = 'rt_session_event:';
 
 const getSessionId = () => {
   const existing = localStorage.getItem(SESSION_KEY);
@@ -29,4 +30,22 @@ export const trackEvent = async (
   } catch (error) {
     // Swallow analytics failures to avoid UX impact.
   }
+};
+
+export const trackEventOncePerSession = async (
+  name: string,
+  metadata: Record<string, unknown> = {},
+  key: string = name
+) => {
+  if (typeof window === 'undefined') {
+    return trackEvent(name, metadata);
+  }
+
+  const storageKey = `${SESSION_EVENT_PREFIX}${key}`;
+  if (window.sessionStorage.getItem(storageKey) === '1') {
+    return;
+  }
+
+  window.sessionStorage.setItem(storageKey, '1');
+  await trackEvent(name, metadata);
 };

@@ -1,4 +1,5 @@
 import { consumePostAuthRedirect } from './authSession';
+import { buildGamePath } from './gamePath';
 
 type LocationLike = {
   pathname?: string;
@@ -11,15 +12,10 @@ type AuthRedirectState = {
 };
 
 export const buildInviteJoinPath = (tableId?: string | null, inviteCode?: string | null) => {
-  if (!tableId) {
-    return '/tables';
-  }
-
-  const query = inviteCode
-    ? `?inviteCode=${encodeURIComponent(inviteCode)}`
-    : '';
-
-  return `/game/${tableId}${query}`;
+  return buildGamePath(tableId, {
+    inviteCode,
+    entry: 'invite',
+  });
 };
 
 export const getPostAuthRedirectPath = (state?: AuthRedirectState | null) => {

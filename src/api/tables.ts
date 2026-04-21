@@ -9,9 +9,25 @@ export interface ManagedPrivateTable extends Table {
   updatedAt?: string;
 }
 
-export const quickSeat = async (): Promise<Table> => {
-  const { data } = await client.post<{ tableId: string; table: Table }>('/tables/quick-seat');
-  return data.table;
+export type QuickPlayReason =
+  | 'ready_to_start'
+  | 'instant_ai_start'
+  | 'filling_fast'
+  | 'live_open_seat';
+
+export interface QuickSeatResult {
+  tableId: string;
+  table: Table;
+  reason: QuickPlayReason;
+  beginnerFriendly: boolean;
+  availableOpenTables: number;
+}
+
+export const quickSeat = async (options?: {
+  beginnerMode?: boolean;
+}): Promise<QuickSeatResult> => {
+  const { data } = await client.post<QuickSeatResult>('/tables/quick-seat', options ?? {});
+  return data;
 };
 
 export const createPrivateTable = async (payload: {

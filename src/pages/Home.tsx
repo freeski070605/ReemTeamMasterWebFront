@@ -1,634 +1,557 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import { trackEvent } from '../api/analytics';
-import { getHomeOverview, HomeLeaderboard, HomeOverview } from '../api/home';
-import { createVipCheckout } from '../api/vip';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, BookOpen, Clock3, DoorOpen, Play, Sparkles, Users } from 'lucide-react';
+import { ANALYTICS_EVENTS } from '../analytics/events';
+import { trackEvent, trackEventOncePerSession } from '../api/analytics';
+import { getHomeOverview, HomeOverview } from '../api/home';
+import { getLobbyActivationState, LobbyActivationState } from '../api/lobby';
+import { QuickPlayReason } from '../api/tables';
+import { CribTableCard } from '../components/activation/CribTableCard';
 import { Button } from '../components/ui/Button';
+import { Loader } from '../components/ui/Loader';
+import { experienceFlags } from '../config/experienceFlags';
 import { useAuthStore } from '../store/authStore';
 import {
-  getContestDisplayName,
-  getContestStatusLabel,
+  ActivationExperienceState,
+  dismissLearnMore,
+  getResumeGamePath,
+  markPostFirstGamePromptSeen,
+  markQuickPlayIntroSeen,
+  readActivationExperience,
+} from '../utils/activationExperience';
+import { buildGamePath } from '../utils/gamePath';
+import { formatRTCAmount } from '../utils/rtcCurrency';
+import {
   getModeDescription,
-  getModeLabel,
   getStakeDisplay,
   getTableDisplayName,
 } from '../branding/modeCopy';
-import { formatRTCAmount } from '../utils/rtcCurrency';
 
-const formatUsd = (value?: number | null) =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value ?? 0);
-
-const formatRtcFromStake = (stake?: number) => {
-  if (typeof stake !== 'number' || !Number.isFinite(stake)) {
-    return formatRTCAmount(25000);
-  }
-  return formatRTCAmount(stake * 1000);
-};
-
-const formatLeaderboardValue = (metric: string, value: number) => {
-  if (metric === 'top_earners') return formatUsd(value);
-  if (metric === 'best_win_rate') return `${value.toFixed(1)}%`;
-  return Math.round(value).toLocaleString('en-US');
+const quickPlayReasonCopy: Record<QuickPlayReason, string> = {
+  ready_to_start: 'Starts fastest with a live human waiting.',
+  instant_ai_start: 'Starts instantly with AI fill already built into public cribs.',
+  filling_fast: 'Already drawing players and close to motion.',
+  live_open_seat: 'Open seat in a crib that is already moving.',
 };
 
 const Home: React.FC = () => {
-  const [overview, setOverview] = useState<HomeOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [vipCheckoutLoading, setVipCheckoutLoading] = useState(false);
-  const { isAuthenticated, user } = useAuthStore();
   const navigate = useNavigate();
-  const isVip = !!user?.isVip;
+  const { authReady, isAuthenticated, user } = useAuthStore();
+  const [loading, setLoading] = useState(true);
+  const [overview, setOverview] = useState<HomeOverview | null>(null);
+  const [launchpad, setLaunchpad] = useState<LobbyActivationState | null>(null);
+  const [localActivationState, setLocalActivationState] = useState<ActivationExperienceState | null>(null);
 
   useEffect(() => {
-    void trackEvent('home_view');
+    if (!authReady) {
+      return;
+    }
 
-    const fetchOverview = async () => {
+    let cancelled = false;
+    setLoading(true);
+
+    const load = async () => {
       try {
-        const response = await getHomeOverview();
-        setOverview(response ?? null);
+        if (isAuthenticated && experienceFlags.newPreGameLayout) {
+          const activationState = await getLobbyActivationState();
+          if (cancelled) {
+            return;
+          }
+          setLaunchpad(activationState);
+          setOverview(null);
+          setLocalActivationState(readActivationExperience(user?._id));
+          return;
+        }
+
+        const nextOverview = await getHomeOverview();
+        if (cancelled) {
+          return;
+        }
+        setOverview(nextOverview);
+        setLaunchpad(null);
       } catch (error) {
-        console.error('Failed to load home overview', error);
-        setOverview(null);
+        console.error('Failed to load home state', error);
+        if (!cancelled) {
+          setOverview(null);
+          setLaunchpad(null);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    void fetchOverview();
-  }, []);
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, isAuthenticated, user?._id]);
 
-  const handleVipCheckout = async () => {
-    void trackEvent('home_cta_click', { cta: 'vip' });
-    if (isVip) {
-      navigate('/account');
+  const activationState = useMemo(() => {
+    const local = localActivationState ?? readActivationExperience(user?._id);
+    const server = launchpad?.playerState;
+    return {
+      ...local,
+      hasPlayedGame: !!server?.hasPlayedGame || local.hasPlayedGame,
+      hasCompletedGame: !!server?.hasCompletedGame || local.hasCompletedGame,
+      firstGameStartedAt: local.firstGameStartedAt ?? server?.lastStartedAt ?? null,
+      firstGameCompletedAt: local.firstGameCompletedAt ?? server?.lastCompletedAt ?? null,
+    };
+  }, [launchpad?.playerState, localActivationState, user?._id]);
+
+  const isFirstTimeUser =
+    experienceFlags.firstTimeUserSimplifiedFlow && !activationState.hasPlayedGame;
+  const resumePath = useMemo(() => getResumeGamePath(), []);
+  const showPostFirstGamePrompt =
+    !!localActivationState?.hasCompletedGame && !localActivationState.hasSeenPostFirstGamePrompt;
+
+  useEffect(() => {
+    if (!isAuthenticated || !launchpad) {
       return;
     }
-    if (!isAuthenticated) {
-      navigate('/login', { state: { from: { pathname: '/' } } });
-      return;
+
+    void trackEventOncePerSession(
+      ANALYTICS_EVENTS.quickPlayImpression,
+      { source: 'home', firstTimeUser: isFirstTimeUser },
+      `quick-play-impression:${user?._id ?? 'anon'}`
+    );
+
+    if (isFirstTimeUser) {
+      void trackEventOncePerSession(
+        ANALYTICS_EVENTS.firstTimeUserDetected,
+        { source: 'home' },
+        `first-time-user:${user?._id ?? 'anon'}`
+      );
     }
-    setVipCheckoutLoading(true);
-    try {
-      const checkoutUrl = await createVipCheckout();
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
-        return;
-      }
-      toast.error('Failed to start VIP checkout.');
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Could not start VIP checkout.');
-    } finally {
-      setVipCheckoutLoading(false);
+
+    if (activationState.hasCompletedGame) {
+      void trackEventOncePerSession(
+        ANALYTICS_EVENTS.returnAfterFirstGame,
+        { source: 'home' },
+        `return-after-first-game:${user?._id ?? 'anon'}`
+      );
     }
+
+    if (launchpad.quickPlay) {
+      void trackEventOncePerSession(
+        ANALYTICS_EVENTS.recommendedTableImpression,
+        {
+          source: 'home',
+          tableId: launchpad.quickPlay.table._id,
+          reason: launchpad.quickPlay.reason,
+        },
+        `recommended-home:${launchpad.quickPlay.table._id}`
+      );
+    }
+
+    if (isFirstTimeUser && !activationState.hasSeenQuickPlayIntro) {
+      setLocalActivationState(markQuickPlayIntroSeen(user?._id));
+    }
+  }, [
+    activationState.hasCompletedGame,
+    activationState.hasSeenQuickPlayIntro,
+    isAuthenticated,
+    isFirstTimeUser,
+    launchpad,
+    user?._id,
+  ]);
+
+  const handleQuickPlayClick = () => {
+    void trackEvent(ANALYTICS_EVENTS.quickPlayClick, {
+      source: 'home',
+      firstTimeUser: isFirstTimeUser,
+    });
+    navigate('/quick-play');
   };
 
-  const featuredTableSummary = useMemo(() => {
-    const featuredTable = overview?.featuredTable;
-    if (!featuredTable) {
-      return {
-        title: '25K Table',
-        label: 'Reem Team Cash Crib',
-        buyIn: formatRTCAmount(25000),
-        seats: '0 / 4',
-        description: 'The easiest place to learn the rhythm of a live ReemTeam table.',
-      };
-    }
-
-    const stakeDisplay = getStakeDisplay(featuredTable.stake, featuredTable.mode);
-    const isUsdTable = featuredTable.mode === 'USD_CONTEST' || featuredTable.mode === 'PRIVATE_USD_TABLE';
-
-    return {
-      title: isUsdTable ? getTableDisplayName(featuredTable) : `${stakeDisplay.amount} Table`,
-      label: getModeLabel(featuredTable.mode),
-      buyIn: isUsdTable ? `${stakeDisplay.amount} ${stakeDisplay.unit}` : formatRtcFromStake(featuredTable.stake),
-      seats: `${featuredTable.currentPlayerCount} / ${featuredTable.maxPlayers}`,
-      description: getModeDescription(featuredTable.mode),
-    };
-  }, [overview?.featuredTable]);
-
-  const featuredContestSummary = useMemo(() => {
-    const featuredContest = overview?.featuredContest;
-    if (!featuredContest) {
-      return {
-        title: 'Cash Crown Spotlight',
-        status: 'Open Seats',
-        entry: '$10',
-        prizePool: '$0',
-        seats: '0 / 0',
-      };
-    }
-
-    return {
-      title: getContestDisplayName(featuredContest.contestId),
-      status: getContestStatusLabel(featuredContest.status),
-      entry: formatUsd(featuredContest.entryFee),
-      prizePool: formatUsd(featuredContest.prizePool),
-      seats: `${featuredContest.participants?.length ?? 0} / ${featuredContest.playerCount}`,
-    };
-  }, [overview?.featuredContest]);
-
-  const leaderboardCards = useMemo(
-    () =>
-      [
-        overview?.leaderboards.topEarners,
-        overview?.leaderboards.mostReems,
-        overview?.leaderboards.bestWinRate,
-        overview?.leaderboards.longestStreak,
-      ]
-        .filter((board): board is HomeLeaderboard => !!board)
-        .map((board) => ({
-          ...board,
-          champion: board.rankings[0] ?? null,
-          runnerUps: board.rankings.slice(1, 4),
-        })),
-    [overview]
-  );
-
-  const glossary = [
-    {
-      term: 'RTC',
-      meaning: 'Reem Team Cash. This is the in-app bankroll used in crib games and RTC lanes.',
-    },
-    {
-      term: 'Crib',
-      meaning: 'A live RTC table where hands keep moving and players can rotate in between rounds.',
-    },
-    {
-      term: 'Reem',
-      meaning: 'A premium win condition players chase and the moment most people remember.',
-    },
-    {
-      term: 'Cash Crown',
-      meaning: 'A real-money tournament lane with fixed entry, locked seats, and prize payouts.',
-    },
-  ];
-
-  const featureCards = [
-    {
-      eyebrow: 'Start Here',
-      title: 'Begin in RTC cribs',
-      body: 'If you are new, this is the easiest place to learn the pace of the table, how turns work, and when to push for a win.',
-    },
-    {
-      eyebrow: 'See What Is Live',
-      title: 'Check the board and jump in',
-      body: 'You can see who is winning, which tables are active, and where the action is before you choose where to sit.',
-    },
-    {
-      eyebrow: 'Ready For More',
-      title: 'Step into Cash Crown',
-      body: 'When you want bigger pressure and real-money competition, Cash Crown gives you fixed seats, visible prize pools, and higher stakes.',
-    },
-  ];
-
-  const newcomerSteps = [
-    {
-      step: '1',
-      title: 'Learn the basics first',
-      body: 'You should know what RTC, cribs, Reems, and Cash Crown mean before you sit down, so the page explains them right away.',
-    },
-    {
-      step: '2',
-      title: 'Pick the right place to start',
-      body: 'Most players should begin in RTC cribs, then move into tournaments later once the game starts to feel natural.',
-    },
-    {
-      step: '3',
-      title: 'Follow the live action',
-      body: 'The leaderboard and featured table show where the game is moving right now and who is playing well.',
-    },
-  ];
-
-  const livePulse = {
-    totalTables: overview?.tableSummary.totalTables ?? 0,
-    activeTables: overview?.tableSummary.activeTables ?? 0,
-    rtcTables: overview?.tableSummary.rtcTables ?? 0,
-    cashTables: overview?.tableSummary.cashTables ?? 0,
-    openContests: overview?.contestSummary.openContests ?? 0,
-    liveContests: overview?.contestSummary.liveContests ?? 0,
-    seatsFilled: overview?.contestSummary.seatsFilled ?? 0,
-    totalSeats: overview?.contestSummary.totalSeats ?? 0,
-    totalPrizePool: overview?.contestSummary.totalPrizePool ?? 0,
-  };
-
-  const openFeaturedTable = () => {
-    const featuredTableId = overview?.featuredTable?._id;
-    void trackEvent('home_cta_click', { cta: 'featured_table_primary' });
-
-    if (!isAuthenticated) {
-      navigate('/login', { state: { from: { pathname: '/tables' } } });
-      return;
-    }
-
-    if (featuredTableId) {
-      navigate(`/game/${featuredTableId}`);
-      return;
-    }
-
+  const handleBrowseClick = () => {
+    void trackEvent(ANALYTICS_EVENTS.browseCribsClick, { source: 'home' });
     navigate('/tables');
   };
 
-  const openContests = () => {
-    void trackEvent('home_cta_click', { cta: 'featured_contest_primary' });
-    if (!isAuthenticated) {
-      navigate('/login', { state: { from: { pathname: '/contests' } } });
-      return;
-    }
-
-    navigate('/contests');
+  const handleHowToPlayClick = () => {
+    void trackEvent(ANALYTICS_EVENTS.howToPlayClick, { source: 'home' });
+    navigate('/how-to-play');
   };
 
+  const handleInviteFriendsClick = () => {
+    navigate('/tables?panel=private');
+  };
+
+  const handleResumeClick = () => {
+    if (!resumePath) {
+      return;
+    }
+    navigate(resumePath);
+  };
+
+  const handleEnterRecommendedTable = (tableId: string, source: string) => {
+    void trackEvent(ANALYTICS_EVENTS.tableCardClick, { source, tableId });
+    void trackEvent(ANALYTICS_EVENTS.joinTableAttempt, { source, tableId });
+    navigate(buildGamePath(tableId, { entry: source }));
+  };
+
+  const handleDismissLearnMore = () => {
+    setLocalActivationState(dismissLearnMore(user?._id));
+  };
+
+  const handleDismissPostFirstGamePrompt = () => {
+    setLocalActivationState(markPostFirstGamePromptSeen(user?._id));
+  };
+
+  if (!authReady || loading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
+
+  if (isAuthenticated && launchpad && experienceFlags.newPreGameLayout) {
+    return (
+      <div className="space-y-6">
+        {showPostFirstGamePrompt ? (
+          <section className="rt-panel-strong rounded-[28px] border border-emerald-300/25 bg-[linear-gradient(135deg,rgba(8,35,30,0.96),rgba(13,15,19,0.96))] p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/75">
+                  First Crib Complete
+                </div>
+                <h2 className="mt-2 text-3xl rt-page-title">You’re in the game now.</h2>
+                <p className="mt-2 max-w-2xl text-sm text-white/70">
+                  That first hand is the hard part. Pull up again, browse more live cribs, or bring your own people in.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={handleQuickPlayClick}>Play Again</Button>
+                <Button variant="secondary" onClick={handleBrowseClick}>Browse More Cribs</Button>
+                <Button variant="ghost" onClick={handleDismissPostFirstGamePrompt}>Close</Button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="landing-hero rt-panel-strong relative overflow-hidden rounded-[32px] border border-white/12 p-6 md:p-8">
+          <div className="landing-hero__mesh pointer-events-none absolute inset-0 opacity-90" />
+          <div className="relative z-10 grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-start">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center rounded-full border border-white/15 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-white/70">
+                {isFirstTimeUser ? 'Start Here' : 'Back In Action'}
+              </div>
+              <h1 className="mt-5 text-4xl leading-[0.98] rt-page-title sm:text-5xl">
+                {isFirstTimeUser ? 'Jump into a crib.' : 'Get seated fast.'}
+              </h1>
+              <p className="mt-4 max-w-2xl text-base text-white/76 sm:text-lg">
+                {isFirstTimeUser
+                  ? 'Fast hands. Live pressure. One tap finds the best open seat for your first game.'
+                  : 'Pull up to the fastest live seat, browse the room list, or jump back into your last table.'}
+              </p>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Button size="lg" onClick={handleQuickPlayClick}>
+                  <Play className="mr-2 h-4 w-4" />
+                  Pull Up to a Crib
+                </Button>
+                <Button size="lg" variant="secondary" onClick={handleBrowseClick}>
+                  Browse Cribs
+                </Button>
+                {resumePath ? (
+                  <Button size="lg" variant="ghost" onClick={handleResumeClick}>
+                    Rejoin Last Table
+                  </Button>
+                ) : null}
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleHowToPlayClick}
+                  className="rounded-full border border-white/12 bg-white/[0.04] px-4 py-2 text-sm text-white/76 transition hover:bg-white/[0.08] hover:text-white"
+                >
+                  How to Play
+                </button>
+                <button
+                  type="button"
+                  onClick={handleInviteFriendsClick}
+                  className="rounded-full border border-white/12 bg-white/[0.04] px-4 py-2 text-sm text-white/76 transition hover:bg-white/[0.08] hover:text-white"
+                >
+                  Invite Friends
+                </button>
+              </div>
+
+              {isFirstTimeUser && !activationState.hasDismissedLearnMore ? (
+                <div className="mt-5 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-amber-100/80">First Game Tip</div>
+                      <p className="mt-2 text-sm text-amber-50/90">
+                        Quick Play finds the least-friction crib first. You can learn the deeper details after you’re seated.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" onClick={handleHowToPlayClick}>
+                        Learn Later
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={handleDismissLearnMore}>
+                        Hide
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="landing-stat-card rounded-2xl p-4">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Live Cribs</div>
+                  <div className="mt-2 text-3xl rt-page-title text-white">{launchpad.summary.activeTables}</div>
+                </div>
+                <div className="landing-stat-card rounded-2xl p-4">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Open Seats</div>
+                  <div className="mt-2 text-3xl rt-page-title text-white">{launchpad.summary.openSeats}</div>
+                </div>
+                <div className="landing-stat-card rounded-2xl p-4">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Players Online</div>
+                  <div className="mt-2 text-3xl rt-page-title text-white">{launchpad.summary.onlinePlayers}</div>
+                </div>
+              </div>
+            </div>
+
+            <aside className="landing-spotlight rounded-[28px] p-5 md:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">Quick Play Route</div>
+                  <div className="mt-2 text-2xl rt-page-title text-white">
+                    {launchpad.quickPlay ? 'Best seat right now' : 'No instant seat right now'}
+                  </div>
+                </div>
+                <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-200">
+                  Live
+                </span>
+              </div>
+
+              {launchpad.quickPlay ? (
+                <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Recommended Crib</div>
+                  <div className="mt-2 text-2xl rt-page-title text-white">
+                    {getTableDisplayName(launchpad.quickPlay.table)}
+                  </div>
+                  <p className="mt-2 text-sm text-white/70">
+                    {quickPlayReasonCopy[launchpad.quickPlay.reason]}
+                  </p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="landing-stat-card rounded-2xl p-4">
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Stake</div>
+                      <div className="mt-2 text-lg rt-page-title text-white">
+                        {getStakeDisplay(launchpad.quickPlay.table.stake, launchpad.quickPlay.table.mode).amount}
+                      </div>
+                    </div>
+                    <div className="landing-stat-card rounded-2xl p-4">
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Seats</div>
+                      <div className="mt-2 text-lg rt-page-title text-white">
+                        {launchpad.quickPlay.table.currentPlayerCount}/{launchpad.quickPlay.table.maxPlayers}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Button onClick={handleQuickPlayClick}>Take Me There</Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleEnterRecommendedTable(launchpad.quickPlay!.table._id, 'home-recommended')}
+                    >
+                      Enter This Crib
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-dashed border-white/12 bg-black/20 p-5 text-sm text-white/68">
+                  We couldn&apos;t find an instant seat. Browse the live room list and jump into the best crib manually.
+                </div>
+              )}
+
+              <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/48">
+                  <Clock3 className="h-4 w-4" />
+                  Activation Goal
+                </div>
+                <p className="mt-3 text-sm text-white/68">
+                  Shorten the path from app open to live seat. Everything below this hero is secondary to getting you into a game.
+                </p>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-3">
+          <button
+            type="button"
+            onClick={handleBrowseClick}
+            className="rt-panel-strong rounded-[24px] border border-white/10 p-5 text-left transition hover:border-white/20 hover:bg-white/[0.03]"
+          >
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
+              <DoorOpen className="h-4 w-4" />
+              Secondary Path
+            </div>
+            <h2 className="mt-3 text-2xl rt-page-title">Browse Cribs</h2>
+            <p className="mt-2 text-sm text-white/68">See every live table, stakes, and seat count without burying quick play.</p>
+          </button>
+          <button
+            type="button"
+            onClick={handleHowToPlayClick}
+            className="rt-panel-strong rounded-[24px] border border-white/10 p-5 text-left transition hover:border-white/20 hover:bg-white/[0.03]"
+          >
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
+              <BookOpen className="h-4 w-4" />
+              Learn As Needed
+            </div>
+            <h2 className="mt-3 text-2xl rt-page-title">How to Play</h2>
+            <p className="mt-2 text-sm text-white/68">Keep rules and terminology one tap away instead of leading the first screen.</p>
+          </button>
+          <button
+            type="button"
+            onClick={handleInviteFriendsClick}
+            className="rt-panel-strong rounded-[24px] border border-white/10 p-5 text-left transition hover:border-white/20 hover:bg-white/[0.03]"
+          >
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
+              <Users className="h-4 w-4" />
+              Returning Player Option
+            </div>
+            <h2 className="mt-3 text-2xl rt-page-title">Invite Friends</h2>
+            <p className="mt-2 text-sm text-white/68">Private rooms stay available, but they no longer compete with the primary play action.</p>
+          </button>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Fastest Seats Right Now</div>
+              <h2 className="mt-2 text-3xl rt-page-title">Live cribs worth opening first.</h2>
+            </div>
+            <Button variant="ghost" onClick={handleBrowseClick}>
+              See Full Lobby
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-3 md:grid-cols-2">
+            {launchpad.recommendedTables.map((item, index) => (
+              <CribTableCard
+                key={item.table._id}
+                table={item.table}
+                emphasized={index === 0}
+                beginnerFriendly={item.beginnerFriendly}
+                highlightLabel={index === 0 ? 'Fastest Start' : undefined}
+                ctaLabel={index === 0 ? 'Enter Recommended Crib' : undefined}
+                onEnter={(table) => handleEnterRecommendedTable(table._id, 'home-recommended-list')}
+              />
+            ))}
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  const featuredTable = overview?.featuredTable ?? null;
+
   return (
-    <div className="space-y-8 md:space-y-10">
-      <section className="landing-hero account-reveal rt-landscape-compact-card relative overflow-hidden rounded-[32px] border border-white/12 p-6 md:p-10">
+    <div className="space-y-6">
+      <section className="landing-hero rt-panel-strong relative overflow-hidden rounded-[32px] border border-white/12 p-6 md:p-8">
         <div className="landing-hero__mesh pointer-events-none absolute inset-0 opacity-90" />
-        <div className="relative z-10 grid gap-8 xl:grid-cols-[1.2fr_0.8fr] xl:items-start">
+        <div className="relative z-10 grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-start">
           <div className="max-w-3xl">
             <div className="inline-flex items-center rounded-full border border-white/15 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-white/70">
-              Crib Smoke. Crown Stage.
+              Play First
             </div>
-            <h1 className="mt-5 text-4xl leading-[0.98] rt-page-title sm:text-5xl xl:text-6xl">
-              Welcome to ReemTeam.
+            <h1 className="mt-5 text-4xl leading-[0.98] rt-page-title sm:text-5xl">
+              Pull up and start playing.
             </h1>
-            <p className="mt-5 max-w-2xl text-base text-white/76 sm:text-lg">
-              Cribs are where players run everyday hands using Reem Team Cash. Pull up, learn the flow of the table,
-              and build your stack.
+            <p className="mt-4 max-w-2xl text-base text-white/76 sm:text-lg">
+              ReemTeam should feel like a game client, not a page to read through. Sign in, find a crib fast, and get seated.
             </p>
-            <p className="mt-3 max-w-2xl text-base text-white/70 sm:text-lg">
-              When you are ready for more pressure, step into Cash Crown Tournaments for fixed seats, real-money buy-ins,
-              and prize pools.
-            </p>
-
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/tables" onClick={() => void trackEvent('home_cta_click', { cta: 'play_cribs' })}>
-                <Button size="lg">Pull Up to Cribs</Button>
-              </Link>
-              <Link to="/contests" onClick={() => void trackEvent('home_cta_click', { cta: 'cash_crown' })}>
-                <Button size="lg" variant="secondary">
-                  View Cash Crown
-                </Button>
-              </Link>
-              <Link to="/how-to-play" onClick={() => void trackEvent('home_cta_click', { cta: 'how_to_play' })}>
-                <Button size="lg" variant="ghost">
-                  How to Play ReemTeam
-                </Button>
-              </Link>
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {glossary.map((item) => (
-                <div key={item.term} className="landing-chip-card rounded-2xl p-4">
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-amber-200/90">{item.term}</div>
-                  <p className="mt-2 text-sm text-white/74">{item.meaning}</p>
-                </div>
-              ))}
+              <Button size="lg" onClick={() => navigate('/quick-play')}>
+                <Play className="mr-2 h-4 w-4" />
+                Pull Up to a Crib
+              </Button>
+              <Button size="lg" variant="secondary" onClick={() => navigate('/tables')}>
+                Browse Cribs
+              </Button>
+              <Button size="lg" variant="ghost" onClick={handleHowToPlayClick}>
+                How to Play
+              </Button>
             </div>
           </div>
 
           <aside className="landing-spotlight rounded-[28px] p-5 md:p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">Live Game Activity</div>
-                <div className="mt-2 text-2xl rt-page-title text-white">
-                  {loading ? 'Loading...' : 'What is running right now'}
-                </div>
+                <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">Live Now</div>
+                <div className="mt-2 text-2xl rt-page-title text-white">What’s moving right now</div>
               </div>
               <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-200">
-                {loading ? 'Checking' : 'Updated'}
+                Live
               </span>
             </div>
 
             <div className="mt-5 grid grid-cols-2 gap-3">
               <div className="landing-stat-card rounded-2xl p-4">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Live Tables</div>
-                <div className="mt-2 text-3xl rt-page-title text-white">{loading ? '--' : livePulse.activeTables}</div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Active Tables</div>
+                <div className="mt-2 text-3xl rt-page-title text-white">{overview?.tableSummary.activeTables ?? 0}</div>
               </div>
               <div className="landing-stat-card rounded-2xl p-4">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Open Crowns</div>
-                <div className="mt-2 text-3xl rt-page-title text-white">{loading ? '--' : livePulse.openContests}</div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">RTC Cribs</div>
+                <div className="mt-2 text-3xl rt-page-title text-white">{overview?.tableSummary.rtcTables ?? 0}</div>
               </div>
               <div className="landing-stat-card rounded-2xl p-4">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">RTC Lanes</div>
-                <div className="mt-2 text-3xl rt-page-title text-white">{loading ? '--' : livePulse.rtcTables}</div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Cash Crown</div>
+                <div className="mt-2 text-3xl rt-page-title text-white">{overview?.contestSummary.openContests ?? 0}</div>
               </div>
               <div className="landing-stat-card rounded-2xl p-4">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Prize Pools</div>
-                <div className="mt-2 text-3xl rt-page-title text-white">
-                  {loading ? '--' : formatUsd(livePulse.totalPrizePool)}
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Featured Stake</div>
+                <div className="mt-2 text-2xl rt-page-title text-white">
+                  {featuredTable ? getStakeDisplay(featuredTable.stake, featuredTable.mode).amount : formatRTCAmount(1000)}
                 </div>
               </div>
             </div>
 
             <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Featured Table</div>
-              <div className="mt-2 text-lg rt-page-title text-white">{featuredTableSummary.title}</div>
-              <div className="mt-1 text-sm text-white/68">{featuredTableSummary.description}</div>
-              <div className="mt-3 flex flex-wrap gap-4 text-xs text-white/62">
-                <span>{featuredTableSummary.label}</span>
-                <span>Buy-in: {featuredTableSummary.buyIn}</span>
-                <span>Seats: {featuredTableSummary.seats}</span>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Featured Crib</div>
+              <div className="mt-2 text-lg rt-page-title text-white">
+                {featuredTable ? getTableDisplayName(featuredTable) : 'Reem Team Cash Crib'}
               </div>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Button onClick={openFeaturedTable}>Go To Featured Table</Button>
-                <Link to={isAuthenticated ? '/tables' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'featured_table_browse' })}>
-                  <Button variant="secondary">Browse All Tables</Button>
-                </Link>
-              </div>
+              <p className="mt-2 text-sm text-white/68">
+                {featuredTable ? getModeDescription(featuredTable.mode) : 'Continuous hands, live pressure, fast entry.'}
+              </p>
             </div>
           </aside>
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        {featureCards.map((card, index) => (
-          <article
-            key={card.title}
-            className="account-reveal rt-landscape-compact-card rt-glass rounded-2xl p-6"
-            style={{ animationDelay: `${60 + index * 70}ms` }}
-          >
-            <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">{card.eyebrow}</div>
-            <h2 className="mt-3 text-2xl rt-page-title">{card.title}</h2>
-            <p className="mt-3 text-sm leading-6 text-white/70">{card.body}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-[28px] p-6 md:p-8">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Leaderboard</div>
-            <h2 className="mt-2 text-3xl rt-page-title">The 7-day board is front and center.</h2>
-            <p className="mt-3 max-w-2xl text-sm text-white/68">
-              See who is winning, who is landing the most Reems, and who is on the best run this week.
-            </p>
+      <section className="grid gap-4 md:grid-cols-3">
+        <article className="rt-panel-strong rounded-[24px] border border-white/10 p-5">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
+            <Sparkles className="h-4 w-4" />
+            One Tap
           </div>
-          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.16em] text-white/58">
-            {loading ? 'Syncing board...' : `Updated ${new Date(overview?.generatedAt ?? Date.now()).toLocaleDateString()}`}
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Link to={isAuthenticated ? '/tables' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'leaderboard_tables' })}>
-            <Button>Find a Table</Button>
-          </Link>
-          <Link to={isAuthenticated ? '/contests' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'leaderboard_crowns' })}>
-            <Button variant="secondary">See Cash Crown</Button>
-          </Link>
-        </div>
-
-        <div className="mt-6 grid gap-4 xl:grid-cols-4 md:grid-cols-2">
-          {leaderboardCards.map((board) => (
-            <article key={`${board.metric}-${board.window}`} className="landing-leaderboard-card rounded-[24px] p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">{board.window}</div>
-                  <h3 className="mt-2 text-xl rt-page-title">{board.title}</h3>
-                </div>
-                <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-amber-200">
-                  Hot
-                </span>
-              </div>
-              <p className="mt-3 text-sm text-white/64">{board.description}</p>
-
-              <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-white/48">Current Leader</div>
-                <div className="mt-2 flex items-end justify-between gap-4">
-                  <div>
-                    <div className="text-lg rt-page-title text-white">{board.champion?.username ?? 'No player yet'}</div>
-                    <div className="mt-1 text-xs text-white/55">Rank #{board.champion?.rank ?? 1}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl rt-page-title text-white">
-                      {board.champion ? formatLeaderboardValue(board.metric, board.champion.value) : '--'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                {board.runnerUps.map((player) => (
-                  <div key={`${board.metric}-${player.playerId}-${player.rank}`} className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5 text-sm">
-                    <span className="text-white/74">
-                      #{player.rank} {player.username}
-                    </span>
-                    <span className="text-white/58">{formatLeaderboardValue(board.metric, player.value)}</span>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <article className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-[28px] p-6 md:p-8">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">How ReemTeam Works</div>
-          <h2 className="mt-2 text-3xl rt-page-title">Everything should make sense before your first hand.</h2>
-          <div className="mt-6 grid gap-4">
-            {newcomerSteps.map((item) => (
-              <div key={item.step} className="flex gap-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-amber-300/30 bg-amber-300/10 text-sm font-semibold text-amber-100">
-                  {item.step}
-                </div>
-                <div>
-                  <div className="text-lg rt-page-title text-white">{item.title}</div>
-                  <p className="mt-2 text-sm leading-6 text-white/68">{item.body}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link to="/how-to-play" onClick={() => void trackEvent('home_cta_click', { cta: 'learn_rules' })}>
-              <Button>Learn the Rules</Button>
-            </Link>
-            <Link to="/tables" onClick={() => void trackEvent('home_cta_click', { cta: 'browse_tables' })}>
-              <Button variant="secondary">Browse Live Tables</Button>
-            </Link>
-          </div>
+          <h2 className="mt-3 text-2xl rt-page-title">Quick Play first.</h2>
+          <p className="mt-2 text-sm text-white/68">The strongest action is above the fold instead of buried under explainer cards.</p>
         </article>
-
-        <article className="account-reveal rt-landscape-compact-card rt-glass rounded-[28px] p-6 md:p-8">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Where To Start</div>
-          <h2 className="mt-2 text-3xl rt-page-title">Choose the game that fits where you are right now.</h2>
-          <div className="mt-6 space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-amber-200/90">Best first stop</div>
-              <div className="mt-2 text-xl rt-page-title text-white">RTC Cribs</div>
-              <p className="mt-2 text-sm text-white/68">
-                Continuous hands, easier repetition, and the cleanest place to learn table rhythm, spreads, hits, and drops.
-              </p>
-              <div className="mt-4">
-                <Link to={isAuthenticated ? '/tables' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'where_start_cribs' })}>
-                  <Button>Open RTC Tables</Button>
-                </Link>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-amber-200/90">Next step</div>
-              <div className="mt-2 text-xl rt-page-title text-white">Cash Crown Tournaments</div>
-              <p className="mt-2 text-sm text-white/68">
-                Fixed entry, visible prize pools, and locked seats for players who want a more serious match.
-              </p>
-              <div className="mt-4">
-                <Link to={isAuthenticated ? '/contests' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'where_start_crowns' })}>
-                  <Button variant="secondary">Open Cash Crown</Button>
-                </Link>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-amber-200/90">Private play</div>
-              <div className="mt-2 text-xl rt-page-title text-white">VIP Private Rooms</div>
-              <p className="mt-2 text-sm text-white/68">
-                Invite-only hosted tables let you bring your own group in and play in a more controlled room.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Button variant="secondary" onClick={handleVipCheckout} disabled={vipCheckoutLoading}>
-                  {isVip ? 'Manage VIP' : vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP'}
-                </Button>
-                <Link to={isAuthenticated ? '/account' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'where_start_vip_account' })}>
-                  <Button variant="ghost">See Account</Button>
-                </Link>
-              </div>
-            </div>
+        <article className="rt-panel-strong rounded-[24px] border border-white/10 p-5">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
+            <Clock3 className="h-4 w-4" />
+            Faster Start
           </div>
+          <h2 className="mt-3 text-2xl rt-page-title">Less browsing friction.</h2>
+          <p className="mt-2 text-sm text-white/68">Players can still browse tables, but it no longer blocks the first game path.</p>
         </article>
-      </section>
-
-      <section className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-[28px] p-6 md:p-8">
-        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr] xl:items-center">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">VIP</div>
-            <h2 className="mt-2 text-3xl rt-page-title">Play in private rooms with your own people.</h2>
-            <p className="mt-3 max-w-2xl text-sm text-white/70">
-              VIP gives you access to private RTC and USD tables, invite links you can share, and a cleaner way to set up games
-              without waiting on public seats.
-            </p>
-            <p className="mt-3 max-w-2xl text-sm text-white/64">
-              It is the best option if you want to host friends, run invite-only games, or keep your play inside a smaller room.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button onClick={handleVipCheckout} disabled={vipCheckoutLoading}>
-                {isVip ? 'Manage VIP' : vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP'}
-              </Button>
-              <Link to={isAuthenticated ? '/account' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'vip_account' })}>
-                <Button variant="secondary">{isVip ? 'Open Account' : 'See Your Account'}</Button>
-              </Link>
-            </div>
+        <article className="rt-panel-strong rounded-[24px] border border-white/10 p-5">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
+            <BookOpen className="h-4 w-4" />
+            Learn Later
           </div>
-          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            <div className="landing-stat-card rounded-2xl p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Private RTC Tables</div>
-              <div className="mt-2 text-sm text-white/72">Create invite-only RTC rooms for your own group.</div>
-            </div>
-            <div className="landing-stat-card rounded-2xl p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Private USD Tables</div>
-              <div className="mt-2 text-sm text-white/72">Host private cash games with clear stakes and human-only seats.</div>
-            </div>
-            <div className="landing-stat-card rounded-2xl p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Shareable Invites</div>
-              <div className="mt-2 text-sm text-white/72">Send players straight into the right room without extra steps.</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-        <article className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-[28px] p-6 md:p-8">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Featured Live Action</div>
-              <h2 className="mt-2 text-2xl rt-page-title">{featuredTableSummary.title}</h2>
-            </div>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-white/60">
-              {featuredTableSummary.label}
-            </span>
-          </div>
-          <p className="mt-3 text-sm text-white/68">{featuredTableSummary.description}</p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="landing-stat-card rounded-2xl p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Buy-In</div>
-              <div className="mt-2 text-lg rt-page-title text-white">{featuredTableSummary.buyIn}</div>
-            </div>
-            <div className="landing-stat-card rounded-2xl p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Seats</div>
-              <div className="mt-2 text-lg rt-page-title text-white">{featuredTableSummary.seats}</div>
-            </div>
-            <div className="landing-stat-card rounded-2xl p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Live Tables</div>
-              <div className="mt-2 text-lg rt-page-title text-white">{loading ? '--' : livePulse.totalTables}</div>
-            </div>
-          </div>
-          <div className="mt-5">
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={openFeaturedTable}>Open This Table</Button>
-              <Link to={isAuthenticated ? '/tables' : '/login'} onClick={() => void trackEvent('home_cta_click', { cta: 'featured_table_list' })}>
-                <Button variant="secondary">View All Tables</Button>
-              </Link>
-            </div>
-          </div>
+          <h2 className="mt-3 text-2xl rt-page-title">Read only when needed.</h2>
+          <p className="mt-2 text-sm text-white/68">Rules, terminology, wallet, and deeper account surfaces stay accessible without crowding the launch path.</p>
         </article>
-
-        <article className="account-reveal rt-landscape-compact-card rt-glass rounded-[28px] p-6 md:p-8">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Cash Crown Spotlight</div>
-              <h2 className="mt-2 text-2xl rt-page-title">{featuredContestSummary.title}</h2>
-            </div>
-            <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-amber-200">
-              {featuredContestSummary.status}
-            </span>
-          </div>
-          <p className="mt-3 text-sm text-white/68">
-            If you want bigger pressure, this is where you can move from RTC tables into real-money tournament play.
-          </p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="landing-stat-card rounded-2xl p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Entry</div>
-              <div className="mt-2 text-lg rt-page-title text-white">{featuredContestSummary.entry}</div>
-            </div>
-            <div className="landing-stat-card rounded-2xl p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Prize Pool</div>
-              <div className="mt-2 text-lg rt-page-title text-white">{featuredContestSummary.prizePool}</div>
-            </div>
-            <div className="landing-stat-card rounded-2xl p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/48">Seats</div>
-              <div className="mt-2 text-lg rt-page-title text-white">{featuredContestSummary.seats}</div>
-            </div>
-          </div>
-          <div className="mt-5">
-            <div className="flex flex-wrap gap-3">
-              <Button variant="secondary" onClick={openContests}>Open Cash Crown</Button>
-              <Link to="/how-to-play" onClick={() => void trackEvent('home_cta_click', { cta: 'featured_contest_rules' })}>
-                <Button variant="ghost">Learn the Game First</Button>
-              </Link>
-            </div>
-          </div>
-        </article>
-      </section>
-
-      <section className="account-reveal rt-landscape-compact-card rt-panel-strong rounded-[28px] p-6 md:p-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Ready To Play</div>
-            <h2 className="mt-2 text-3xl rt-page-title">Pick your lane and get into the game.</h2>
-            <p className="mt-3 max-w-2xl text-sm text-white/68">
-              Start in RTC cribs, check the leaderboard, or move into Cash Crown when you are ready for the bigger stage.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link to="/tables" onClick={() => void trackEvent('home_cta_click', { cta: 'bottom_play' })}>
-              <Button size="lg">Play Now</Button>
-            </Link>
-            <Button size="lg" variant="secondary" onClick={handleVipCheckout} disabled={vipCheckoutLoading || isVip}>
-              {isVip ? 'Manage VIP' : vipCheckoutLoading ? 'Starting VIP...' : 'Start VIP'}
-            </Button>
-          </div>
-        </div>
       </section>
     </div>
   );

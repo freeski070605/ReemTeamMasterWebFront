@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+import { ANALYTICS_EVENTS } from './analytics/events';
+import { trackEventOncePerSession } from './api/analytics';
 import { useAuthStore } from './store/authStore';
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
@@ -13,6 +15,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import QuickPlay from './pages/QuickPlay';
 import TableSelect from './pages/TableSelect';
 import ContestLobby from './pages/ContestLobby';
 import GameTable from './pages/GameTable';
@@ -30,11 +33,29 @@ const WalletRedirect: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  const { checkAuth } = useAuthStore();
+  const { checkAuth, authReady, isAuthenticated, user } = useAuthStore();
 
   useEffect(() => {
     void checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    void trackEventOncePerSession(ANALYTICS_EVENTS.appOpen, {
+      path: typeof window !== 'undefined' ? window.location.pathname : '/',
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!authReady || !isAuthenticated || !user?._id) {
+      return;
+    }
+
+    void trackEventOncePerSession(
+      ANALYTICS_EVENTS.signedIn,
+      { userId: user._id },
+      `signed-in:${user._id}`
+    );
+  }, [authReady, isAuthenticated, user?._id]);
 
   return (
     <Router>
@@ -52,6 +73,7 @@ const App: React.FC = () => {
           <Route path="/invite/:code" element={<Invite />} />
           
           <Route element={<ProtectedRoute />}>
+            <Route path="/quick-play" element={<QuickPlay />} />
             <Route path="/tables" element={<TableSelect />} />
             <Route path="/contests" element={<ContestLobby />} />
             <Route path="/game/:tableId" element={<GameTable />} />

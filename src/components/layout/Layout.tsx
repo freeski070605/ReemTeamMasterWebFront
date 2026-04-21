@@ -38,7 +38,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const navLinks = useMemo(
     () => {
       const links = [
-        { to: '/tables', label: 'Cribs' },
+        { to: '/', label: 'Play' },
+        { to: '/tables', label: 'Browse Cribs' },
         { to: '/contests', label: 'Cash Crown Tournaments' },
         { to: '/how-to-play', label: 'How to Play' },
         { to: '/account', label: 'Account' },
