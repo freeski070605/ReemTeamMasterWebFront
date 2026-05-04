@@ -64,7 +64,7 @@ const TableSelect: React.FC = () => {
       setError('');
     } catch (err) {
       console.error(err);
-      setError('Could not load crib tables right now. Try again.');
+      setError('Could not load crib tables. Try again.');
     }
   }, []);
 
@@ -156,7 +156,7 @@ const TableSelect: React.FC = () => {
       navigate(buildGamePath(result.tableId, { entry: 'browse-cribs-quick-play', quickPlayReason: result.reason }));
     } catch (err: any) {
       void trackEvent(ANALYTICS_EVENTS.joinTableFail, { source: 'browse-cribs-quick-play', reason: err?.response?.data?.message || 'quick_play_failed' });
-      toast.error(err?.response?.data?.message || 'No open seats available right now.');
+      toast.error(err?.response?.data?.message || 'No open seats available.');
     } finally {
       setQuickSeatLoading(false);
     }
@@ -259,8 +259,8 @@ const TableSelect: React.FC = () => {
         <div className="relative z-10 grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-start">
           <div className="max-w-3xl">
             <div className="inline-flex items-center rounded-full border border-white/15 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-white/70">Browse Cribs</div>
-            <h1 className="mt-5 text-4xl leading-[0.98] rt-page-title sm:text-5xl">Play first. Browse second.</h1>
-            <p className="mt-4 max-w-2xl text-base text-white/76 sm:text-lg">Quick Play stays on top. The full room list is here when you want to pick the exact seat and stakes yourself.</p>
+            <h1 className="mt-5 text-4xl leading-[0.98] rt-page-title sm:text-5xl">Find your crib.</h1>
+            <p className="mt-4 max-w-2xl text-base text-white/76 sm:text-lg">Use Quick Play for the fastest open seat, or choose the exact crib and stake yourself.</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button size="lg" onClick={handleQuickSeat} isLoading={quickSeatLoading}><Sparkles className="mr-2 h-4 w-4" />Pull Up to a Crib</Button>
               <Button size="lg" variant="secondary" onClick={() => navigate('/how-to-play')}>How to Play</Button>
@@ -275,7 +275,7 @@ const TableSelect: React.FC = () => {
           <aside className="landing-spotlight rounded-[28px] p-5 md:p-6">
             <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">Recommended Seat</div>
             <div className="mt-2 text-2xl rt-page-title text-white">{launchpad?.quickPlay ? getTableDisplayName(launchpad.quickPlay.table) : 'Browse manually'}</div>
-            <p className="mt-3 text-sm text-white/68">{launchpad?.quickPlay ? 'This crib is the best next entry based on speed, friction, and open seats.' : 'Quick Play could not find an instant seat. Use the crib list below.'}</p>
+            <p className="mt-3 text-sm text-white/68">{launchpad?.quickPlay ? 'A fast open seat with room to jump in.' : 'Pick a seat from the crib list below.'}</p>
             <div className="mt-4 flex flex-wrap gap-3">
               {launchpad?.quickPlay ? <Button onClick={() => handleEnterTable(launchpad.quickPlay!.table, 'browse-recommended')}>Enter Recommended Crib</Button> : null}
               <Button variant="secondary" onClick={() => { void fetchTables(); void fetchLaunchpad(); }}>Refresh Lobby</Button>
@@ -315,17 +315,17 @@ const TableSelect: React.FC = () => {
       <section className="grid gap-4 xl:grid-cols-2">
         <article className="rt-panel-strong rounded-[28px] border border-white/10 p-6">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50"><Lock className="h-4 w-4" />Private Rooms</div>
-          <h2 className="mt-3 text-3xl rt-page-title">Advanced options stay secondary.</h2>
-          <p className="mt-2 text-sm text-white/68">Hosted invite-only tables are still here, but they no longer compete with the main play action.</p>
+          <h2 className="mt-3 text-3xl rt-page-title">Invite-only cribs.</h2>
+          <p className="mt-2 text-sm text-white/68">Host a private table, choose the stake, and bring players in with an invite link.</p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Button onClick={handlePrivateEntry}>Create Private Crib</Button>
             <Button variant="secondary" onClick={() => setPrivateManagerOpen(true)}>Manage Private Tables</Button>
           </div>
         </article>
         <article className="rt-panel-strong rounded-[28px] border border-white/10 p-6">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50"><Shield className="h-4 w-4" />Secondary Destinations</div>
-          <h2 className="mt-3 text-3xl rt-page-title">Everything else lives elsewhere.</h2>
-          <p className="mt-2 text-sm text-white/68">Wallet, profile, rules, and admin stay available without crowding the path into gameplay.</p>
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50"><Shield className="h-4 w-4" />Account Tools</div>
+          <h2 className="mt-3 text-3xl rt-page-title">Wallet, rules, and profile.</h2>
+          <p className="mt-2 text-sm text-white/68">Manage funds, review rules, and keep your account ready for the next table.</p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link to="/account"><Button variant="secondary">Open Account</Button></Link>
             {isAdmin ? <Button onClick={handleOpenPromoTable} isLoading={promoLoading}>{promoTable ? 'Open Promo Table' : 'Create Promo Table'}</Button> : null}

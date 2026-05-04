@@ -84,7 +84,7 @@ const Profile: React.FC = () => {
           <div className="border-t border-white/10 pt-4">
             <h3 className="text-lg font-medium mb-3 text-white">Sign-In Method</h3>
             <p className="text-sm text-white/60">
-              Social login has been removed. Use your email and password to access this account.
+              Use your email and password to access this account.
             </p>
           </div>
         </div>

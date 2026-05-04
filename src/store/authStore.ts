@@ -117,7 +117,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
         return { ...state, user };
       });
-      toast.success('Avatar updated successfully!');
+      toast.success('Avatar saved.');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Avatar upload failed');
     }
@@ -137,9 +137,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
         return { ...state, user };
       });
-      toast.success('Avatar updated successfully!');
+      toast.success('Avatar saved.');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Avatar update failed');
+      toast.error(error.response?.data?.message || 'Avatar save failed');
     }
   },
 

@@ -29,7 +29,7 @@ import {
 
 const quickPlayReasonCopy: Record<QuickPlayReason, string> = {
   ready_to_start: 'Starts fastest with a live human waiting.',
-  instant_ai_start: 'Starts instantly with AI fill already built into public cribs.',
+  instant_ai_start: 'Starts instantly with an open public crib.',
   filling_fast: 'Already drawing players and close to motion.',
   live_open_seat: 'Open seat in a crib that is already moving.',
 };
@@ -218,9 +218,9 @@ const Home: React.FC = () => {
                 <div className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/75">
                   First Crib Complete
                 </div>
-                <h2 className="mt-2 text-3xl rt-page-title">You’re in the game now.</h2>
+                <h2 className="mt-2 text-3xl rt-page-title">First crib complete.</h2>
                 <p className="mt-2 max-w-2xl text-sm text-white/70">
-                  That first hand is the hard part. Pull up again, browse more live cribs, or bring your own people in.
+                  Pull up again, browse more live cribs, or bring your own people in.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -237,7 +237,7 @@ const Home: React.FC = () => {
           <div className="relative z-10 grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-start">
             <div className="max-w-3xl">
               <div className="inline-flex items-center rounded-full border border-white/15 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-white/70">
-                {isFirstTimeUser ? 'Start Here' : 'Back In Action'}
+                {isFirstTimeUser ? 'First Seat' : 'Ready to Play'}
               </div>
               <h1 className="mt-5 text-4xl leading-[0.98] rt-page-title sm:text-5xl">
                 {isFirstTimeUser ? 'Jump into a crib.' : 'Get seated fast.'}
@@ -284,14 +284,14 @@ const Home: React.FC = () => {
                 <div className="mt-5 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-amber-100/80">First Game Tip</div>
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-amber-100/80">First Crib</div>
                       <p className="mt-2 text-sm text-amber-50/90">
-                        Quick Play finds the least-friction crib first. You can learn the deeper details after you’re seated.
+                        Quick Play looks for an easy first seat. You can check rules and details after you&apos;re seated.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" variant="secondary" onClick={handleHowToPlayClick}>
-                        Learn Later
+                        How to Play
                       </Button>
                       <Button size="sm" variant="ghost" onClick={handleDismissLearnMore}>
                         Hide
@@ -320,9 +320,9 @@ const Home: React.FC = () => {
             <aside className="landing-spotlight rounded-[28px] p-5 md:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">Quick Play Route</div>
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">Quick Play</div>
                   <div className="mt-2 text-2xl rt-page-title text-white">
-                    {launchpad.quickPlay ? 'Best seat right now' : 'No instant seat right now'}
+                    {launchpad.quickPlay ? 'Best seat available' : 'No instant seat available'}
                   </div>
                 </div>
                 <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-200">
@@ -365,17 +365,17 @@ const Home: React.FC = () => {
                 </div>
               ) : (
                 <div className="mt-5 rounded-2xl border border-dashed border-white/12 bg-black/20 p-5 text-sm text-white/68">
-                  We couldn&apos;t find an instant seat. Browse the live room list and jump into the best crib manually.
+                  No instant seat is open. Browse the live room list and pick a crib.
                 </div>
               )}
 
               <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
                 <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/48">
                   <Clock3 className="h-4 w-4" />
-                  Activation Goal
+                  Seat Finder
                 </div>
                 <p className="mt-3 text-sm text-white/68">
-                  Shorten the path from app open to live seat. Everything below this hero is secondary to getting you into a game.
+                  Find a live seat fast and start the next hand.
                 </p>
               </div>
             </aside>
@@ -390,10 +390,10 @@ const Home: React.FC = () => {
           >
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
               <DoorOpen className="h-4 w-4" />
-              Secondary Path
+              Live Tables
             </div>
             <h2 className="mt-3 text-2xl rt-page-title">Browse Cribs</h2>
-            <p className="mt-2 text-sm text-white/68">See every live table, stakes, and seat count without burying quick play.</p>
+            <p className="mt-2 text-sm text-white/68">See every live table, stake, and seat count.</p>
           </button>
           <button
             type="button"
@@ -402,10 +402,10 @@ const Home: React.FC = () => {
           >
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
               <BookOpen className="h-4 w-4" />
-              Learn As Needed
+              Rules
             </div>
             <h2 className="mt-3 text-2xl rt-page-title">How to Play</h2>
-            <p className="mt-2 text-sm text-white/68">Keep rules and terminology one tap away instead of leading the first screen.</p>
+            <p className="mt-2 text-sm text-white/68">Check the rules, scoring, and table terms whenever you need them.</p>
           </button>
           <button
             type="button"
@@ -414,17 +414,17 @@ const Home: React.FC = () => {
           >
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
               <Users className="h-4 w-4" />
-              Returning Player Option
+              Private Play
             </div>
             <h2 className="mt-3 text-2xl rt-page-title">Invite Friends</h2>
-            <p className="mt-2 text-sm text-white/68">Private rooms stay available, but they no longer compete with the primary play action.</p>
+            <p className="mt-2 text-sm text-white/68">Create invite-only rooms for friends and regular crews.</p>
           </button>
         </section>
 
         <section className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Fastest Seats Right Now</div>
+              <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Fastest Seats</div>
               <h2 className="mt-2 text-3xl rt-page-title">Live cribs worth opening first.</h2>
             </div>
             <Button variant="ghost" onClick={handleBrowseClick}>
@@ -466,7 +466,7 @@ const Home: React.FC = () => {
               Pull up and start playing.
             </h1>
             <p className="mt-4 max-w-2xl text-base text-white/76 sm:text-lg">
-              ReemTeam should feel like a game client, not a page to read through. Sign in, find a crib fast, and get seated.
+              Sign in, find a crib fast, and get seated.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button size="lg" onClick={() => navigate('/quick-play')}>
@@ -485,8 +485,8 @@ const Home: React.FC = () => {
           <aside className="landing-spotlight rounded-[28px] p-5 md:p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">Live Now</div>
-                <div className="mt-2 text-2xl rt-page-title text-white">What’s moving right now</div>
+                <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">Live Lobby</div>
+                <div className="mt-2 text-2xl rt-page-title text-white">Open action</div>
               </div>
               <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-200">
                 Live
@@ -533,24 +533,24 @@ const Home: React.FC = () => {
             <Sparkles className="h-4 w-4" />
             One Tap
           </div>
-          <h2 className="mt-3 text-2xl rt-page-title">Quick Play first.</h2>
-          <p className="mt-2 text-sm text-white/68">The strongest action is above the fold instead of buried under explainer cards.</p>
+          <h2 className="mt-3 text-2xl rt-page-title">Quick Play.</h2>
+          <p className="mt-2 text-sm text-white/68">Jump straight into the fastest open crib.</p>
         </article>
         <article className="rt-panel-strong rounded-[24px] border border-white/10 p-5">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
             <Clock3 className="h-4 w-4" />
             Faster Start
           </div>
-          <h2 className="mt-3 text-2xl rt-page-title">Less browsing friction.</h2>
-          <p className="mt-2 text-sm text-white/68">Players can still browse tables, but it no longer blocks the first game path.</p>
+          <h2 className="mt-3 text-2xl rt-page-title">Fast seat pick.</h2>
+          <p className="mt-2 text-sm text-white/68">Pick a live seat without scrolling through every room.</p>
         </article>
         <article className="rt-panel-strong rounded-[24px] border border-white/10 p-5">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
             <BookOpen className="h-4 w-4" />
-            Learn Later
+            Rules
           </div>
-          <h2 className="mt-3 text-2xl rt-page-title">Read only when needed.</h2>
-          <p className="mt-2 text-sm text-white/68">Rules, terminology, wallet, and deeper account surfaces stay accessible without crowding the launch path.</p>
+          <h2 className="mt-3 text-2xl rt-page-title">Rules on hand.</h2>
+          <p className="mt-2 text-sm text-white/68">Rules, wallet, and account tools stay close when you need them.</p>
         </article>
       </section>
     </div>

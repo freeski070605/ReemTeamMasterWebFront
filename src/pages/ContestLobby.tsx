@@ -122,7 +122,7 @@ const ContestLobby: React.FC = () => {
       });
 
     if (candidates.length === 0) {
-      throw new Error('No joinable Cash Crown tournament table is open for this tier right now.');
+      throw new Error('No joinable Cash Crown tournament table is open for this tier.');
     }
 
     return candidates[0]._id;

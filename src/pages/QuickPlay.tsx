@@ -132,7 +132,7 @@ const QuickPlay: React.FC = () => {
         <section className="rt-panel-strong rounded-[28px] p-8 text-center">
           <h1 className="text-3xl rt-page-title">Quick Play hit a snag.</h1>
           <p className="mt-3 text-white/68">
-            We couldn&apos;t route you into a crib right away. Jump into the browse view and pick your seat manually.
+            No instant crib opened. Browse the live room list and pick a seat.
           </p>
           <div className="mt-6 flex justify-center gap-3">
             <Button onClick={() => navigate('/tables')}>Browse Cribs</Button>
@@ -150,11 +150,11 @@ const QuickPlay: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
               <Compass className="h-4 w-4" />
-              Quick Play Fallback
+              Quick Play
             </div>
-            <h1 className="mt-3 text-3xl rt-page-title">No instant seat opened.</h1>
+            <h1 className="mt-3 text-3xl rt-page-title">Pick from live cribs.</h1>
             <p className="mt-2 max-w-2xl text-sm text-white/68">
-              Here are the best live cribs to enter next. Browse if you want the full room list instead.
+              These tables have open seats and active momentum.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

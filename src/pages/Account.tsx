@@ -80,12 +80,12 @@ const Account: React.FC = () => {
 
     if (paymentStatus === 'success') {
       if (paymentType === 'rtc') {
-        toast.success('RTC purchase completed. Your RTC balance will update shortly.');
+        toast.success('RTC purchase complete. Your balance is refreshing.');
       } else if (paymentType === 'vip') {
-        toast.success('VIP subscription activated. Private tables are now unlocked.');
+        toast.success('VIP subscription active. Private tables unlocked.');
         void refreshVipStatus(true);
       } else {
-        toast.success('Deposit completed. Your balance will update shortly.');
+        toast.success('Deposit complete. Your balance is refreshing.');
       }
       window.dispatchEvent(new Event('wallet-balance-refresh'));
       void Promise.all([refreshUsdBalance(), refreshRtcBalance()]);
@@ -253,7 +253,7 @@ const Account: React.FC = () => {
       setVipCancelOpen(false);
       void refreshVipStatus();
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Could not cancel VIP right now.');
+      toast.error(error?.response?.data?.message || 'Could not cancel VIP.');
     } finally {
       setVipCanceling(false);
     }
@@ -267,7 +267,7 @@ const Account: React.FC = () => {
       await refreshVipStatus(true);
       toast.success('VIP status synced.');
     } catch {
-      toast.error('Could not sync VIP status right now.');
+      toast.error('Could not sync VIP status.');
     }
   };
 
@@ -764,7 +764,7 @@ const Account: React.FC = () => {
             <div className="text-xs uppercase tracking-[0.2em] text-white/50">Account Security</div>
             <h3 className="mt-2 text-xl rt-page-title">Credential-First Access</h3>
             <p className="mt-2 text-sm text-white/65">
-              Social sign-in is removed. Accounts now use direct email and password credentials only.
+              Use your email and password to access this account.
             </p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">

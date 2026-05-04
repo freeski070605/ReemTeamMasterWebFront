@@ -38,7 +38,7 @@ const ResetPassword: React.FC = () => {
 
     try {
       await client.post('/auth/reset-password', { token, password });
-      toast.success('Password updated. You can now sign in.');
+      toast.success('Password reset. Sign in to continue.');
       navigate('/login');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Unable to reset password');
@@ -60,7 +60,7 @@ const ResetPassword: React.FC = () => {
             to="/forgot-password"
             className="inline-block mt-6 text-amber-300 hover:text-amber-200 underline"
           >
-            Request a new reset link
+            Request another reset link
           </Link>
         </section>
       </div>
@@ -74,13 +74,13 @@ const ResetPassword: React.FC = () => {
           <div className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
             Account Recovery
           </div>
-          <h1 className="mt-5 rt-page-title text-4xl font-semibold">Set a New Password</h1>
+          <h1 className="mt-5 rt-page-title text-4xl font-semibold">Reset Your Password</h1>
           <p className="mt-3 text-white/70">
             Choose a strong password that you do not reuse elsewhere.
           </p>
           <div className="mt-8 space-y-3 text-sm text-white/70">
             <div className="rt-glass rounded-xl p-3">Minimum length: {MIN_PASSWORD_LENGTH} characters.</div>
-            <div className="rt-glass rounded-xl p-3">After updating, sign in with your new credentials.</div>
+            <div className="rt-glass rounded-xl p-3">Sign in again after the reset is complete.</div>
           </div>
         </section>
 
@@ -90,12 +90,12 @@ const ResetPassword: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4 mt-6">
             <Input
-              label="New Password"
+              label="Password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              placeholder="Enter a new password"
+              placeholder="Enter a password"
             />
             <Input
               label="Confirm Password"
@@ -103,7 +103,7 @@ const ResetPassword: React.FC = () => {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              placeholder="Re-enter your new password"
+              placeholder="Re-enter your password"
             />
             <Button type="submit" className="w-full" isLoading={isLoading}>
               Update Password

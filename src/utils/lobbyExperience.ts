@@ -126,7 +126,7 @@ export const getTableMomentumMeta = (table: Table): TableMomentumMeta => {
     recommendedScore += 140;
   } else if (activeOpenTable) {
     badge = "Hand live";
-    detail = "The board is moving right now.";
+    detail = "The board is moving.";
     tone = "sky";
     recommendedScore += 100;
   } else if (currentPlayerCount > 0) {
@@ -216,7 +216,7 @@ export const buildLobbyActivityItems = (input: {
           momentum.badge === "1 seat left"
             ? `${tableLabel} needs one more player`
             : momentum.badge === "Hot table"
-              ? `${tableLabel} is moving right now`
+              ? `${tableLabel} is moving`
               : `${tableLabel} is ${table.status === "in-game" ? "live" : "filling"}`,
         detail: momentum.detail,
         tone: momentum.tone,
@@ -262,7 +262,7 @@ export const buildLobbyActivityItems = (input: {
     const liveTables = input.tables.filter((table) => table.status === "in-game").length;
     pushActivity(items, seen, {
       eyebrow: "Lobby Live",
-      message: `${liveTables} live table${liveTables === 1 ? "" : "s"} running right now`,
+      message: `${liveTables} live table${liveTables === 1 ? "" : "s"} running`,
       detail: "Pick a seat and keep the pressure moving.",
       tone: "amber",
       priority: 80,
