@@ -3,6 +3,8 @@ export interface BuildGamePathOptions {
   inviteCode?: string | null;
   entry?: string | null;
   quickPlayReason?: string | null;
+  spectator?: boolean;
+  promo?: boolean;
 }
 
 export const buildGamePath = (tableId?: string | null, options: BuildGamePathOptions = {}) => {
@@ -22,6 +24,12 @@ export const buildGamePath = (tableId?: string | null, options: BuildGamePathOpt
   }
   if (options.quickPlayReason) {
     params.set('quickPlayReason', options.quickPlayReason);
+  }
+  if (options.spectator) {
+    params.set('spectator', '1');
+  }
+  if (options.promo) {
+    params.set('promo', '1');
   }
 
   const search = params.toString();

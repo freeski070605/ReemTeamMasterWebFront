@@ -241,7 +241,7 @@ const TableSelect: React.FC = () => {
     try {
       const table = await adminApi.ensurePromoTable(false);
       setPromoTable(table);
-      navigate(buildGamePath(table.tableId, { entry: 'admin-promo' }));
+      navigate(buildGamePath(table.tableId, { entry: 'admin-promo', spectator: true, promo: true }));
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Could not open the promo table.');
     } finally {
