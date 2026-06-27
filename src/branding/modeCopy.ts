@@ -1,4 +1,5 @@
 import { Contest, GameMode, Table } from '../types/game';
+import { getCribIdentity } from '../utils/cribIdentity';
 import { formatRTCCompactAmount } from '../utils/rtcCurrency';
 
 const DEFAULT_MODE: GameMode = 'FREE_RTC_TABLE';
@@ -114,7 +115,7 @@ export const getTableDisplayName = (table: Pick<Table, '_id' | 'name' | 'mode' |
   }
 
   if (typeof table.stake === 'number' && Number.isFinite(table.stake)) {
-    return `Crib ${formatRTCCompactAmount(rtcFromTier(table.stake))} Reem Team Cash`;
+    return getCribIdentity(table as Table).name;
   }
 
   return `Crib ${suffix}`;

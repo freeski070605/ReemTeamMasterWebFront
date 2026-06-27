@@ -15,6 +15,7 @@ import { PlayingCard as CardComponent } from "../components/ui/Card";
 import PlayerAvatar from "../components/game/PlayerAvatar";
 import TurnTimer from "../components/game/TurnTimer";
 import GameActions from "../components/game/GameActions";
+import RoundReceipt from "../components/game/RoundReceipt";
 import RtcParticleOverlay from "../components/game/RtcParticleOverlay";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
@@ -33,6 +34,8 @@ import {
 } from "../utils/activationExperience";
 import { formatRTCAmount } from "../utils/rtcCurrency";
 import { getModeLabel, getStakeDisplay } from "../branding/modeCopy";
+import { getCribIdentity, getLightReputationTag } from "../utils/cribIdentity";
+import { buildRoundReceipt, EVENT_CONFIGS, getTableHypeMessage } from "../utils/reemEvents";
 import bgImage from '../assets/bg.png';
 import backCardImage from "../assets/cards/back.png";
 
@@ -229,6 +232,7 @@ const GameTable: React.FC = () => {
   const [feedbackPulseArea, setFeedbackPulseArea] = useState<InlineFeedbackArea | null>(null);
   const [activityTick, setActivityTick] = useState(0);
   const [tableMoment, setTableMoment] = useState<TableMoment | null>(null);
+  const [completedEventHands, setCompletedEventHands] = useState(0);
   const [showHandReorderHint, setShowHandReorderHint] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
@@ -250,6 +254,7 @@ const GameTable: React.FC = () => {
   const tableMomentTimeoutRef = useRef<number | null>(null);
   const handReorderHintTimeoutRef = useRef<number | null>(null);
   const hasShownHandReorderHintRef = useRef(false);
+  const countedRoundPresentationKeyRef = useRef<string | null>(null);
   const lastHandDragAtRef = useRef(0);
   const endRoundPhaseTimeoutsRef = useRef<number[]>([]);
   const lastRoundPresentationKeyRef = useRef<string | null>(null);
@@ -953,7 +958,18 @@ const GameTable: React.FC = () => {
       return;
     }
 
-    setTableMoment(latestTableMoment);
+    const hypeMessage = getTableHypeMessage(lastActionForMoment, {
+      players: playersForMoment,
+      roundEndedBy: gameState?.roundEndedBy ?? null,
+      caughtDroppingPlayerId: caughtDroppingPlayerIdForMoment,
+    });
+
+    setTableMoment({
+      ...latestTableMoment,
+      eyebrow: hypeMessage ? "Table Hype" : latestTableMoment.eyebrow,
+      detail: hypeMessage ?? latestTableMoment.detail,
+      tone: hypeMessage ? "action" : latestTableMoment.tone,
+    });
 
     if (tableMomentTimeoutRef.current !== null) {
       window.clearTimeout(tableMomentTimeoutRef.current);
@@ -962,7 +978,7 @@ const GameTable: React.FC = () => {
     tableMomentTimeoutRef.current = window.setTimeout(() => {
       setTableMoment((current) => (current?.title === latestTableMoment.title ? null : current));
     }, 2400);
-  }, [gameState?.caughtDroppingPlayerId, gameState?.lastAction, gameState?.players]);
+  }, [gameState?.caughtDroppingPlayerId, gameState?.lastAction, gameState?.players, gameState?.roundEndedBy]);
 
   useEffect(() => {
     if (!isMyTurn || !hasCurrentPlayer) {
@@ -1083,6 +1099,10 @@ const GameTable: React.FC = () => {
 
     clearEndRoundPhaseTimers();
     lastRoundPresentationKeyRef.current = roundPresentationSequenceKey;
+    if (countedRoundPresentationKeyRef.current !== roundPresentationSequenceKey) {
+      countedRoundPresentationKeyRef.current = roundPresentationSequenceKey;
+      setCompletedEventHands((count) => count + 1);
+    }
     setEndRoundPhase("global");
 
     const winnerPhaseTimeout = window.setTimeout(() => {
@@ -1552,6 +1572,17 @@ const GameTable: React.FC = () => {
   };
   const placementByUserId = new Map((gameState.placements ?? []).map((placement) => [placement.userId, placement]));
   const isContinuousMode = !gameState.mode || gameState.mode === "FREE_RTC_TABLE";
+  const cribIdentity = tableInfo
+    ? getCribIdentity(tableInfo)
+    : { name: "The Basement", vibe: "Fast hands. New players welcome.", crownFallback: "Crown open.", eventType: "friday_night_reem" as const };
+  const activeEventConfig = EVENT_CONFIGS[cribIdentity.eventType];
+  const eventHandNumber = Math.min(activeEventConfig.handLimit, completedEventHands + (gameState.status === "round-end" ? 0 : 1));
+  const isFinalEventHand = eventHandNumber >= activeEventConfig.handLimit;
+  const eventProgressLabel = gameState.status === "round-end"
+    ? `Hand ${Math.max(1, eventHandNumber)}/${activeEventConfig.handLimit} Complete`
+    : isFinalEventHand
+      ? "FINAL HAND - CROWN ON THE LINE"
+      : `Hand ${Math.max(1, eventHandNumber)} of ${activeEventConfig.handLimit}`;
   const rankedRoundPlayers = [...gameState.players].sort((a, b) => {
     const aRank = placementByUserId.get(a.userId)?.rank ?? Number.MAX_SAFE_INTEGER;
     const bRank = placementByUserId.get(b.userId)?.rank ?? Number.MAX_SAFE_INTEGER;
@@ -1617,6 +1648,33 @@ const GameTable: React.FC = () => {
     };
   });
   const roundResultByUserId = new Map(roundResultRows.map((row) => [row.userId, row]));
+  const eventLeaderboardRows = [...gameState.players]
+    .map((player) => {
+      const roundNet = getRoundNetForPlayer(gameState, player.userId) ?? 0;
+      return {
+        userId: player.userId,
+        username: player.username,
+        netRtc: roundNet,
+        tag: getLightReputationTag(player.userId),
+      };
+    })
+    .sort((a, b) => b.netRtc - a.netRtc);
+  const roundReceipt = gameState.status === "round-end"
+    ? buildRoundReceipt(gameState, {
+        cribName: cribIdentity.name,
+        winnerName: winnerPlayer?.username,
+        payoutRtc: winnerRoundNet,
+      })
+    : null;
+  const handleCopyReceipt = async () => {
+    if (!roundReceipt) return;
+    try {
+      await navigator.clipboard.writeText(roundReceipt.receiptText);
+      toast.success("Receipt copied.");
+    } catch {
+      toast.info(roundReceipt.receiptText);
+    }
+  };
   const waitingPlayerCount = Math.max(0, totalRoundPlayers - readyCount);
   const roundReadyProgress = totalRoundPlayers > 0 ? readyCount / totalRoundPlayers : 0;
   const roundRailStatusLabel = isContinuousMode
@@ -1630,8 +1688,14 @@ const GameTable: React.FC = () => {
     promoModeRequested || spectatorModeRequested
       ? PROMO_ROUND_READY_DURATION_MS / 1000
       : DEFAULT_ROUND_READY_DURATION_MS / 1000;
+  const displayedRoundCountdownSeconds =
+    waitingPlayerCount === 0
+      ? Math.min(roundCountdownSeconds ?? defaultRoundCountdownSeconds, 3)
+      : roundCountdownSeconds ?? defaultRoundCountdownSeconds;
   const countdownLabel = isContinuousMode
-    ? `Next hand in ${roundCountdownSeconds ?? defaultRoundCountdownSeconds}s`
+    ? waitingPlayerCount === 0
+      ? "Next hand starting..."
+      : `Next hand in ${displayedRoundCountdownSeconds}s`
     : null;
   const isRoundEnd = gameState.status === "round-end";
   const roundPresentationKey = isRoundEnd
@@ -1654,7 +1718,7 @@ const GameTable: React.FC = () => {
   const runItBackPrompt = !isContinuousMode
     ? "Match complete"
     : waitingPlayerCount === 0
-      ? "Table locked in"
+      ? `${readyCount}/${totalRoundPlayers} locked`
       : waitingPlayerCount === 1
         ? "Waiting on one player"
         : `${waitingPlayerCount} players still deciding`;
@@ -1915,6 +1979,20 @@ const GameTable: React.FC = () => {
       : "h-[4.4rem] w-[3.05rem] sm:h-[4.75rem] sm:w-[3.3rem]",
   };
   const dropLockTurnsRemaining = currentPlayer?.hitLockCounter ?? 0;
+  const drawDeckDisabledReason = !isMyTurn
+    ? "Wait for your turn."
+    : hasDrawnThisTurn
+      ? "Draw is already done."
+      : gameState.deck.length <= 0
+        ? "Deck is empty."
+        : undefined;
+  const drawDiscardDisabledReason = !isMyTurn
+    ? "Wait for your turn."
+    : hasDrawnThisTurn
+      ? "Draw is already done."
+      : gameState.discardPile.length <= 0
+        ? "Discard pile is empty."
+        : undefined;
 
   const canDrop = !!(
     isMyTurn &&
@@ -1960,6 +2038,35 @@ const GameTable: React.FC = () => {
       : selectedCards.length === 1
         ? undefined
         : "Select exactly 1 card.";
+  const canDiscard = !!(
+    isMyTurn &&
+    hasDrawnThisTurn &&
+    !hasDiscardedThisTurn &&
+    selectedCards.length === 1 &&
+    !selectedIllegalDiscardCard
+  );
+  const discardDisabledReason = !isMyTurn
+    ? "Wait for your turn."
+    : !hasDrawnThisTurn
+      ? "Draw first."
+      : hasDiscardedThisTurn
+        ? "Turn already ended."
+        : selectedCards.length !== 1
+          ? "Select 1 card."
+          : selectedIllegalDiscardCard
+            ? "Cannot discard pickup."
+            : undefined;
+  const activeInstruction = isRoundEnd
+    ? roundRailStatusLabel
+    : isHitMode
+      ? "Your move: choose a spread to hit"
+      : isMyTurn
+        ? isDiscardStep
+          ? "Your move: discard 1 card"
+          : canDrop
+            ? "Your move: draw from deck or discard. Drop is available."
+            : "Your move: draw from deck or discard"
+        : `${activeTurnPlayerName} is up`;
 
   const getTurnStatus = (playerUserId: string, isSelfPanel = false): TurnStatusBadge => {
     if (!activeTurnPlayer || activeTurnPlayer.userId !== playerUserId) {
@@ -2299,7 +2406,7 @@ const GameTable: React.FC = () => {
     : isBottomSeatActive
       ? "border-amber-300/42 bg-black/10 shadow-[0_0_20px_rgba(251,191,36,0.14)]"
       : "border-white/10 bg-black/8 opacity-85";
-  const showBottomActionDock = showActionDock && (canDrop || canSpread || canHit);
+  const showBottomActionDock = showActionDock && isMyTurn;
   const showBottomReadyButton = isRoundEnd && isContinuousMode && !isSpectator && !isQueuedForNextRound && hasCurrentPlayer;
   const shouldShiftBottomReadyDockForWinner = showBottomReadyButton && shouldHeroBottomWinner;
   const bottomReadyDockWinnerOffsetPx = shouldShiftBottomReadyDockForWinner
@@ -2747,6 +2854,13 @@ const GameTable: React.FC = () => {
                         ) : null}
                         <span className="font-bold">{formatSeatBalance(gameState.pot)}</span>
                       </div>
+                      <div
+                        className={`flex items-center rounded-full border border-amber-200/22 bg-amber-300/10 text-amber-50 shadow-[0_12px_26px_rgba(0,0,0,0.18)] ${
+                          isPhoneLandscapeLayout ? "px-2 py-1 text-[10px]" : "px-3 py-1.5 text-[10px]"
+                        }`}
+                      >
+                        <span className="font-bold uppercase tracking-[0.14em]">{eventProgressLabel}</span>
+                      </div>
                       <Button
                         variant="secondary"
                         size="sm"
@@ -2875,6 +2989,47 @@ const GameTable: React.FC = () => {
                             ) : null}
                           </motion.div>
                         ) : null}
+                        {isRoundEndSettlementPhase && roundReceipt ? (
+                          <motion.div
+                            key={`receipt-${roundReceipt.id}`}
+                            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                            transition={{ duration: 0.24, ease: "easeOut" }}
+                            className="w-full"
+                          >
+                            <RoundReceipt
+                              receipt={roundReceipt}
+                              compact={isPhoneLandscapeLayout}
+                              onCopy={handleCopyReceipt}
+                              onInvite={handleCreateInviteLink}
+                              onRunItBack={isContinuousMode && !isReadyForNextRound ? handlePutIn : undefined}
+                            />
+                          </motion.div>
+                        ) : null}
+                        {!isPhoneLandscapeLayout && isRoundEndSettlementPhase ? (
+                          <motion.div
+                            key={`event-board-${roundPresentationKey}`}
+                            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                            transition={{ duration: 0.24, ease: "easeOut" }}
+                            className="w-full rounded-[22px] border border-white/12 bg-black/28 p-3 text-white shadow-[0_14px_28px_rgba(0,0,0,0.2)] backdrop-blur-[8px]"
+                          >
+                            <div className="text-[8px] font-semibold uppercase tracking-[0.26em] text-white/52">
+                              {activeEventConfig.label}
+                            </div>
+                            <div className="mt-1 text-[11px] font-semibold text-amber-50">{eventProgressLabel}</div>
+                            <div className="mt-2 space-y-1">
+                              {eventLeaderboardRows.slice(0, 4).map((entry, index) => (
+                                <div key={entry.userId} className="flex items-center justify-between gap-2 text-[10px] text-white/74">
+                                  <span className="truncate">{index + 1}. {entry.username}</span>
+                                  <span className="shrink-0 font-semibold text-white">{formatRoundDeltaAmount(entry.netRtc, "RTC")}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </motion.div>
+                        ) : null}
                       </AnimatePresence>
                     </div>
                   </div>
@@ -2975,7 +3130,7 @@ const GameTable: React.FC = () => {
                   {showBottomActionDock || showBottomReadyButton ? (
                     <div
                       className={`pointer-events-auto flex flex-col ${
-                        isPhoneLandscapeLayout ? "w-[82px] gap-1.5 pb-1" : "w-[92px] gap-1.5 pb-1"
+                        isPhoneLandscapeLayout ? "w-[142px] gap-1.5 pb-1" : "w-[168px] gap-1.5 pb-1"
                       }`}
                       style={
                         bottomReadyDockWinnerOffsetPx > 0
@@ -2984,8 +3139,21 @@ const GameTable: React.FC = () => {
                       }
                     >
                       {showBottomActionDock ? (
-                        <div className="rounded-[22px] border border-white/12 bg-black/18 p-1.5 shadow-[0_14px_28px_rgba(0,0,0,0.22)] backdrop-blur-[4px]">
+                        <div className="rounded-[22px] border border-white/12 bg-black/24 p-1.5 shadow-[0_14px_28px_rgba(0,0,0,0.22)] backdrop-blur-[6px]">
+                          <div className={`${isPhoneLandscapeLayout ? "px-1 pb-1 text-[9px]" : "px-1.5 pb-1.5 text-[10px]"} font-semibold leading-tight text-amber-50`}>
+                            {activeInstruction}
+                          </div>
                           <GameActions
+                            drawDeck={{
+                              enabled: canDrawFromDeck,
+                              reason: canDrawFromDeck ? undefined : drawDeckDisabledReason,
+                              isPrimary: canDrawFromDeck,
+                            }}
+                            drawDiscard={{
+                              enabled: canDrawFromDiscard,
+                              reason: canDrawFromDiscard ? undefined : drawDiscardDisabledReason,
+                              isPrimary: canDrawFromDiscard,
+                            }}
                             drop={{
                               enabled: canDrop,
                               reason: canDrop ? undefined : dropDisabledReason,
@@ -3001,12 +3169,19 @@ const GameTable: React.FC = () => {
                               reason: canHit ? undefined : hitDisabledReason,
                               isPrimary: canHit,
                             }}
+                            discard={{
+                              enabled: canDiscard,
+                              reason: canDiscard ? undefined : discardDisabledReason,
+                              isPrimary: canDiscard,
+                            }}
+                            onDrawDeck={handleDeckClick}
+                            onDrawDiscard={handleDiscardPileClick}
                             onDrop={handleDrop}
                             onSpread={handleSpread}
                             onHit={handleHitClick}
+                            onDiscard={discardSelectedCard}
                             orientation="vertical"
                             layout="side-stack"
-                            hideDisabled
                           />
                         </div>
                       ) : null}

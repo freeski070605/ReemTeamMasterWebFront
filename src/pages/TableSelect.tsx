@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Lock, Shield, Sparkles } from 'lucide-react';
+import { CalendarDays, Lock, Shield, Sparkles, Users } from 'lucide-react';
 import { toast } from 'react-toastify';
 import client from '../api/client';
 import { adminApi, AdminTable } from '../api/admin';
@@ -19,6 +19,7 @@ import { useAuthStore } from '../store/authStore';
 import { Table } from '../types/game';
 import { roleAtLeast } from '../types/roles';
 import { buildGamePath } from '../utils/gamePath';
+import { EVENT_CONFIGS } from '../utils/reemEvents';
 
 type PrivateTableMode = 'FREE_RTC_TABLE' | 'PRIVATE_USD_TABLE';
 
@@ -258,13 +259,13 @@ const TableSelect: React.FC = () => {
         <div className="landing-hero__mesh pointer-events-none absolute inset-0 opacity-90" />
         <div className="relative z-10 grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-start">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center rounded-full border border-white/15 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-white/70">Browse Cribs</div>
-            <h1 className="mt-5 text-4xl leading-[0.98] rt-page-title sm:text-5xl">Find your crib.</h1>
-            <p className="mt-4 max-w-2xl text-base text-white/76 sm:text-lg">Use Quick Play for the fastest open seat, or choose the exact crib and stake yourself.</p>
+            <div className="inline-flex items-center rounded-full border border-white/15 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-white/70">A crib in your pocket</div>
+            <h1 className="mt-5 text-4xl leading-[0.98] rt-page-title sm:text-5xl">Pull Up To The Crib</h1>
+            <p className="mt-4 max-w-2xl text-base text-white/76 sm:text-lg">Run hands, take the crown, and keep your table alive.</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Button size="lg" onClick={handleQuickSeat} isLoading={quickSeatLoading}><Sparkles className="mr-2 h-4 w-4" />Pull Up to a Crib</Button>
-              <Button size="lg" variant="secondary" onClick={() => navigate('/how-to-play')}>How to Play</Button>
-              <Button size="lg" variant="ghost" onClick={handlePrivateEntry}>Invite Friends</Button>
+              <Button size="lg" onClick={handleQuickSeat} isLoading={quickSeatLoading}><Sparkles className="mr-2 h-4 w-4" />Take a Seat</Button>
+              <Button size="lg" variant="secondary" onClick={handlePrivateEntry}><Users className="mr-2 h-4 w-4" />Invite Crew</Button>
+              <Button size="lg" variant="ghost" onClick={() => navigate('/how-to-play')}>How to Play</Button>
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <div className="landing-stat-card rounded-2xl p-4"><div className="text-[11px] uppercase tracking-[0.18em] text-white/50">Open Seats</div><div className="mt-2 text-3xl rt-page-title text-white">{openSeats}</div></div>
@@ -275,13 +276,27 @@ const TableSelect: React.FC = () => {
           <aside className="landing-spotlight rounded-[28px] p-5 md:p-6">
             <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">Recommended Seat</div>
             <div className="mt-2 text-2xl rt-page-title text-white">{launchpad?.quickPlay ? getTableDisplayName(launchpad.quickPlay.table) : 'Browse manually'}</div>
-            <p className="mt-3 text-sm text-white/68">{launchpad?.quickPlay ? 'A fast open seat with room to jump in.' : 'Pick a seat from the crib list below.'}</p>
+            <p className="mt-3 text-sm text-white/68">{launchpad?.quickPlay ? 'Best available crib with a seat open.' : 'Pick a seat from the crib list below.'}</p>
             <div className="mt-4 flex flex-wrap gap-3">
-              {launchpad?.quickPlay ? <Button onClick={() => handleEnterTable(launchpad.quickPlay!.table, 'browse-recommended')}>Enter Recommended Crib</Button> : null}
+              {launchpad?.quickPlay ? <Button onClick={() => handleEnterTable(launchpad.quickPlay!.table, 'browse-recommended')}>Take Seat</Button> : null}
               <Button variant="secondary" onClick={() => { void fetchTables(); void fetchLaunchpad(); }}>Refresh Lobby</Button>
             </div>
           </aside>
         </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        {Object.values(EVENT_CONFIGS).map((eventConfig) => (
+          <article key={eventConfig.type} className="rt-panel-strong rounded-[24px] border border-white/10 p-5">
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
+              <CalendarDays className="h-4 w-4" />
+              Event Night
+            </div>
+            <h2 className="mt-3 text-2xl rt-page-title">{eventConfig.label}</h2>
+            <p className="mt-2 text-sm text-white/72">{eventConfig.handLimit} hands. Top stack wins.</p>
+            <p className="mt-1 text-sm text-amber-100/80">{eventConfig.tagline}</p>
+          </article>
+        ))}
       </section>
 
       <section className="space-y-4">

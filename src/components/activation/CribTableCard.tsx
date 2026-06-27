@@ -4,6 +4,7 @@ import { Table } from '../../types/game';
 import { Button } from '../ui/Button';
 import { getModeBadge, getModeDescription, getStakeDisplay, getTableDisplayName } from '../../branding/modeCopy';
 import { getTableMomentumMeta } from '../../utils/lobbyExperience';
+import { getCrownLine, getCribIdentity, getLightReputationTag } from '../../utils/cribIdentity';
 
 const toneClasses = {
   amber: 'border-amber-300/35 bg-amber-300/10 text-amber-100',
@@ -34,8 +35,12 @@ export const CribTableCard: React.FC<CribTableCardProps> = ({
 }) => {
   const stakeDisplay = getStakeDisplay(table.stake, table.mode);
   const momentum = getTableMomentumMeta(table);
+  const cribIdentity = getCribIdentity(table);
   const seatsRemaining = Math.max(0, table.maxPlayers - table.currentPlayerCount);
   const disabled = seatsRemaining <= 0;
+  const seatsOpenLabel = `${seatsRemaining}/${table.maxPlayers} seats open`;
+  const crownLine = getCrownLine(table);
+  const repTag = getLightReputationTag(table._id);
 
   return (
     <article
@@ -86,13 +91,13 @@ export const CribTableCard: React.FC<CribTableCardProps> = ({
           <span className="text-sm text-white/58">{stakeDisplay.unit}</span>
         </div>
 
-        <p className="mt-3 text-sm leading-6 text-white/66">{getModeDescription(table.mode)}</p>
+        <p className="mt-3 text-sm leading-6 text-white/76">{cribIdentity.vibe || getModeDescription(table.mode)}</p>
 
         <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
           <div className="flex items-center justify-between gap-3 text-sm text-white/72">
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-white/52" />
-              {table.currentPlayerCount}/{table.maxPlayers} seats
+              {seatsOpenLabel}
             </div>
             <div>{momentum.seatLabel}</div>
           </div>
@@ -112,6 +117,14 @@ export const CribTableCard: React.FC<CribTableCardProps> = ({
             <Flame className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-200/80" />
             <span>{momentum.detail}</span>
           </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full border border-amber-200/24 bg-amber-300/10 px-2.5 py-1 font-semibold text-amber-100">
+              {crownLine}
+            </span>
+            <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1 text-white/62">
+              {repTag}
+            </span>
+          </div>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-3">
@@ -121,7 +134,7 @@ export const CribTableCard: React.FC<CribTableCardProps> = ({
             onClick={() => onEnter(table)}
             variant={disabled ? 'secondary' : 'primary'}
           >
-            {disabled ? 'Crib Full' : ctaLabel || (emphasized ? 'Take This Seat' : 'Enter Crib')}
+            {disabled ? 'Crib Full' : ctaLabel || 'Take Seat'}
           </Button>
           {onInvite ? (
             <Button className="min-w-[160px] flex-1" variant="secondary" onClick={() => onInvite(table)}>
