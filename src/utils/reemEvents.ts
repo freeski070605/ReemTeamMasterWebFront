@@ -31,7 +31,10 @@ export type RoundReceipt = {
   cribName: string;
   winnerName: string;
   title: string;
+  playerNames: string[];
   reason: "REEM" | "DROP_WIN" | "BAD_DROP" | "LOW_SCORE" | "STOCK";
+  handType: string;
+  timestamp: number;
   score?: number;
   payoutRtc: number;
   receiptText: string;
@@ -120,16 +123,31 @@ export const buildRoundReceipt = (
             : "LOW_SCORE";
   const scoreLine = score === undefined ? null : `Score: ${score}`;
   const payoutLine = formatRoundDeltaAmount(payoutRtc, "RTC");
-  const receiptText = [title, `Won ${payoutLine}`, scoreLine, `Table: ${options.cribName}`, "Run it back?"]
+  const playerNames = state.players.map((player) => player.username);
+  const handType =
+    reason === "REEM"
+      ? "Reem win"
+      : reason === "DROP_WIN"
+        ? "Drop win"
+        : reason === "BAD_DROP"
+          ? "Bad drop"
+          : reason === "STOCK"
+            ? "Stock hand"
+            : "Round win";
+  const timestamp = state.lastAction?.timestamp ?? Date.now();
+  const receiptText = [title, `Won ${payoutLine}`, scoreLine, `Crib: ${options.cribName}`, handType, "Run it back?"]
     .filter(Boolean)
     .join("\n");
 
   return {
-    id: `${state.tableId}-${state.lastAction?.timestamp ?? Date.now()}`,
+    id: `${state.tableId}-${timestamp}`,
     cribName: options.cribName,
     winnerName,
     title,
+    playerNames,
     reason,
+    handType,
+    timestamp,
     score,
     payoutRtc,
     receiptText,

@@ -17,6 +17,9 @@ import TurnTimer from "../components/game/TurnTimer";
 import GameActions from "../components/game/GameActions";
 import RoundReceipt from "../components/game/RoundReceipt";
 import RtcParticleOverlay from "../components/game/RtcParticleOverlay";
+import { CribReceiptsPanel } from "../components/cribs/CribReceiptsPanel";
+import { EventRecapPanel, EventRecapPlayer } from "../components/cribs/EventRecapPanel";
+import { PlayerProfileCard } from "../components/cribs/PlayerProfileCard";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
 import { experienceFlags } from "../config/experienceFlags";
@@ -35,7 +38,9 @@ import {
 import { formatRTCAmount } from "../utils/rtcCurrency";
 import { getModeLabel, getStakeDisplay } from "../branding/modeCopy";
 import { getCribIdentity, getLightReputationTag } from "../utils/cribIdentity";
-import { buildRoundReceipt, EVENT_CONFIGS, getTableHypeMessage } from "../utils/reemEvents";
+import { buildRoundReceipt, EVENT_CONFIGS, getTableHypeMessage, RoundReceipt as RoundReceiptModel } from "../utils/reemEvents";
+import { buildEventInviteCopy, buildReceiptInviteCopy, tableToCrewCrib } from "../utils/crewCribs";
+import { shareOrCopy, copyTextWithFallback } from "../utils/share";
 import bgImage from '../assets/bg.png';
 import backCardImage from "../assets/cards/back.png";
 
@@ -233,6 +238,9 @@ const GameTable: React.FC = () => {
   const [activityTick, setActivityTick] = useState(0);
   const [tableMoment, setTableMoment] = useState<TableMoment | null>(null);
   const [completedEventHands, setCompletedEventHands] = useState(0);
+  const [receiptArchive, setReceiptArchive] = useState<RoundReceiptModel[]>([]);
+  const [eventStatsByPlayerId, setEventStatsByPlayerId] = useState<Record<string, EventRecapPlayer>>({});
+  const [dismissedEventRecapKey, setDismissedEventRecapKey] = useState<string | null>(null);
   const [showHandReorderHint, setShowHandReorderHint] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
@@ -550,6 +558,13 @@ const GameTable: React.FC = () => {
       }
     };
   }, [tableId, user, connect, disconnect, navigate, contestId, inviteCode, spectatorModeRequested, entrySource, quickPlayReason]);
+
+  useEffect(() => {
+    setCompletedEventHands(0);
+    setReceiptArchive([]);
+    setEventStatsByPlayerId({});
+    setDismissedEventRecapKey(null);
+  }, [tableId]);
 
   useEffect(() => {
     if (!tableId || joinSuccessTrackedRef.current || !user) {
@@ -1102,6 +1117,66 @@ const GameTable: React.FC = () => {
     if (countedRoundPresentationKeyRef.current !== roundPresentationSequenceKey) {
       countedRoundPresentationKeyRef.current = roundPresentationSequenceKey;
       setCompletedEventHands((count) => count + 1);
+
+      if (gameState) {
+        const identity = tableInfo
+          ? getCribIdentity(tableInfo)
+          : { name: "The Basement", vibe: "Fast hands. New players welcome.", crownFallback: "Crown open.", eventType: "friday_night_reem" as const };
+        const eventConfig = EVENT_CONFIGS[identity.eventType];
+        const winnerId = gameState.roundWinnerId ?? gameState.placements?.find((placement) => placement.rank === 1)?.userId;
+        const winner = winnerId ? gameState.players.find((player) => player.userId === winnerId) : null;
+        const winnerNet = winner ? getRoundNetForPlayer(gameState, winner.userId) : null;
+        const receipt = buildRoundReceipt(gameState, {
+          cribName: identity.name,
+          winnerName: winner?.username,
+          payoutRtc: winnerNet,
+        });
+
+        if (receipt) {
+          setReceiptArchive((current) => {
+            if (current.some((entry) => entry.id === receipt.id)) return current;
+            return [receipt, ...current].slice(0, 12);
+          });
+        }
+
+        setEventStatsByPlayerId((current) => {
+          const next = { ...current };
+          gameState.players.forEach((player) => {
+            const roundNet = getRoundNetForPlayer(gameState, player.userId) ?? 0;
+            const isWinner = player.userId === winnerId;
+            const previous = next[player.userId] ?? {
+              playerId: player.userId,
+              playerName: player.username,
+              handsPlayed: 0,
+              handsWon: 0,
+              reems: 0,
+              successfulDrops: 0,
+              failedDrops: 0,
+              biggestPayoutRtc: 0,
+              rtcBalance: playerBalances[player.userId] ?? eventConfig.startingStackRtc,
+              finalStackRtc: eventConfig.startingStackRtc,
+              netRtc: 0,
+            };
+
+            next[player.userId] = {
+              ...previous,
+              playerName: player.username,
+              handsPlayed: (previous.handsPlayed ?? 0) + 1,
+              handsWon: (previous.handsWon ?? 0) + (isWinner ? 1 : 0),
+              reems: (previous.reems ?? 0) + (isWinner && gameState.roundEndedBy === "REEM" ? 1 : 0),
+              successfulDrops:
+                (previous.successfulDrops ?? 0) +
+                (isWinner && gameState.roundEndedBy === "REGULAR" && gameState.lastAction?.type === "drop" && !gameState.lastAction?.payload?.caught ? 1 : 0),
+              failedDrops: (previous.failedDrops ?? 0) + (player.userId === gameState.caughtDroppingPlayerId ? 1 : 0),
+              biggestPayoutRtc: Math.max(previous.biggestPayoutRtc ?? 0, roundNet),
+              rtcBalance: playerBalances[player.userId] ?? previous.rtcBalance,
+              finalStackRtc: previous.finalStackRtc + roundNet,
+              netRtc: previous.netRtc + roundNet,
+            };
+          });
+          return next;
+        });
+      }
     }
     setEndRoundPhase("global");
 
@@ -1117,7 +1192,7 @@ const GameTable: React.FC = () => {
     return () => {
       clearEndRoundPhaseTimers();
     };
-  }, [clearEndRoundPhaseTimers, roundPresentationSequenceKey]);
+  }, [clearEndRoundPhaseTimers, gameState, playerBalances, roundPresentationSequenceKey, tableInfo]);
 
   useEffect(() => {
     if (gameState?.status !== "round-end") return;
@@ -1659,6 +1734,29 @@ const GameTable: React.FC = () => {
       };
     })
     .sort((a, b) => b.netRtc - a.netRtc);
+  const crewCrib = tableInfo ? tableToCrewCrib(tableInfo, receiptArchive) : null;
+  const eventRecapPlayers: EventRecapPlayer[] =
+    Object.keys(eventStatsByPlayerId).length > 0
+      ? Object.values(eventStatsByPlayerId)
+      : gameState.players.map((player) => ({
+          playerId: player.userId,
+          playerName: player.username,
+          handsPlayed: 0,
+          handsWon: 0,
+          reems: 0,
+          successfulDrops: 0,
+          failedDrops: 0,
+          biggestPayoutRtc: 0,
+          rtcBalance: playerBalances[player.userId] ?? activeEventConfig.startingStackRtc,
+          finalStackRtc: playerBalances[player.userId] ?? activeEventConfig.startingStackRtc,
+          netRtc: 0,
+        }));
+  const currentProfileStats =
+    eventRecapPlayers.find((player) => player.playerId === user._id) ??
+    eventRecapPlayers.find((player) => player.playerId === winnerPlayer?.userId) ??
+    null;
+  const biggestReceipt = [...receiptArchive].sort((a, b) => Math.abs(b.payoutRtc) - Math.abs(a.payoutRtc))[0];
+  const isEventRecapReady = gameState.status === "round-end" && completedEventHands >= activeEventConfig.handLimit;
   const roundReceipt = gameState.status === "round-end"
     ? buildRoundReceipt(gameState, {
         cribName: cribIdentity.name,
@@ -1666,14 +1764,35 @@ const GameTable: React.FC = () => {
         payoutRtc: winnerRoundNet,
       })
     : null;
+  const handleCopyArchiveReceipt = async (receipt: RoundReceiptModel) => {
+    const copied = await copyTextWithFallback(receipt.receiptText);
+    toast.success(copied ? "Receipt copied." : "Receipt ready.");
+  };
   const handleCopyReceipt = async () => {
     if (!roundReceipt) return;
-    try {
-      await navigator.clipboard.writeText(roundReceipt.receiptText);
-      toast.success("Receipt copied.");
-    } catch {
-      toast.info(roundReceipt.receiptText);
-    }
+    await handleCopyArchiveReceipt(roundReceipt);
+  };
+  const handleShareEventRecap = async () => {
+    const winner = [...eventRecapPlayers].sort((a, b) => b.finalStackRtc - a.finalStackRtc)[0];
+    const recapCopy = [
+      "Friday Night Reem Results",
+      `${activeEventConfig.handLimit} hands. Top stack owned the crib.`,
+      winner ? `Winner: ${winner.playerName} ${formatRoundDeltaAmount(winner.finalStackRtc, "RTC")}` : null,
+      "Crown stays until next week.",
+      buildEventInviteCopy(activeEventConfig.label, cribIdentity.name, activeEventConfig.handLimit),
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const result = await shareOrCopy({ title: "Friday Night Reem Results", text: recapCopy });
+    toast.success(result === "shared" ? "Recap shared." : result === "copied" ? "Recap copied." : "Recap ready.");
+  };
+  const handleShareReceiptInvite = async () => {
+    if (!roundReceipt) return;
+    const result = await shareOrCopy({
+      title: roundReceipt.title,
+      text: buildReceiptInviteCopy(roundReceipt),
+    });
+    toast.success(result === "shared" ? "Receipt shared." : result === "copied" ? "Receipt copied." : "Receipt ready.");
   };
   const waitingPlayerCount = Math.max(0, totalRoundPlayers - readyCount);
   const roundReadyProgress = totalRoundPlayers > 0 ? readyCount / totalRoundPlayers : 0;
@@ -2733,6 +2852,7 @@ const GameTable: React.FC = () => {
   };
 
   return (
+    <>
     <div className="relative overflow-hidden" style={{ height: "var(--app-height)" }}>
       <div className="absolute inset-0 z-0" aria-hidden>
         <div
@@ -3002,8 +3122,44 @@ const GameTable: React.FC = () => {
                               receipt={roundReceipt}
                               compact={isPhoneLandscapeLayout}
                               onCopy={handleCopyReceipt}
-                              onInvite={handleCreateInviteLink}
+                              onInvite={handleShareReceiptInvite}
                               onRunItBack={isContinuousMode && !isReadyForNextRound ? handlePutIn : undefined}
+                            />
+                          </motion.div>
+                        ) : null}
+                        {!isPhoneLandscapeLayout && isRoundEndSettlementPhase && currentProfileStats ? (
+                          <motion.div
+                            key={`profile-${currentProfileStats.playerId}-${roundPresentationKey}`}
+                            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                            transition={{ duration: 0.24, ease: "easeOut" }}
+                            className="w-full"
+                          >
+                            <PlayerProfileCard
+                              playerName={currentProfileStats.playerName}
+                              stats={{
+                                ...currentProfileStats,
+                                isCrownHolder: crewCrib?.crownHolder === currentProfileStats.playerName,
+                              }}
+                              compact
+                            />
+                          </motion.div>
+                        ) : null}
+                        {!isPhoneLandscapeLayout && isRoundEndSettlementPhase ? (
+                          <motion.div
+                            key={`receipt-archive-${roundPresentationKey}`}
+                            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                            transition={{ duration: 0.24, ease: "easeOut" }}
+                            className="w-full"
+                          >
+                            <CribReceiptsPanel
+                              receipts={receiptArchive}
+                              title={`${cribIdentity.name} Receipts`}
+                              compact
+                              onCopyReceipt={handleCopyArchiveReceipt}
                             />
                           </motion.div>
                         ) : null}
@@ -3502,6 +3658,48 @@ const GameTable: React.FC = () => {
         </div>
 
     </div>
+
+    <Modal
+      isOpen={inviteModalOpen}
+      onClose={() => setInviteModalOpen(false)}
+      onConfirm={() => {
+        if (inviteLink) {
+          void copyInviteLink(inviteLink);
+        }
+      }}
+      title="Invite Link Ready"
+      confirmLabel="Copy Link"
+    >
+      <div className="space-y-4">
+        <p>Pull your crew into this crib.</p>
+        <input
+          readOnly
+          value={inviteLink}
+          className="h-11 w-full rounded-xl border border-white/14 bg-black/35 px-3 text-sm text-white"
+        />
+        <p className="text-xs text-white/55">
+          Pull up to {cribIdentity.name} on ReemTeam. Seat open now.
+        </p>
+      </div>
+    </Modal>
+
+    <Modal
+      isOpen={isEventRecapReady && isRoundEndSettlementPhase && dismissedEventRecapKey !== roundPresentationKey}
+      onClose={() => setDismissedEventRecapKey(roundPresentationKey)}
+      onConfirm={handleShareEventRecap}
+      title="Friday Night Reem Results"
+      confirmLabel="Copy/Share Recap"
+    >
+      <EventRecapPanel
+        eventConfig={activeEventConfig}
+        cribName={cribIdentity.name}
+        players={eventRecapPlayers}
+        biggestHandLabel={biggestReceipt ? `${biggestReceipt.winnerName} ${formatRoundDeltaAmount(biggestReceipt.payoutRtc, "RTC")}` : undefined}
+        compact
+        onShare={handleShareEventRecap}
+      />
+    </Modal>
+    </>
   );
 };
 

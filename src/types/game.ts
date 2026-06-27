@@ -85,6 +85,15 @@ export interface Table {
   mode?: GameMode;
   activeContestId?: string;
   isPrivate?: boolean;
+  inviteCode?: string | null;
+  inviteSlug?: string | null;
+  members?: Array<{ userId: string; username?: string }>;
+  crownHolder?: string;
+  weeklyHandsPlayed?: number;
+  biggestReem?: string;
+  worstDrop?: string;
+  mostRtcWon?: string;
+  recentReceipts?: unknown[];
   isPromo?: boolean;
   createdBy?: string | null;
   hostNote?: string | null;

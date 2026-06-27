@@ -12,14 +12,17 @@ import { createPrivateTable, getMyPrivateTables, ManagedPrivateTable, quickSeat 
 import { createVipCheckout } from '../api/vip';
 import { getStakeDisplay, getTableDisplayName } from '../branding/modeCopy';
 import { CribTableCard } from '../components/activation/CribTableCard';
+import { CrewCribSummary } from '../components/cribs/CrewCribSummary';
 import { Button } from '../components/ui/Button';
 import { Loader } from '../components/ui/Loader';
 import { Modal } from '../components/ui/Modal';
 import { useAuthStore } from '../store/authStore';
 import { Table } from '../types/game';
 import { roleAtLeast } from '../types/roles';
+import { buildCribInviteCopy, tableToCrewCrib } from '../utils/crewCribs';
 import { buildGamePath } from '../utils/gamePath';
 import { EVENT_CONFIGS } from '../utils/reemEvents';
+import { shareOrCopy } from '../utils/share';
 
 type PrivateTableMode = 'FREE_RTC_TABLE' | 'PRIVATE_USD_TABLE';
 
@@ -137,6 +140,7 @@ const TableSelect: React.FC = () => {
   const liveTables = rtcTables.filter((table) => table.status === 'in-game').length;
   const openSeats = rtcTables.reduce((sum, table) => sum + Math.max(0, table.maxPlayers - table.currentPlayerCount), 0);
   const activePrivateStakeOptions = privateMode === 'PRIVATE_USD_TABLE' ? USD_STAKES : RTC_STAKES;
+  const featuredCrewCribs = useMemo(() => rtcTables.slice(0, 3).map((table) => tableToCrewCrib(table)), [rtcTables]);
 
   const copyText = async (text: string) => {
     try {
@@ -179,6 +183,11 @@ const TableSelect: React.FC = () => {
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to create invite.');
     }
+  };
+
+  const handleShareCribCopy = async (copy: string) => {
+    const result = await shareOrCopy({ title: 'Pull up to ReemTeam', text: copy });
+    toast.success(result === 'shared' ? 'Invite shared.' : result === 'copied' ? 'Crib invite copied.' : 'Invite text ready.');
   };
 
   const handlePrivateEntry = useCallback(async () => {
@@ -297,6 +306,32 @@ const TableSelect: React.FC = () => {
             <p className="mt-1 text-sm text-amber-100/80">{eventConfig.tagline}</p>
           </article>
         ))}
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-white/48">Permanent Crew Cribs</div>
+            <h2 className="mt-2 text-3xl rt-page-title">History lives here.</h2>
+          </div>
+          <Button variant="secondary" onClick={() => featuredCrewCribs[0] && void handleShareCribCopy(buildCribInviteCopy(featuredCrewCribs[0]))}>
+            Copy Crib Link
+          </Button>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-3 md:grid-cols-2">
+          {featuredCrewCribs.map((crib) => {
+            const table = rtcTables.find((candidate) => candidate._id === crib.id);
+            return (
+              <CrewCribSummary
+                key={crib.id}
+                crib={crib}
+                onTakeSeat={table ? () => handleEnterTable(table, 'crew-crib-summary') : undefined}
+                onInvite={handleShareCribCopy}
+                onViewReceipts={() => toast.info('Receipts unlock after hands finish at the crib.')}
+              />
+            );
+          })}
+        </div>
       </section>
 
       <section className="space-y-4">

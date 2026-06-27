@@ -138,7 +138,7 @@ export const CribTableCard: React.FC<CribTableCardProps> = ({
           </Button>
           {onInvite ? (
             <Button className="min-w-[160px] flex-1" variant="secondary" onClick={() => onInvite(table)}>
-              Invite Friends
+              Invite Crew
             </Button>
           ) : null}
         </div>
