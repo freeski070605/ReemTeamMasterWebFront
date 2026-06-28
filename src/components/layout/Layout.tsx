@@ -46,6 +46,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       ];
       if (user?.role && hasAdminTabAccess(user.role)) {
         links.push({ to: '/admin', label: 'Admin' });
+        links.push({ to: '/admin/events', label: 'Event Admin' });
       }
       return links;
     },

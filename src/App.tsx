@@ -20,12 +20,18 @@ import TableSelect from './pages/TableSelect';
 import ContestLobby from './pages/ContestLobby';
 import GameTable from './pages/GameTable';
 import Admin from './pages/Admin';
+import AdminEvents from './pages/AdminEvents';
+import AdminEventDetail from './pages/AdminEventDetail';
+import AdminEventEdit from './pages/AdminEventEdit';
+import AdminEventRecap from './pages/AdminEventRecap';
 import Account from './pages/Account';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import UserDataDeletion from './pages/UserDataDeletion';
 import HowToPlay from './pages/HowToPlay';
 import Invite from './pages/Invite';
+import EventJoin from './pages/EventJoin';
+import EventResults from './pages/EventResults';
 
 const WalletRedirect: React.FC = () => {
   const location = useLocation();
@@ -71,6 +77,8 @@ const App: React.FC = () => {
           <Route path="/data-deletion" element={<UserDataDeletion />} />
           <Route path="/how-to-play" element={<HowToPlay />} />
           <Route path="/invite/:code" element={<Invite />} />
+          <Route path="/events/:slug" element={<EventJoin />} />
+          <Route path="/events/:slug/results" element={<EventResults />} />
           
           <Route element={<ProtectedRoute />}>
             <Route path="/quick-play" element={<QuickPlay />} />
@@ -84,6 +92,11 @@ const App: React.FC = () => {
 
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/events" element={<AdminEvents />} />
+            <Route path="/admin/events/new" element={<AdminEventEdit />} />
+            <Route path="/admin/events/:eventId" element={<AdminEventDetail />} />
+            <Route path="/admin/events/:eventId/edit" element={<AdminEventEdit />} />
+            <Route path="/admin/events/:eventId/recap" element={<AdminEventRecap />} />
           </Route>
           
           <Route path="*" element={<Navigate to="/" replace />} />

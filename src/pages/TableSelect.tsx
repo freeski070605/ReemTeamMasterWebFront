@@ -28,6 +28,11 @@ type PrivateTableMode = 'FREE_RTC_TABLE' | 'PRIVATE_USD_TABLE';
 
 const RTC_STAKES = [1, 5, 10, 25, 50];
 const USD_STAKES = [5, 10, 20, 50, 100];
+const EVENT_SLUG_BY_TYPE = {
+  quick_smoke: 'quick-smoke-late-table',
+  friday_night_reem: 'friday-night-reem',
+  crown_room: 'crown-room-invite',
+} as const;
 
 const TableSelect: React.FC = () => {
   const navigate = useNavigate();
@@ -304,6 +309,9 @@ const TableSelect: React.FC = () => {
             <h2 className="mt-3 text-2xl rt-page-title">{eventConfig.label}</h2>
             <p className="mt-2 text-sm text-white/72">{eventConfig.handLimit} hands. Top stack wins.</p>
             <p className="mt-1 text-sm text-amber-100/80">{eventConfig.tagline}</p>
+            <Link to={`/events/${EVENT_SLUG_BY_TYPE[eventConfig.type]}`}>
+              <Button size="sm" variant="secondary" className="mt-4">Open Event</Button>
+            </Link>
           </article>
         ))}
       </section>
