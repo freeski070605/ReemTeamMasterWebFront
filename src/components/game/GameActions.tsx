@@ -8,36 +8,24 @@ interface ActionState {
 }
 
 interface GameActionsProps {
-  drawDeck?: ActionState;
-  drawDiscard?: ActionState;
   drop: ActionState;
   spread: ActionState;
   hit: ActionState;
-  discard?: ActionState;
-  onDrawDeck?: () => void;
-  onDrawDiscard?: () => void;
   onDrop: () => void;
   onSpread: () => void;
   onHit: () => void;
-  onDiscard?: () => void;
   orientation?: "horizontal" | "vertical";
   layout?: "default" | "mobile-dock" | "side-stack";
   hideDisabled?: boolean;
 }
 
 const GameActions: React.FC<GameActionsProps> = ({
-  drawDeck,
-  drawDiscard,
   drop,
   spread,
   hit,
-  discard,
-  onDrawDeck,
-  onDrawDiscard,
   onDrop,
   onSpread,
   onHit,
-  onDiscard,
   orientation = "horizontal",
   layout = "default",
   hideDisabled = false,
@@ -46,7 +34,7 @@ const GameActions: React.FC<GameActionsProps> = ({
     layout === "mobile-dock"
       ? "grid w-full grid-cols-3 gap-1.5"
       : layout === "side-stack"
-        ? "grid w-full grid-cols-2 gap-1.5"
+        ? "flex w-full flex-col gap-1.5"
         : orientation === "vertical"
         ? "flex flex-col gap-1.5"
         : "flex flex-wrap justify-center gap-1.5";
@@ -75,7 +63,7 @@ const GameActions: React.FC<GameActionsProps> = ({
           size="sm"
           className={
             `${layout === "mobile-dock" ? "h-9 w-full rounded-full px-2 text-[11px] uppercase tracking-[0.18em]" : ""}${
-              layout === "side-stack" ? "h-8 w-full rounded-[14px] px-1.5 text-[8px] font-semibold uppercase tracking-[0.08em]" : ""
+              layout === "side-stack" ? "h-8 w-full rounded-[15px] px-2 text-[9px] font-semibold uppercase tracking-[0.14em]" : ""
             } ${
               layout === "default" ? "h-8 rounded-full px-3 text-[10px] uppercase tracking-[0.18em]" : ""
             } ${
@@ -98,12 +86,9 @@ const GameActions: React.FC<GameActionsProps> = ({
 
   return (
     <div className={layoutClass}>
-      {drawDeck && onDrawDeck && (!hideDisabled || drawDeck.enabled) ? renderAction("Draw Deck", drawDeck, onDrawDeck) : null}
-      {drawDiscard && onDrawDiscard && (!hideDisabled || drawDiscard.enabled) ? renderAction("Draw Discard", drawDiscard, onDrawDiscard) : null}
       {!hideDisabled || drop.enabled ? renderAction("Drop", drop, onDrop) : null}
       {!hideDisabled || spread.enabled ? renderAction("Spread", spread, onSpread) : null}
       {!hideDisabled || hit.enabled ? renderAction("Hit", hit, onHit) : null}
-      {discard && onDiscard && (!hideDisabled || discard.enabled) ? renderAction("Discard", discard, onDiscard) : null}
     </div>
   );
 };

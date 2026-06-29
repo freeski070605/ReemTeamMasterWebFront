@@ -2098,21 +2098,6 @@ const GameTable: React.FC = () => {
       : "h-[4.4rem] w-[3.05rem] sm:h-[4.75rem] sm:w-[3.3rem]",
   };
   const dropLockTurnsRemaining = currentPlayer?.hitLockCounter ?? 0;
-  const drawDeckDisabledReason = !isMyTurn
-    ? "Wait for your turn."
-    : hasDrawnThisTurn
-      ? "Draw is already done."
-      : gameState.deck.length <= 0
-        ? "Deck is empty."
-        : undefined;
-  const drawDiscardDisabledReason = !isMyTurn
-    ? "Wait for your turn."
-    : hasDrawnThisTurn
-      ? "Draw is already done."
-      : gameState.discardPile.length <= 0
-        ? "Discard pile is empty."
-        : undefined;
-
   const canDrop = !!(
     isMyTurn &&
     !hasDrawnThisTurn &&
@@ -2157,35 +2142,6 @@ const GameTable: React.FC = () => {
       : selectedCards.length === 1
         ? undefined
         : "Select exactly 1 card.";
-  const canDiscard = !!(
-    isMyTurn &&
-    hasDrawnThisTurn &&
-    !hasDiscardedThisTurn &&
-    selectedCards.length === 1 &&
-    !selectedIllegalDiscardCard
-  );
-  const discardDisabledReason = !isMyTurn
-    ? "Wait for your turn."
-    : !hasDrawnThisTurn
-      ? "Draw first."
-      : hasDiscardedThisTurn
-        ? "Turn already ended."
-        : selectedCards.length !== 1
-          ? "Select 1 card."
-          : selectedIllegalDiscardCard
-            ? "Cannot discard pickup."
-            : undefined;
-  const activeInstruction = isRoundEnd
-    ? roundRailStatusLabel
-    : isHitMode
-      ? "Your move: choose a spread to hit"
-      : isMyTurn
-        ? isDiscardStep
-          ? "Your move: discard 1 card"
-          : canDrop
-            ? "Your move: draw from deck or discard. Drop is available."
-            : "Your move: draw from deck or discard"
-        : `${activeTurnPlayerName} is up`;
 
   const getTurnStatus = (playerUserId: string, isSelfPanel = false): TurnStatusBadge => {
     if (!activeTurnPlayer || activeTurnPlayer.userId !== playerUserId) {
@@ -3295,21 +3251,8 @@ const GameTable: React.FC = () => {
                       }
                     >
                       {showBottomActionDock ? (
-                        <div className="rounded-[22px] border border-white/12 bg-black/24 p-1.5 shadow-[0_14px_28px_rgba(0,0,0,0.22)] backdrop-blur-[6px]">
-                          <div className={`${isPhoneLandscapeLayout ? "px-1 pb-1 text-[9px]" : "px-1.5 pb-1.5 text-[10px]"} font-semibold leading-tight text-amber-50`}>
-                            {activeInstruction}
-                          </div>
+                        <div className="rounded-[22px] border border-white/12 bg-black/18 p-1.5 shadow-[0_14px_28px_rgba(0,0,0,0.22)] backdrop-blur-[4px]">
                           <GameActions
-                            drawDeck={{
-                              enabled: canDrawFromDeck,
-                              reason: canDrawFromDeck ? undefined : drawDeckDisabledReason,
-                              isPrimary: canDrawFromDeck,
-                            }}
-                            drawDiscard={{
-                              enabled: canDrawFromDiscard,
-                              reason: canDrawFromDiscard ? undefined : drawDiscardDisabledReason,
-                              isPrimary: canDrawFromDiscard,
-                            }}
                             drop={{
                               enabled: canDrop,
                               reason: canDrop ? undefined : dropDisabledReason,
@@ -3325,19 +3268,12 @@ const GameTable: React.FC = () => {
                               reason: canHit ? undefined : hitDisabledReason,
                               isPrimary: canHit,
                             }}
-                            discard={{
-                              enabled: canDiscard,
-                              reason: canDiscard ? undefined : discardDisabledReason,
-                              isPrimary: canDiscard,
-                            }}
-                            onDrawDeck={handleDeckClick}
-                            onDrawDiscard={handleDiscardPileClick}
                             onDrop={handleDrop}
                             onSpread={handleSpread}
                             onHit={handleHitClick}
-                            onDiscard={discardSelectedCard}
                             orientation="vertical"
                             layout="side-stack"
+                            hideDisabled
                           />
                         </div>
                       ) : null}
